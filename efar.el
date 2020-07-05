@@ -127,7 +127,7 @@
     
     (puthash :reset-status? nil efar-state)
 
-    (puthash :dir-history (make-hash-table :test `equal) efar-state)
+    (puthash :directory-history (make-hash-table :test `equal) efar-state)
     
     (efar-set-keys)
     
@@ -745,11 +745,11 @@ Notifications in the queue will be processed only if there are no new notificati
   
   (local-set-key (kbd "<M-f1>") (lambda ()
 				  (interactive)
-				  (efar-read-directory :left)))
+				  (efar-change-directory :left)))
   
   (local-set-key (kbd "<M-f2>") (lambda ()
 				  (interactive)
-				  (efar-read-directory :right)))
+				  (efar-change-directory :right)))
   
   (local-set-key (kbd "<C-f1>") (lambda ()
 				  (interactive)
@@ -1026,8 +1026,6 @@ If a double mode is active then actual panel becomes fullscreen."
     (when (eq side (gethash :current-panel efar-state))
       (setf default-directory dir))
     
-    ;; (efar-set-value :last-dir dir side)
-    
     (efar-set-value :selected ()  side)
     (efar-set-value :dir dir side)
     
@@ -1046,6 +1044,8 @@ If a double mode is active then actual panel becomes fullscreen."
     
     (let ((disk (concat (car (split-string dir "/")) "/")))
       (puthash disk dir (gethash :last-dir efar-state) ))
+
+    (puthash (efar-get-root-directory dir) dir (gethash :directory-history efar-state))
     
     (efar-setup-notifier dir side)))
 
@@ -1111,17 +1111,17 @@ If a double mode is active then actual panel becomes fullscreen."
 
 
 
-(defun efar-read-directory(side)
-  ""
-  
+(defun efar-change-directory(side)
+  "Show menu with available disks (Windows) or mount points (Unix) (*ToDo*).
+Selected item bacomes actual for panel SIDE."
   (let ((dir (concat
 	      (ido-completing-read "Change disk to: "
 				   (nconc (when (eq window-system 'w32)
 					    (mapcar (lambda(e) (car (split-string e " " t)))
-						    (cdr (split-string  (shell-command-to-string "wmic LogicalDisk get Caption")
+						    (cdr (split-string  (downcase (shell-command-to-string "wmic LogicalDisk get Caption"))
 									"\r\n" t))))
-					  (list "Manual"))
-				   ) "/")))
+					  (list "Manual")))
+	      "/")))
     
     (when dir 
       
@@ -1131,10 +1131,8 @@ If a double mode is active then actual panel becomes fullscreen."
       (setf dir
 	    (or (gethash dir (gethash :last-dir efar-state))
 		dir))
-      
-      
-      (efar-go-to-dir dir side)
-      
+
+      (efar-go-to-dir (or (gethash dir (gethash :directory-history efar-state)) dir) side)
       
       (efar-write-enable (efar-redraw)))))
 
@@ -1857,3 +1855,17 @@ If a double mode is active then actual panel becomes fullscreen."
 (add-hook 'kill-buffer-hook 'efar-buffer-killed)
 
 (add-hook 'kill-emacs-hook 'efar-emacs-killed)
+
+(defun efar-get-root-directory(path)
+  "Returns a root directory for given PATH."
+  ;; get parent directory
+  (let ((parent-dir
+	 (file-name-directory
+	  (directory-file-name path))))
+    ;; if we are in root directory already
+    (if (string= parent-dir path)
+	path
+      ;; otherwise check parent directory
+      (efar-get-root-directory parent-dir ))))
+  
+  
