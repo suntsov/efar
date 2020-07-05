@@ -126,6 +126,9 @@
     (puthash :status :ready efar-state)
     
     (puthash :reset-status? nil efar-state)
+
+    (puthash :dir-history (make-hash-table :test `equal) efar-state)
+    
     (efar-set-keys)
     
     (efar-go-to-dir (efar-get-value :dir :left) :left)
@@ -1822,7 +1825,7 @@ If a double mode is active then actual panel becomes fullscreen."
 
 
 (defun efar-frame-size-changed(frame)
-  ""
+  "Function called when frame size changes. Redraws entire eFar buffer."
   (when (get-buffer-window efar-buffer-name)
     (efar-calculate-window-size)
     (efar-calculate-widths)
