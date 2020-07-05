@@ -1822,7 +1822,7 @@ If a double mode is active then actual panel becomes fullscreen."
 
 
 (defun efar-frame-size-changed(frame)
-  ""
+  "Function called when frame size changes. Redraws entire eFar buffer."
   (when (get-buffer-window efar-buffer-name)
     (efar-calculate-window-size)
     (efar-calculate-widths)
