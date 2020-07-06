@@ -1,5 +1,3 @@
-(setq debug-on-error t) 
-
 (require 'cl)
 (require 'ido)
 (require 'tramp)
@@ -13,30 +11,37 @@
 (defconst efar-save-state? nil)
 
 (defun efar(arg)
-  ""
+  "Main funtion to run eFar commander.
+If the function called with prefix argument, then go to default-directory of current buffer."
   (interactive "P")
   
-  (let ((need-init? (not (get-buffer efar-buffer-name)))
-	(b (get-buffer-create efar-buffer-name))
-	(go-to-dir (when arg
+  (let(
+       ;; if eFar buffer doesn't exist, we need to do initialisation
+       (need-init? (not (get-buffer efar-buffer-name)))
+       ;; get existing or create new eFar buffer
+       (efar-buffer (get-buffer-create efar-buffer-name))
+       ;; if eFar is called with prefix argument, then go to default-directory of current buffer
+       (go-to-dir (when arg
 		     default-directory)))
     
-    (with-current-buffer b
-      
+    (with-current-buffer efar-buffer
+      ;; make eFar buffer fullscreen
       (delete-other-windows)
-      
+
+      ;; do initialisation if necessary and redraw the content of the buffer
       (when need-init?
 	(efar-init)
 	(efar-calculate-window-size)
 	(efar-calculate-widths)
 	(efar-write-enable
 	 (efar-redraw)))
-      
+
+      ;; go to default-directory of current buffer if function is called with prefix argument
       (when go-to-dir
 	(efar-go-to-dir go-to-dir :left)
 	(efar-write-enable (efar-redraw))))
     
-    (switch-to-buffer b)))
+    (switch-to-buffer efar-buffer)))
 
 
 (defun efar-init()
