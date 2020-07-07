@@ -12,6 +12,10 @@
 (defconst efar-default-startup-dirs (cons user-emacs-directory  user-emacs-directory))
 (defconst efar-save-state? t)
 
+(when (eq window-system 'w32)
+  (set-default 'tramp-auto-save-directory "C:\test")
+  (set-default 'tramp-default-method "plink"))
+
 (defun efar(arg)
   "Main funtion to run eFar commander.
 If the function called with prefix argument, then go to default-directory of current buffer."
@@ -58,7 +62,8 @@ If the function called with prefix argument, then go to default-directory of cur
   (when (and
 	 efar-save-state?
 	 (file-exists-p efar-state-file-name))
-    (setf efar-state (efar-read-state)))
+    (setf efar-state (efar-read-state))
+    (efar-set-status :ready (concat "eFar state loaded from file " efar-state-file-name) nil t))
   
   ;; if eFAR state cannot be restored from file (missing or broken file) or saving/restoring of state is disabled
   ;; then initialize state storage with default values
@@ -333,11 +338,6 @@ Notifications in the queue will be processed only if there are no new notificati
     (cl-assert (eq (point) (point-min)))
     (read (current-buffer))))
 
-(when (eq window-system 'w32)
-  (set-default 'tramp-auto-save-directory "C:\test")
-  (set-default 'tramp-default-method "plink"))
-
-
 ;;------------------------------------------------------------------
 ;; efar file operations
 ;;------------------------------------------------------------------
@@ -604,24 +604,24 @@ Notifications in the queue will be processed only if there are no new notificati
   (sit-for 0.001))
 
 (defun efar-set-keys()
-  ""
+  "Set up local key bindings"
   
+;; ToDo: implement mouse interaction
+;;  (local-set-key (kbd "<down-mouse-1>")
+;;		 (lambda (event)
+;;		   (interactive "e")
+;;		   (if (<  (car (nth 6 (nth 1 event))) (+ 2 (efar-get :panel-width) ))
+;;		       (progn
+;;			 (efar-set :left :current-panel)
+;;			 (efar-set default-directory :panels :left :dir))
+;;		     
+;;		     (progn
+;;		       (efar-set :right :current-panel)
+;;		       (efar-set default-directory :panels :right :dir))
+;;		     )
+;;		   (efar-write-enable (efar-redraw))))
   
-  (local-set-key (kbd "<down-mouse-1>")
-		 (lambda (event)
-		   (interactive "e")
-		   (if (<  (car (nth 6 (nth 1 event))) (+ 2 (efar-get :panel-width) ))
-		       (progn
-			 (efar-set :left :current-panel)
-			 (efar-set default-directory :panels :left :dir))
-		     
-		     (progn
-		       (efar-set :right :current-panel)
-		       (efar-set default-directory :panels :right :dir))
-		     )
-		   (efar-write-enable (efar-redraw))))
-  
-  
+  ;; set up fast-search keys 
   (let ((characters (list
 		     ?a ?b ?c ?d ?e ?f ?g ?h ?i ?j ?k ?l ?m ?n ?o ?p ?q ?r ?s ?t ?u ?v ?w ?x ?y ?z
 		     ?A ?B ?C ?D ?E ?F ?G ?H ?I ?J ?K ?L ?M ?N ?O ?P ?Q ?R ?S ?T ?U ?V ?W ?X ?Y ?Z
@@ -646,22 +646,24 @@ Notifications in the queue will be processed only if there are no new notificati
   (local-set-key (kbd "C-b") (lambda ()
 			       (interactive)
 			       (efar-fast-search :prev)))
-  
-  
+
+  ;; set up key to open terminal window
   (local-set-key (kbd "C-o") (lambda () 
 			       (interactive)
 			       (efar-display-console)))
   
   
-  
+  ;; set up key to mark file
   (local-set-key (kbd "<insert>") (lambda () 
 				    (interactive)
 				    (efar-mark-file)))
-  
-  (local-set-key (kbd "<f12>") (lambda () 
+
+  ;; set up key to reinit eFar
+  (local-set-key (kbd "<f12> <f12>") (lambda () 
 				 (interactive) 
 				 (efar-init)))
-  
+
+  ;; set up keys intended to move cursor
   (local-set-key (kbd "<down>") (lambda () 
 				  (interactive)
 				  (efar-move-cursor  :down)))
@@ -670,12 +672,10 @@ Notifications in the queue will be processed only if there are no new notificati
 				(interactive)
 				(efar-move-cursor  :up)))
   
-  ;; ToDo improve performance by changing face for affected lines only    
   (local-set-key (kbd "<right>") (lambda () 
 				   (interactive)
 				   (efar-move-cursor  :right)))
   
-  ;; ToDo improve performance by changing face for affected lines only    
   (local-set-key (kbd "<left>") (lambda () 
 				  (interactive)
 				  (efar-move-cursor  :left)))
@@ -695,75 +695,57 @@ Notifications in the queue will be processed only if there are no new notificati
   (local-set-key (kbd "C-<right>") (lambda () 
 				     (interactive)
 				     (efar-move-cursor  :end)))
-  
+
+  ;; set up key to enter directory
   (local-set-key (kbd "RET") (lambda () 
 			       (interactive)
-			       (efar-write-enable			
-				(let* ((side (efar-get :current-panel))				       
-				       (start-file-number (efar-get :panels side :start-file-number))
-				       (file-number (+ start-file-number (efar-get :panels side :current-pos)))
-				       (file (nth file-number (efar-get :panels side :files)))
-				       (current-dir-path (efar-get :panels side :dir)))
-				  
-				  (when (car (cdr file))
-				    (let ((newdir (file-name-as-directory (expand-file-name (car file) current-dir-path))))
-				      (cond
-				       ((not (file-accessible-directory-p  newdir))
-					(efar-set-status :ready (concat "Directory "  newdir " is not accessible") 3))
-				       
-				       (t				
-					(progn
-					  (efar-go-to-dir newdir side)
-					  (efar-redraw))))))))))
-  
+			       (efar-enter-directory)))
+
+  ;; set up key to switch the current panel
   (local-set-key (kbd "TAB") (lambda () 
 			       (interactive)
-			       (when (equal (efar-get :mode) :both)
-				 (efar-write-enable
-				  (let ((side (efar-get :current-panel)))
-				    (if (equal side  :left)
-					(progn
-					  (efar-set :right :current-panel)
-					  (setf default-directory (efar-get :panels :right :dir)))
-				      (progn
-					(efar-set :left :current-panel)
-					(setf default-directory (efar-get :panels :left :dir)))))
-				  (efar-redraw)))))
-  
-  
+			       (efar-switch-to-other-panel)))
+   
+  ;; set up key to open same directory in other panel
   (local-set-key (kbd "C-c TAB") (lambda ()
 				   (interactive)
 				   (efar-open-same-directory-other-panel)))
-  
+
+  ;; set up key to edit file
   (local-set-key (kbd "<f4>") (lambda () 
 				(interactive)
 				(efar-edit-file)))
-  
+
+  ;; set up key to open file in external app
   (local-set-key (kbd "<M-f4>") (lambda () 
 				  (interactive)
 				  (efar-open-file-in-external-app)))
-  
+
+  ;; set up key to copy files
   (local-set-key (kbd "<f5>") (lambda () 
 				(interactive)
 				(efar-copy-or-move-files :copy)))
-  
+
+  ;; set up key to move/rename files
   (local-set-key (kbd "<f6>") (lambda () 
 				(interactive)
 				(efar-copy-or-move-files :move)))
   
-  
+  ;; set up key to unmark all marked files
   (local-set-key (kbd "<C-insert>") (lambda () 
 				      (interactive)
 				      (efar-deselect-all)))
-  
+
+  ;; set up keys to change disk/mount point
   (local-set-key (kbd "<M-f1>") (lambda ()
 				  (interactive)
 				  (efar-change-directory :left)))
-  
+
   (local-set-key (kbd "<M-f2>") (lambda ()
 				  (interactive)
 				  (efar-change-directory :right)))
-  
+
+  ;; set up keys to change sort algorythm
   (local-set-key (kbd "<C-f1>") (lambda ()
 				  (interactive)
 				  (efar-change-sort-function :left)))
@@ -771,20 +753,23 @@ Notifications in the queue will be processed only if there are no new notificati
   (local-set-key (kbd "<C-f2>") (lambda ()
 				  (interactive)
 				  (efar-change-sort-function :right)))
-  
-  (local-set-key (kbd "<M-f7>") (lambda ()
-				  (interactive)
-				  (efar-start-search)))
-  
-  
+
+;;  ;; set up key to run search
+;;  (local-set-key (kbd "<M-f7>") (lambda ()
+;;				  (interactive)
+;;				  (efar-start-search)))
+ 
+  ;; set up key to create directory
   (local-set-key (kbd "<f7>") (lambda ()
 				(interactive)
 				(efar-create-new-directory)))
-  
+
+  ;; set up key to delete selected files
   (local-set-key (kbd "<f8>") (lambda ()
 				(interactive)
 				(efar-delete-selected)))
-  
+
+  ;; set up keys to change filtering in current directory
   (local-set-key (kbd "<S-f1>") (lambda()
 				  (interactive)
 				  (efar-filter-files :left)))
@@ -792,12 +777,13 @@ Notifications in the queue will be processed only if there are no new notificati
   (local-set-key (kbd "<S-f2>") (lambda()
 				  (interactive)
 				  (efar-filter-files :right)))
-  
+
+  ;; set up key to change mode :double <-> :single
   (local-set-key (kbd "<f11>") (lambda()
 				 (interactive)
 				 (efar-change-mode)))
   
-  
+  ;; set up keys to change column number
   (local-set-key (kbd "C-c +") (lambda()
 				 (interactive)
 				 (efar-change-column-number t)))
@@ -805,18 +791,20 @@ Notifications in the queue will be processed only if there are no new notificati
   (local-set-key (kbd "C-c -") (lambda()
 				 (interactive)
 				 (efar-change-column-number nil)))
-  
+
+  ;; set up key to copy current file path
   (local-set-key (kbd "<f10>") (lambda()
 				 (interactive)
 				 (efar-copy-current-path)))
+
+  ;; set up key to change directory "manually"
   (local-set-key (kbd "C-c C-d") (lambda()
 				  (interactive)
 				  (efar-cd)
-				  ))
-  )
+				  )))
 
 (defun efar-cd()
-  ""
+  "Open directory selector (read-diretory-name) and go to selected directory."
   (efar-go-to-dir (read-directory-name "Go to directory: " default-directory))
   (efar-write-enable (efar-redraw)))
 
@@ -1347,6 +1335,41 @@ Selected item bacomes actual for panel SIDE."
      
      (efar-output-file-details side))))
 
+
+(defun efar-enter-directory()
+  "Enter directory under cursor"
+  (efar-write-enable			
+   (let* ((side (efar-get :current-panel))				       
+	  (start-file-number (efar-get :panels side :start-file-number))
+	  (file-number (+ start-file-number (efar-get :panels side :current-pos)))
+	  (file (nth file-number (efar-get :panels side :files)))
+	  (current-dir-path (efar-get :panels side :dir)))
+     
+     (when (car (cdr file))
+       (let ((newdir (file-name-as-directory (expand-file-name (car file) current-dir-path))))
+	 (cond
+	  
+	  ((not (file-accessible-directory-p  newdir))
+	   (efar-set-status :ready (concat "Directory "  newdir " is not accessible") 3))
+	  
+	  (t				
+	   (progn
+	     (efar-go-to-dir newdir side)
+	     (efar-redraw)))))))))
+
+(defun efar-switch-to-other-panel()
+  "Make other panel active."
+  (when (equal (efar-get :mode) :both)
+    (efar-write-enable
+     (let ((side (efar-get :current-panel)))
+       (if (equal side  :left)
+	   (progn
+	     (efar-set :right :current-panel)
+	     (setf default-directory (efar-get :panels :right :dir)))
+	 (progn
+	   (efar-set :left :current-panel)
+	   (setf default-directory (efar-get :panels :left :dir)))))
+     (efar-redraw))))
 
 (defun efar-calculate-window-size()
   ""
