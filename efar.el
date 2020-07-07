@@ -1,3 +1,5 @@
+(setq debug-on-error t)
+
 (require 'cl)
 (require 'ido)
 (require 'tramp)
@@ -8,7 +10,7 @@
 (defconst efar-buffer-name "*eFAR*")
 (defvar efar-state nil)
 (defconst efar-default-startup-dirs (cons user-emacs-directory  user-emacs-directory))
-(defconst efar-save-state? nil)
+(defconst efar-save-state? t)
 
 (defun efar(arg)
   "Main funtion to run eFar commander.
@@ -61,84 +63,65 @@ If the function called with prefix argument, then go to default-directory of cur
   ;; if eFAR state cannot be restored from file (missing or broken file) or saving/restoring of state is disabled
   ;; then initialize state storage with default values
   (when (null efar-state)
+    (efar-init-state))
     
-    (setf efar-state (make-hash-table :test `equal))  
-    
-    (puthash :panel-left (make-hash-table :test `equal) efar-state)
-    (puthash :panel-right (make-hash-table :test `equal) efar-state)
-    
-    
-    (puthash :panels (make-hash-table :test `equal) efar-state)
-    (puthash :left (make-hash-table :test `equal) (gethash :panels efar-state))
-    (puthash :right (make-hash-table :test `equal) (gethash :panels efar-state))
-    
-					;(puthash 
-    (puthash :dir (car efar-default-startup-dirs) (gethash :left (gethash :panels efar-state)))
-    (puthash :dir (cdr efar-default-startup-dirs) (gethash :right (gethash :panels efar-state)))
-    
-    (setf default-directory (car efar-default-startup-dirs))
-    
-    (puthash :current-panel :left efar-state)
-    
-    (puthash :current-pos 0 (gethash :left (gethash :panels efar-state)))
-    (puthash :current-pos 0 (gethash :right (gethash :panels efar-state)))
-    
-    (puthash :selected () (gethash :left (gethash :panels efar-state)))
-    (puthash :selected () (gethash :right (gethash :panels efar-state)))
-    
-    (puthash :start-file-number 0 (gethash :left (gethash :panels efar-state)))
-    (puthash :start-file-number 0 (gethash :right (gethash :panels efar-state)))
-    
-    (puthash :fast-search-string "" efar-state)
-    (puthash :fast-search-timer nil efar-state)
-    
-    (puthash :notification-timer nil efar-state)
-    
-    (puthash :fast-search-occur 0 efar-state)
-    
-    (puthash :file-filter "" (gethash :left (gethash :panels efar-state)))
-    (puthash :file-filter "" (gethash :right (gethash :panels efar-state)))
-    
-    (puthash :file-notifier nil (gethash :left (gethash :panels efar-state)))
-    (puthash :file-notifier nil (gethash :right (gethash :panels efar-state)))
-    
-    (puthash :pending-notifications () efar-state)
-    
-    (puthash :sort-order nil (gethash :left (gethash :panels efar-state)))
-    (puthash :sort-order nil (gethash :right (gethash :panels efar-state)))
-    
-    (puthash :sort-function-name "Name" (gethash :left (gethash :panels efar-state)))
-    (puthash :sort-function-name "Name" (gethash :right (gethash :panels efar-state)))
-    
-    (puthash :search-processes '() efar-state)
-    
-    (puthash :search-files-to-process 0 efar-state)
-    
-    (puthash :search-results (make-hash-table :test `equal) efar-state)
-    (puthash :search-running? nil efar-state)
-    
-    (puthash :last-dir (make-hash-table :test `equal) efar-state)
-    
-    (puthash :mode :both efar-state)
-    
-    (puthash :column-number 3 (gethash :left (gethash :panels efar-state)))
-    (puthash :column-number 2 (gethash :right (gethash :panels efar-state)))
-    
-    (puthash :column-widths nil efar-state)
-    
-    (puthash :status-string "Ready" efar-state)
-    
-    (puthash :status :ready efar-state)
-    
-    (puthash :reset-status? nil efar-state)
+  (efar-set-keys)
+  
+  (efar-go-to-dir (efar-get :panels :left :dir) :left)
+  (efar-go-to-dir (efar-get :panels :right :dir) :right))
 
-    (puthash :directory-history (make-hash-table :test `equal) efar-state)
-    
-    (efar-set-keys)
-    
-    (efar-go-to-dir (efar-get-value :dir :left) :left)
-    (efar-go-to-dir (efar-get-value :dir :right) :right)))
-
+(defun efar-init-state()
+  ""
+  (setf efar-state (make-hash-table :test `equal))  
+  
+  (efar-set (car efar-default-startup-dirs) :panels :left :dir)
+  (efar-set (cdr efar-default-startup-dirs) :panels :right :dir)
+  
+  (setf default-directory (car efar-default-startup-dirs))
+  
+  (efar-set :left :current-panel)
+  
+  (efar-set 0 :panels :left :current-pos)
+  (efar-set 0 :panels :right :current-pos)
+  
+  (efar-set '() :panels :left :selected)
+  (efar-set '() :panels :right :selected)
+  
+  (efar-set 0 :panels :left :start-file-number)
+  (efar-set 0 :panels :right :start-file-number)
+  
+  (efar-set "" :fast-search-string)
+  (efar-set nil :fast-search-timer)
+  (efar-set 0 :fast-search-occur)
+  
+  (efar-set nil :notification-timer)
+  
+  (efar-set "" :panels :left :file-filter)
+  (efar-set "" :panels :right :file-filter)
+  
+  (efar-set nil :panels :left :file-notifier)
+  (efar-set nil :panels :right :file-notifier)
+  
+  (efar-set '() :pending-notifications)
+  
+  (efar-set nil :panels :left :sort-order)
+  (efar-set nil :panels :right :sort-order)
+  
+  (efar-set "Name" :panels :left :sort-function-name)
+  (efar-set "Name" :panels :right :sort-function-name)
+  
+  (efar-set :both :mode)
+  
+  (efar-set 5 :panels :left :column-number)
+  (efar-set 2 :panels :right :column-number)
+  
+  (efar-set nil :column-widths)
+  
+  (efar-set "Ready" :status-string)
+  (efar-set :ready :status)
+  (efar-set nil :reset-status?)
+  
+  (efar-set (make-hash-table :test `equal) :directory-history))
 
 ;;--------------------------------------------------------------------------------
 ;; file sort functions
@@ -162,7 +145,7 @@ The name of a function which is currently used for the panel SIDE (or current pa
     (lambda(e)
       (car e))
     efar-sort-functions)
-   (lambda(a b) (when (string= a (efar-get-value :sort-function-name side)) t))))
+   (lambda(a b) (when (string= a (efar-get :panels side :sort-function-name)) t))))
 
 (defun efar-sort-files-by-name(a b)
   "Function to sort files by name.
@@ -226,12 +209,12 @@ Case is ignored."
 
 (defun efar-change-sort-function(side)
   "Ask user for sort function and order and set them for panel SIDE."
-  (efar-set-value :sort-function-name
-		  (ido-completing-read "Sort files by: " (efar-sort-function-names side))
-		  side)
-  (efar-set-value :sort-order
-		  (string= (char-to-string 9660) (ido-completing-read "Sort order: " (list (char-to-string 9650) (char-to-string 9660) )))
-		  side)
+  (efar-set (ido-completing-read "Sort files by: " (efar-sort-function-names side))
+		  :panels side :sort-function-name)
+		  
+  (efar-set (string= (char-to-string 9660) (ido-completing-read "Sort order: " (list (char-to-string 9650) (char-to-string 9660) )))
+		  :panels side :sort-order)
+
   (efar-refresh-dir side nil (efar-get-short-file-name (efar-current-file))))
 
 ;;--------------------------------------------------------------------------------
@@ -249,7 +232,7 @@ Case is ignored."
   ;; first remove existing file-notify-watch
   (efar-remove-notifier side)
   
-  (let* ((other-side-notifier (efar-get-value :file-notifier (efar-other-side side)))
+  (let* ((other-side-notifier (efar-get :panels (efar-other-side side) :file-notifier))
 	 (descriptor
 	  ;; if file-notify-watch for given DIR is already registered for other panel and it is valid, use it	  
 	  (if (and
@@ -259,17 +242,17 @@ Case is ignored."
 	    ;; otherwise create new one
 	    (file-notify-add-watch dir '(change attribute-change) 'efar-notification))))
     
-    (efar-set-value :file-notifier (cons dir descriptor) side)))
+    (efar-set (cons dir descriptor) :panels side :file-notifier)))
 
 
 (defun efar-remove-notifier(side &optional dont-check-other)
   "Remove file-notify-watch registered for panel SIDE.
 If same watch is registered for other panel, then don't remove the watch, but just unregister it for panel SIDE, unless DONT-CHECK-OTHER is t"
-  (let ((descriptor (cdr (efar-get-value :file-notifier side)))
-	(other-descriptor (cdr (efar-get-value :file-notifier (efar-other-side side)))))
+  (let ((descriptor (cdr (efar-get :panels side :file-notifier)))
+	(other-descriptor (cdr (efar-get :panels (efar-other-side side) :file-notifier))))
     (when (or dont-check-other (not (equal descriptor other-descriptor)))
       (file-notify-rm-watch descriptor))
-    (efar-set-value :file-notifier nil side)))
+    (efar-set nil :panels side :file-notifier)))
 
 (defun efar-notification(event)
   "Callback function triggered when a file event occurs.
@@ -285,18 +268,19 @@ Notifications in the queue will be processed only if there are no new notificati
 	
 	;; if there is yet no notifications in the queue for given descriptor
 	;; add descriptor to the queue
-	(when (not (member descriptor (gethash :pending-notifications efar-state)))
-	  (push descriptor (gethash :pending-notifications efar-state)))
+	(let ((pending-notifications (efar-get :pending-notifications)))
+	  (when (not (member descriptor pending-notifications))
+	    (push descriptor pending-notifications)
+	    (efar-set pending-notifications :pending-notifications)))
 	
 	;; if there is a running timer, cancel it
-	(let ((timer (gethash :notification-timer efar-state)))	  
+	(let ((timer (efar-get :notification-timer)))	  
 	  (when timer (cancel-timer timer))
 	  ;; create new timer
-	  (puthash :notification-timer
-		   (run-at-time "1 sec" nil
-				(lambda()
-				  (efar-process-pending-notifications)))
-		   efar-state))))))
+	  (efar-set (run-at-time "1 sec" nil
+				 (lambda()
+				   (efar-process-pending-notifications)))
+		    :notification-timer))))))
 
 
 (defun efar-process-pending-notifications()
@@ -305,13 +289,16 @@ Notifications in the queue will be processed only if there are no new notificati
   ;; while there are notifications in a queue
   (while
       ;; pop next notification
-      (let ((descriptor (pop (gethash :pending-notifications efar-state))))       
+      (let* ((pending-notifications (efar-get :pending-notifications))
+	     (descriptor (prog1
+			     (pop pending-notifications)
+			   (efar-set pending-notifications :pending-notifications))))
 	(when descriptor
 	  ;; if event comes from the watch is registered for left panel directory, refersh left panel
-	  (when (equal descriptor (cdr (efar-get-value :file-notifier :left)))
+	  (when (equal descriptor (cdr (efar-get :panels :left :file-notifier)))
 	    (efar-refresh-dir :left))
 	  ;; if event comes from the watch is registered for right panel directory, refersh right panel
-	  (when (equal descriptor (cdr (efar-get-value :file-notifier :right)))
+	  (when (equal descriptor (cdr (efar-get :panels :right :file-notifier)))
 	    (efar-refresh-dir :right))))))
 
 ;;--------------------------------------------------------------------------------
@@ -319,22 +306,27 @@ Notifications in the queue will be processed only if there are no new notificati
 ;;--------------------------------------------------------------------------------
 
 (defun efar-remove-file-state()
-  ""
+  "Remove eFar state file. Could be helpfull in case of errors during startup."
   (interactive)
   (delete-file efar-state-file-name))
 
 (defun efar-save-state()
-  ""
+  "Save eFar state to the state file. Data from this file is used during startup to restore last state."
   (with-temp-file efar-state-file-name
     (let ((copy (copy-hash-table efar-state)))
-      
+
+      ;; clear up data not not relevant for saving
       (puthash :file-notifier nil (gethash :left (gethash :panels copy)))
       (puthash :file-notifier nil (gethash :right (gethash :panels copy)))
-      (puthash :pending-notifications () copy))))
+      (puthash :pending-notifications () copy)
+      (puthash :files () (gethash :left (gethash :panels copy)))
+      (puthash :files () (gethash :right (gethash :panels copy)))
+
+      (print copy (current-buffer)))))
 
 
 (defun efar-read-state() 
-  ""
+  "Read eFar state from the file."
   (interactive)
   (with-temp-buffer
     (insert-file-contents efar-state-file-name)
@@ -354,7 +346,7 @@ Notifications in the queue will be processed only if there are no new notificati
   
   (efar-with-notification-disabled
    (let ((new-dir-name (read-string "Input name for new directory: "))
-	 (side (gethash :current-panel efar-state)))
+	 (side (efar-get :current-panel)))
      
      ;; try to create a directory
      (efar-handle-error      
@@ -364,7 +356,7 @@ Notifications in the queue will be processed only if there are no new notificati
      (efar-refresh-dir side nil new-dir-name)
      
      ;; if other panel displays same directory as current one, refresh it as well
-     (when (string= (efar-get-value :dir) (efar-get-value :dir (efar-other-side)))
+     (when (string= (efar-get :panels side :dir) (efar-get :panels (efar-other-side) :dir))
        (efar-refresh-dir (efar-other-side))))))
 
 
@@ -382,15 +374,15 @@ Notifications in the queue will be processed only if there are no new notificati
 	(let ((start-time (time-to-seconds (current-time))))
 	  
 	  (efar-with-notification-disabled
-	   (let* ((side (gethash :current-panel efar-state))
-		  (todir  (efar-get-value :dir (efar-other-side)) )	 
-		  (selected (gethash :selected (efar-panel side)))
-		  (start-file-number (gethash :start-file-number (efar-panel side)))
-		  (file-number (+ start-file-number (gethash :current-pos (efar-panel side))))
+	   (let* ((side (efar-get :current-panel))
+		  (todir  (efar-get :panels (efar-other-side) :dir) )	 
+		  (selected (efar-get :panels side :selected))
+		  (start-file-number (efar-get :panels side :start-file-number))
+		  (file-number (+ start-file-number (efar-get :panels side :current-pos)))
 		  
 		  (files (mapcar
 			  (lambda (fn)
-			    (efar-get-short-file-name (nth fn (gethash :files (efar-panel side)))))
+			    (efar-get-short-file-name (nth fn (efar-get :panels side :files))))
 			  
 			  (if selected 
 			      selected
@@ -475,10 +467,10 @@ Notifications in the queue will be processed only if there are no new notificati
       (progn
 	
 	(efar-with-notification-disabled
-	 (let* ((side (gethash :current-panel efar-state))
-		(selected (gethash :selected (efar-panel side)))     
-		(start-file-number (gethash :start-file-number (efar-panel side)))
-		(file-number (+ start-file-number (gethash :current-pos (efar-panel side))))
+	 (let* ((side (efar-get :current-panel))
+		(selected (efar-get :panels side :selected))
+		(start-file-number (efar-get :panels side :start-file-number))
+		(file-number (+ start-file-number (efar-get :panels side :current-pos)))
 		
 		(to-delete (if selected 
 			       selected
@@ -487,7 +479,7 @@ Notifications in the queue will be processed only if there are no new notificati
 	   (when (and (> file-number 0) (string= "Yes" (ido-completing-read "Delete selected files? " (list "Yes" "No"))))
 	     (mapc
 	      (lambda (e)
-		(let* ((file (nth e (gethash :files (efar-panel side))))
+		(let* ((file (nth e (efar-get :panels side :files)))
 		       (file-name (car file))
 		       (dir? (car (cdr file)))
 		       )
@@ -500,7 +492,7 @@ Notifications in the queue will be processed only if there are no new notificati
 	     
 	     (efar-refresh-dir side)
 	     
-	     (when (string= (efar-get-value :dir) (efar-get-value :dir (efar-other-side)))
+	     (when (string= (efar-get :panels side :dir) (efar-get :panels (efar-other-side) :dir))
 	       (efar-refresh-dir (efar-other-side)))))))
     
     (efar-set-status :ready "Ready")))
@@ -508,8 +500,8 @@ Notifications in the queue will be processed only if there are no new notificati
 
 (defmacro efar-with-notification-disabled(&rest body)
   ""
-  `(let ((file-notifier-left (efar-get-value :file-notifier :left))
-	 (file-notifier-right (efar-get-value :file-notifier :right)))
+  `(let ((file-notifier-left (efar-get :panels :left :file-notifier))
+	 (file-notifier-right (efar-get :panels :right :file-notifier)))
      
      (when (file-notify-valid-p (cdr file-notifier-left))
        (efar-remove-notifier :left))
@@ -519,8 +511,8 @@ Notifications in the queue will be processed only if there are no new notificati
      
      ,@body
      
-     (efar-setup-notifier (efar-get-value :dir :left) :left)
-     (efar-setup-notifier (efar-get-value :dir :right) :right)))
+     (efar-setup-notifier (efar-get :panels :left :dir) :left)
+     (efar-setup-notifier (efar-get :panels :right :dir) :right)))
 
 (defmacro efar-write-enable (&rest body)
   `(with-current-buffer ,efar-buffer-name
@@ -544,31 +536,47 @@ Notifications in the queue will be processed only if there are no new notificati
 		   "error"))))))
 
 
-(defun efar-get-value (p &optional s) 
+(defun efar-get(&rest keys)
   ""
-  (gethash p (efar-panel (or s (gethash :current-panel efar-state)))))
+  (let ((value nil))
+    (mapc
+     (lambda(key)
+       (if value
+	   (setf value (gethash key value))
+	 (setf value (gethash key efar-state))))
+       keys)
+    value))
 
-(defun efar-set-value(p v &optional s)
+(defun efar-set(value &rest keys)
   ""
-  (puthash p v (efar-panel (or s (gethash :current-panel efar-state)))))
+  (let ((place nil))
+    (mapc
 
+     (lambda(key)
+       (if place
+	     (setf place (puthash key (gethash key place (make-hash-table :test `equal)) place))
+	 (setf place (puthash key (gethash key efar-state (make-hash-table :test `equal)) efar-state))))
+
+     (subseq keys 0 -1))
+    
+    (puthash (car (subseq keys -1)) value (or place efar-state))))
 
 (defun efar-reset-status()
   ""
-  (when (gethash :reset-status? efar-state)
-    (puthash :reset-status? nil efar-state)
+  (when (efar-get :reset-status?)
+    (efar-set nil :reset-status?)
     (efar-set-status :ready "Ready")))
 
 (defun efar-set-status(status &optional status-string seconds reset?)
   ""
   (when reset?
-    (puthash :reset-status? t efar-state))
+    (efar-set t :reset-status?))
   
-  (let ((prev-status (gethash :status efar-state))
-	(prev-status-string (gethash :status-string efar-state)))
+  (let ((prev-status (efar-get :status))
+	(prev-status-string (efar-get :status-string)))
     
-    (puthash :status status efar-state)
-    (when status-string (puthash :status-string status-string efar-state))
+    (efar-set status :status)
+    (when status-string (efar-set status-string :status-string))
     (efar-output-status)
     
     (when seconds
@@ -580,12 +588,12 @@ Notifications in the queue will be processed only if there are no new notificati
   ""
   (efar-write-enable 
    
-   (let* ((w (- (gethash :window-width efar-state) 2))
-	  (status-string (efar-prepare-file-name (or status (gethash :status-string efar-state)) w)))
+   (let* ((w (- (efar-get :window-width) 2))
+	  (status-string (efar-prepare-file-name (or status (efar-get :status-string)) w)))
      
      (goto-char 0)
      
-     (forward-line (+ 4 (gethash :panel-height efar-state)))
+     (forward-line (+ 4 (efar-get :panel-height)))
      
      (move-to-column 1)
      
@@ -602,14 +610,14 @@ Notifications in the queue will be processed only if there are no new notificati
   (local-set-key (kbd "<down-mouse-1>")
 		 (lambda (event)
 		   (interactive "e")
-		   (if (<  (car (nth 6 (nth 1 event))) (+ 2 (gethash :panel-width efar-state) ))
+		   (if (<  (car (nth 6 (nth 1 event))) (+ 2 (efar-get :panel-width) ))
 		       (progn
-			 (setf (gethash :current-panel efar-state) :left)
-			 (setf default-directory (gethash :dir (efar-panel :left))))
+			 (efar-set :left :current-panel)
+			 (efar-set default-directory :panels :left :dir))
 		     
 		     (progn
-		       (setf (gethash :current-panel efar-state) :right)
-		       (setf default-directory (gethash :dir (efar-panel :right))))
+		       (efar-set :right :current-panel)
+		       (efar-set default-directory :panels :right :dir))
 		     )
 		   (efar-write-enable (efar-redraw))))
   
@@ -691,11 +699,11 @@ Notifications in the queue will be processed only if there are no new notificati
   (local-set-key (kbd "RET") (lambda () 
 			       (interactive)
 			       (efar-write-enable			
-				(let* ((side (gethash :current-panel efar-state))				       
-				       (start-file-number (efar-get-value :start-file-number))
-				       (file-number (+ start-file-number (efar-get-value :current-pos)))
-				       (file (nth file-number (efar-get-value :files)))
-				       (current-dir-path (efar-get-value :dir)))
+				(let* ((side (efar-get :current-panel))				       
+				       (start-file-number (efar-get :panels side :start-file-number))
+				       (file-number (+ start-file-number (efar-get :panels side :current-pos)))
+				       (file (nth file-number (efar-get :panels side :files)))
+				       (current-dir-path (efar-get :panels side :dir)))
 				  
 				  (when (car (cdr file))
 				    (let ((newdir (file-name-as-directory (expand-file-name (car file) current-dir-path))))
@@ -710,16 +718,16 @@ Notifications in the queue will be processed only if there are no new notificati
   
   (local-set-key (kbd "TAB") (lambda () 
 			       (interactive)
-			       (when (equal (gethash :mode efar-state) :both)
+			       (when (equal (efar-get :mode) :both)
 				 (efar-write-enable
-				  (let ((side (gethash :current-panel efar-state)))
+				  (let ((side (efar-get :current-panel)))
 				    (if (equal side  :left)
 					(progn
-					  (setf (gethash :current-panel efar-state) :right)
-					  (setf default-directory (gethash :dir (efar-panel :right))))
+					  (efar-set :right :current-panel)
+					  (setf default-directory (efar-get :panels :right :dir)))
 				      (progn
-					(setf (gethash :current-panel efar-state) :left)
-					(setf default-directory (gethash :dir (efar-panel :left))))))
+					(efar-set :left :current-panel)
+					(setf default-directory (efar-get :panels :left :dir)))))
 				  (efar-redraw)))))
   
   
@@ -801,16 +809,25 @@ Notifications in the queue will be processed only if there are no new notificati
   (local-set-key (kbd "<f10>") (lambda()
 				 (interactive)
 				 (efar-copy-current-path)))
+  (local-set-key (kbd "C-c C-d") (lambda()
+				  (interactive)
+				  (efar-cd)
+				  ))
   )
+
+(defun efar-cd()
+  ""
+  (efar-go-to-dir (read-directory-name "Go to directory: " default-directory))
+  (efar-write-enable (efar-redraw)))
 
 (defun efar-change-column-number(increase)
   ""
-  (let ((side (gethash :current-panel efar-state)))
+  (let ((side (efar-get :current-panel)))
     
     (if increase
-	(efar-set-value :column-number (+ (efar-get-value :column-number side) 1) side)
-      (when (> (efar-get-value :column-number side) 1)
-	(efar-set-value :column-number (- (efar-get-value :column-number side) 1) side)
+	(efar-set (+ (efar-get :panels side :column-number) 1) :panels side :column-number)
+      (when (> (efar-get :panels side :column-number) 1)
+	(efar-set (- (efar-get :panels side :column-number) 1) :panels side :column-number)
 	
 	(let ((file (car (efar-current-file side))))
 	  (when (not (string= file "..")) (efar-go-to-file file))))))
@@ -821,16 +838,14 @@ Notifications in the queue will be processed only if there are no new notificati
 (defun efar-change-mode()
   "Switch mode from double to single-panel or vice versa.
 If a double mode is active then actual panel becomes fullscreen."
-  (let ((current-mode (gethash :mode efar-state))
-	(side (gethash :current-panel efar-state)))
+  (let ((current-mode (efar-get :mode))
+	(side (efar-get :current-panel)))
     
-    (puthash :mode
-	     (cond
-	      ((equal current-mode :both) side)
-	      (t :both))
-	     
-	     efar-state)
-    
+    (efar-set (cond
+	       ((equal current-mode :both) side)
+	       (t :both))
+	      :mode)
+
     (efar-calculate-widths)
     
     (efar-write-enable (efar-redraw))))
@@ -842,18 +857,18 @@ If a double mode is active then actual panel becomes fullscreen."
 
 (defun efar-copy-current-path()
   "Copies to the clipboard the full path to the current file or directory."
-  (let* ((side (gethash :current-panel efar-state))
-	 (fnum (+ (gethash :start-file-number (efar-panel side)) (gethash :current-pos (efar-panel side)) ))
-	 (file (nth fnum (gethash :files (efar-panel side))))
-	 (fname (expand-file-name (car file) (gethash :dir (efar-panel side)))))
+  (let* ((side (efar-get :current-panel))
+	 (fnum (+ (efar-get :panels side :start-file-number) (efar-get :panels side :current-pos) ))
+	 (file (nth fnum (efar-get :panels side :files)))
+	 (fname (expand-file-name (car file) (efar-get :panels side :dir))))
     (kill-new fname)))
 
 (defun efar-open-file-in-external-app()
   ""
-  (let* ((side (gethash :current-panel efar-state))
-	 (fnum (+ (gethash :start-file-number (efar-panel side)) (gethash :current-pos (efar-panel side)) ))
-	 (file (nth fnum (gethash :files (efar-panel side))))
-	 (@fname (expand-file-name (car file) (gethash :dir (efar-panel side)))))
+  (let* ((side (efar-get :current-panel))
+	 (fnum (+ (efar-get :panels side :start-file-number) (efar-get :panels side :current-pos) ))
+	 (file (nth fnum (efar-get :panels side :files)))
+	 (@fname (expand-file-name (car file) (efar-get :panels side :dir))))
     
     (let* (
 	   ($file-list
@@ -898,16 +913,17 @@ If a double mode is active then actual panel becomes fullscreen."
 
 (defun efar-filter-files(side)
   ""
-  (let ((side (or side (gethash :current-panel efar-state))))
+  (let ((side (or side (efar-get :current-panel))))
     
-    (efar-set-value
-     :file-filter
-     (read-string "String to filter file names: " (efar-get-value :file-filter side))
-     side)
+    (efar-set
+     (read-string "String to filter file names: " (efar-get :panels side :file-filter))
+     :panels
+     side
+     :file-filter)
     
     (efar-get-file-list side)
-    (efar-set-value :start-file-number 0 side)
-    (efar-set-value :current-pos 0 side)
+    (efar-set 0 :panels side :start-file-number)
+    (efar-set 0 :panels side :current-pos)
     (efar-write-enable (efar-redraw))))
 
 (defun efar-display-console ()
@@ -916,7 +932,7 @@ If a double mode is active then actual panel becomes fullscreen."
       (shell "*efar-shell*")
     (progn
       (with-current-buffer (get-buffer "*efar-shell*")
-	(insert (concat "cd " (efar-get-value :dir)))
+	(insert (concat "cd " (efar-get :panels side :dir)))
 	(comint-send-input nil t))
       (display-buffer "*efar-shell*")
       )))
@@ -925,31 +941,30 @@ If a double mode is active then actual panel becomes fullscreen."
 (defun efar-fast-search (k)
   ""
   
-  (let ((timer (gethash :fast-search-timer efar-state)))
+  (let ((timer (efar-get :fast-search-timer)))
     
     (when timer (cancel-timer timer))
     
-    (puthash :fast-search-timer
-	     (run-at-time "5 sec" nil
+    (efar-set (run-at-time "5 sec" nil
 			  (lambda()
 			    (when (not (null efar-state))
-			      (puthash :fast-search-string "" efar-state)
+			      (efar-set "" :fast-search-string)
 			      (efar-output-status)
-			      (puthash :fast-search-occur 0 efar-state)
-			      (puthash :fast-search-timer nil efar-state))))
-	     efar-state)
+			      (efar-set 0 :fast-search-occur)
+			      (efar-set nil :fast-search-timer))))
+	     :fast-search-timer)
     
-    (let ((str (gethash :fast-search-string efar-state)))
+    (let ((str (efar-get :fast-search-string)))
       
       (cond
        
        ((equal k :next)
 	(when (> (length str) 0)
-	  (incf (gethash :fast-search-occur efar-state))))
+	  (incf (efar-get :fast-search-occur))))
        
        ((equal k :prev)
 	(when (> (length str) 0)
-	  (decf (gethash :fast-search-occur efar-state))))
+	  (decf (efar-get :fast-search-occur))))
        
        ((equal k :backspace)
 	(when (> (length str) 0)
@@ -958,33 +973,33 @@ If a double mode is active then actual panel becomes fullscreen."
        (t
 	(setf str (concat str (format "%c" k)))))
       
-      
-      (let ((file-name (nth
-			(gethash :fast-search-occur efar-state)
+      (let* ((side (efar-get :current-panel))
+	    (file-name (nth
+			(efar-get :fast-search-occur)
 			
 			(mapcan (lambda (e)
 				  (when (string-match str (efar-get-short-file-name e))
 				    (list (car e))))
-				(efar-get-value :files)))))
+				(efar-get :panels side :files)))))
 	(when file-name
 	  (efar-go-to-file file-name nil 0)
 	  (efar-write-enable (efar-redraw))))
       
-      (puthash :fast-search-string str efar-state))
+      (efar-set str :fast-search-string))
     
-    (efar-output-status (concat "Fast search: " (gethash :fast-search-string efar-state)))))
+    (efar-output-status (concat "Fast search: " (efar-get :fast-search-string)))))
 
 
 (defun efar-get-accessible-directory-in-path (path)
   "Return first accessible directory in the PATH going from bottom to up. If there are no accessible directories in the given path, return user-emacs-directory."
   
-  ;; if directory PATH doesn't exist or isn't accessible
-  (if (not (and (file-exists-p path)
-		(file-accessible-directory-p path)))
-      
-      (efar-output-status (concat "Does not exist " path)) 
+  ;; if directory PATH exists or is accessible
+  (if (and (file-exists-p path)
+		(file-accessible-directory-p path))
+      ;; return this directory
+      path
     
-    ;; get parent directory
+    ;; else get parent directory
     (let ((parent-dir
 	   (file-name-directory
 	    (directory-file-name path))))
@@ -993,18 +1008,15 @@ If a double mode is active then actual panel becomes fullscreen."
 	  ;; that means there are no accessible directories in the path and we return user-emacs-directory
 	  user-emacs-directory
 	;; otherwise check parent directory
-	(efar-get-accessible-directory-in-path parent-dir )))
-    
-    ;; return first accessible directory
-    path))
+	(efar-get-accessible-directory-in-path parent-dir )))))
 
 (defun efar-refresh-dir(&optional side move-to-first? move-to-file-name)
   ""
-  (let ((dir (efar-get-accessible-directory-in-path (efar-get-value :dir side))))
-    
-    (efar-set-value :dir dir side)
-    (efar-set-value :selected () side)
-    (efar-set-value :fast-search-string "" side)
+  (let* ((side (or side (efar-get :current-panel)))
+	 (dir (efar-get-accessible-directory-in-path (efar-get :panels side :dir))))
+    (efar-set dir :panels side :dir)
+    (efar-set () :panels side :selected)
+    (efar-set "" :panels side :fast-search-string)
     
     (let ((current-file-name (cond
 			      (move-to-first? "")
@@ -1023,19 +1035,19 @@ If a double mode is active then actual panel becomes fullscreen."
   ""
   
   (let* ((dir (when dir (efar-get-accessible-directory-in-path (expand-file-name dir))))
-	 (side (or side (gethash :current-panel efar-state)))
-	 (current-dir (efar-get-value :dir side))
+	 (side (or side (efar-get :current-panel)))
+	 (current-dir (efar-get :panels side :dir))
 	 (parent-dir (efar-get-parent-dir current-dir))
 	 (go-to-parent? (string= dir parent-dir)))
     
-    (when (eq side (gethash :current-panel efar-state))
+    (when (eq side (efar-get :current-panel))
       (setf default-directory dir))
     
-    (efar-set-value :selected ()  side)
-    (efar-set-value :dir dir side)
+    (efar-set () :panels side :selected)
+    (efar-set dir :panels side :dir)
     
-    (efar-set-value :file-filter "" side)
-    (puthash :fast-search-string "" efar-state)
+    (efar-set "" :panels side :file-filter)
+    (efar-set "" :fast-search-string)
     
     (efar-get-file-list side)        
     
@@ -1043,14 +1055,10 @@ If a double mode is active then actual panel becomes fullscreen."
 	(progn
 	  (efar-go-to-file current-dir side 0))
       (progn
-	(efar-set-value :start-file-number 0 side)
-	(efar-set-value :current-pos 0 side)))
-    
-    
-    (let ((disk (concat (car (split-string dir "/")) "/")))
-      (puthash disk dir (gethash :last-dir efar-state) ))
+	(efar-set 0 :panels side :start-file-number)
+	(efar-set 0 :panels side :current-pos)))
 
-    (puthash (efar-get-root-directory dir) dir (gethash :directory-history efar-state))
+    (efar-set dir :directory-history (efar-get-root-directory dir))
     
     (efar-setup-notifier dir side)))
 
@@ -1061,13 +1069,13 @@ If a double mode is active then actual panel becomes fullscreen."
 
 (defun efar-go-to-file(file &optional side prev-file-number)
   ""
-  (let* ((side (or side (gethash :current-panel efar-state)))
-	 (file (directory-file-name (expand-file-name file (efar-get-value :dir side))))
-	 (number-of-files (length (efar-get-value :files side)))
+  (let* ((side (or side (efar-get :current-panel)))
+	 (file (directory-file-name (expand-file-name file (efar-get :panels side :dir))))
+	 (number-of-files (length (efar-get :panels side :files)))
 	 (new-file-number
 	  (or
 	   (cl-position file
-			(mapcar (lambda (e) (car e)) (efar-get-value :files side))
+			(mapcar (lambda (e) (car e)) (efar-get :panels side :files))
 			:test 'string=)
 	   (if (>= prev-file-number number-of-files)
 	       (- number-of-files 1)
@@ -1076,29 +1084,29 @@ If a double mode is active then actual panel becomes fullscreen."
     (cond
      
      ((and
-       (>= new-file-number (efar-get-value :start-file-number side))
-       (< new-file-number (+ (efar-get-value :start-file-number side) (* 2 (gethash :panel-height efar-state)))))
+       (>= new-file-number (efar-get :panels side :start-file-number))
+       (< new-file-number (+ (efar-get :panels side :start-file-number) (* 2 (efar-get :panel-height)))))
       
       (progn
-	(efar-set-value :current-pos (- new-file-number (efar-get-value :start-file-number side)) side)))
+	(efar-set (- new-file-number (efar-get :panels side :start-file-number)) :panels side :current-pos)))
      
-     ((< new-file-number (* 2 (gethash :panel-height efar-state)))
+     ((< new-file-number (* 2 (efar-get :panel-height)))
       (progn
-	(efar-set-value :start-file-number 0 side)
-	(efar-set-value :current-pos new-file-number side)))
+	(efar-set 0 :panels side :start-file-number)
+	(efar-set new-file-number :panels side :current-pos)))
      
      (t 
       (progn
-	(efar-set-value :start-file-number new-file-number side)
-	(efar-set-value :current-pos 0 side))))))
+	(efar-set new-file-number :panels side :start-file-number)
+	(efar-set 0 :panels side :current-pos))))))
 
 
 (defun efar-current-file-number(&optional side)
   ""
-  (let* ((side (or side (gethash :current-panel efar-state)))
-	 (start-file-number (efar-get-value :start-file-number side)))
+  (let* ((side (or side (efar-get :current-panel)))
+	 (start-file-number (efar-get :panels side :start-file-number)))
     
-    (+ start-file-number (efar-get-value :current-pos side))))
+    (+ start-file-number (efar-get :panels side :current-pos))))
 
 (defun efar-current-file-name(&optional side)
   ""
@@ -1106,12 +1114,13 @@ If a double mode is active then actual panel becomes fullscreen."
 
 (defun efar-current-file(&optional side)
   ""
-  (nth (efar-current-file-number side) (efar-get-value :files side)))
+  (let ((side (or side (efar-get :current-panel))))
+    (nth (efar-current-file-number side) (efar-get :panels side :files))))
 
 ;;(loop for i from 1 to 100 do (make-directory (concat "c:/test/" (int-to-string i))))
 (defun efar-other-side(&optional side)
   ""
-  (let ((side (if side side (gethash :current-panel efar-state))))
+  (let ((side (if side side (efar-get :current-panel))))
     (if (equal side :left) :right :left)))
 
 
@@ -1133,21 +1142,18 @@ Selected item bacomes actual for panel SIDE."
       (setf dir (if (string= dir "Manual/")
 		    (read-string "Input connection string: ")
 		  dir))
-      (setf dir
-	    (or (gethash dir (gethash :last-dir efar-state))
-		dir))
 
-      (efar-go-to-dir (or (gethash dir (gethash :directory-history efar-state)) dir) side)
+      (efar-go-to-dir (or (efar-get :directory-history  dir) dir) side)
       
       (efar-write-enable (efar-redraw)))))
 
 
 (defun efar-files-as-string(file-numbers)
   ""
-  (let ((side (gethash :current-panel efar-state)))
+  (let ((side (efar-get :current-panel)))
     (mapconcat
      (lambda(x)
-       (car (nth x (gethash :files (efar-panel side)))))
+       (car (nth x (efar-get :panels side :files))))
      file-numbers
      ", ")))
 
@@ -1156,40 +1162,37 @@ Selected item bacomes actual for panel SIDE."
 (defun efar-deselect-all()
   ""
   (efar-write-enable
-   (let ((side (gethash :current-panel efar-state)))
-     (puthash :selected () (efar-panel side))
+   (let ((side (efar-get :current-panel)))
+     (efar-set '() :panels side :selected)
      (efar-redraw))))
 
 (defun efar-mark-file()
   ""
-  (let* ((side (gethash :current-panel efar-state))
-	 (start-file-number (gethash :start-file-number (efar-panel side)))
-	 (current-position (gethash :current-pos (efar-panel side)))
-	 (selected-file-number (+ start-file-number current-position)))
+  (let* ((side (efar-get :current-panel))
+	 (start-file-number (efar-get :panels side :start-file-number))
+	 (current-position (efar-get :panels side :current-pos))
+	 (selected-file-number (+ start-file-number current-position))
+	 (selected-items (efar-get :panels side :selected)))
     
-    (or (string= (car (nth selected-file-number (gethash :files (efar-panel side)))) "..")
-	(if (member selected-file-number (gethash :selected (efar-panel side)))
-	    (setf (gethash :selected (efar-panel side)) (delete selected-file-number (gethash :selected (efar-panel side))))
-	  (push selected-file-number (gethash :selected (efar-panel side)))))
+    (or (string= (car (nth selected-file-number (efar-get :panels side :files))) "..")
+	(if (member selected-file-number selected-items)
+	    (efar-set (delete selected-file-number selected-items) :panels side :selected)
+	  (efar-set (push selected-file-number selected-items) :panels side :selected)))
     
     (efar-move-cursor  :down)))
 
 (defun efar-edit-file()
   ""
-  (let* ((side (gethash :current-panel efar-state))
-	 (fnum (+ (gethash :start-file-number (efar-panel side)) (gethash :current-pos (efar-panel side)) ))
-	 (file (nth fnum (gethash :files (efar-panel side))))
-	 (fdir (expand-file-name (car file) (gethash :dir (efar-panel side)))))
+  (let* ((side (efar-get :current-panel))
+	 (fnum (+ (efar-get :panels side :start-file-number) (efar-get :panels side :current-pos) ))
+	 (file (nth fnum (efar-get :panels side :files)))
+	 (fdir (expand-file-name (car file) (efar-get :panes side :dir))))
     (find-file fdir)))
 
 
-(defun efar-panel(side)
-  ""
-  (gethash side (gethash :panels efar-state)))
-
 (defun efar-set-files-order(files side)
   ""
-  (if (efar-get-value :sort-order side)
+  (if (efar-get :panels side :sort-order)
       (reverse files)
     files))
 
@@ -1200,57 +1203,51 @@ Selected item bacomes actual for panel SIDE."
 
 (defun efar-get-file-list(side)
   ""
-  (let ((filter (efar-get-value :file-filter side))
-	(root? (efar-is-root-directory (efar-get-value :dir side))))
+  (let ((filter (efar-get :panels side :file-filter))
+	(root? (efar-is-root-directory (efar-get :panels side :dir))))
     
-    (puthash :files
-	     (mapcar
-	      (lambda(e)
-		(append e (list (list (cons 23 "sdfj;sdf;sdflkwlkfjksjdlkmsdwmer34") (cons 56 "dsfdjij34j43549t09dv9vlkerlkt5j90dv0-dv"))))
-		)
-	      ;; if we are not in the root directory, we add entry to go up
-	      (append (when (not root?) (list (list ".." t)))
-		      ;; change order of files according to selected mode (ASC or DESC)
-		      (efar-set-files-order
-		       
-		       ;; build file list
-		       (let ((files
-			      ;; remove entries "." and ".." and filter file list according to selected wildcard
-			      (remove-if
-			       (lambda (f)  (or		       
-					     (string-suffix-p "/." (car f))
-					     (string-suffix-p "/.." (car f))					    
-					     (and (not (string-suffix-p "/.." (car f)))
-						  (> (length filter) 0 )
-						  (not (string-match (wildcard-to-regexp filter) (car f))))))
-			       
-			       ;; files and attributes for current directory
-			       (directory-files-and-attributes (gethash :dir (efar-panel side)) t nil t)))
-			     
-			     ;; get selected sort function
-			     (sort-function (efar-get-sort-function (efar-get-value :sort-function-name side))))
-			 
-			 ;; sort file list according to selected sort function
-			 (if sort-function
-			     (sort files sort-function)
-			   files))
-		       
-		       side)))
-	     
-	     (efar-panel side))))
-
+    (efar-set
+     ;; if we are not in the root directory, we add entry to go up
+     (append (when (not root?) (list (list ".." t)))
+	     ;; change order of files according to selected mode (ASC or DESC)
+	     (efar-set-files-order
+	      
+	      ;; build file list
+	      (let ((files
+		     ;; remove entries "." and ".." and filter file list according to selected wildcard
+		     (remove-if
+		      (lambda (f)  (or		       
+				    (string-suffix-p "/." (car f))
+				    (string-suffix-p "/.." (car f))					    
+				    (and (not (string-suffix-p "/.." (car f)))
+					 (> (length filter) 0 )
+					 (not (string-match (wildcard-to-regexp filter) (car f))))))
+		      
+		      ;; files and attributes for current directory
+		      (directory-files-and-attributes (efar-get :panels side :dir) t nil t)))
+		    
+		    ;; get selected sort function
+		    (sort-function (efar-get-sort-function (efar-get :panels side :sort-function-name))))
+		
+		;; sort file list according to selected sort function
+		(if sort-function
+		    (sort files sort-function)
+		  files))
+	      
+	      side))
+     :panels side :files)))
 
 (defun efar-move-cursor (direction)
   ""
   (efar-reset-status)
   
   (efar-write-enable
-   (let* ((side (gethash :current-panel efar-state))
-	  (curr-pos (gethash :current-pos (efar-panel side)))
-	  (max-files-in-column (- (gethash :panel-height efar-state) 1))
-	  (max-file-number (length (gethash :files (efar-panel side))))
-	  (start-file-number (gethash :start-file-number (efar-panel side)))
-	  (col-number (efar-get-value :column-number side))
+   (let* ((side (efar-get :current-panel))
+	  (curr-pos (efar-get :panels side :current-pos))
+	  (max-files-in-column (- (efar-get :panel-height) 1))
+	  (max-file-number (length (efar-get :panels side :files)))
+	  (start-file-number (efar-get :panels side :start-file-number))
+	  (col-number (efar-get :panels side :column-number))
 	  (affected-item-numbers ()))
      
      (cond 
@@ -1262,13 +1259,16 @@ Selected item bacomes actual for panel SIDE."
 	;; if we are on first item
 	((= curr-pos 0)
 	 (progn (let ((rest (- start-file-number (* col-number max-files-in-column))))
-		  (puthash :start-file-number  (if (< rest 0) 0 rest) (efar-panel side))
-		  (puthash :current-pos (if (< rest 0) (- start-file-number 1) (- (* col-number max-files-in-column) 1)) (efar-panel side)))))
+		  (efar-set (if (< rest 0) 0 rest)
+			    :panels side :start-file-number)
+		  (efar-set (if (< rest 0) (- start-file-number 1) (- (* col-number max-files-in-column) 1))
+			    :panels side :current-pos))))
 	;; else move up by one
 	(t (progn
-	     (push  (gethash :current-pos (efar-panel side)) affected-item-numbers)
-	     (decf (gethash :current-pos (efar-panel side)))
-	     (push  (gethash :current-pos (efar-panel side)) affected-item-numbers)))))
+	     (push  curr-pos affected-item-numbers)
+	     (decf curr-pos)
+	     (push  curr-pos affected-item-numbers)
+	     (efar-set curr-pos :panels side :current-pos)))))
       
       ;; if DOWN key is pressed
       ((equal direction :down) 
@@ -1277,14 +1277,16 @@ Selected item bacomes actual for panel SIDE."
 	((= (+ start-file-number curr-pos) (- max-file-number 1)) nil)
 	;; else if we are on last item 
 	((= curr-pos (- (* max-files-in-column col-number) 1)) 
-	 (progn (puthash :start-file-number (+ start-file-number curr-pos 1) (efar-panel side))
-		(puthash :current-pos 0 (efar-panel side)) ))
+	 (progn (efar-set (+ start-file-number curr-pos 1)
+			  :panels side :start-file-number)
+		(efar-set 0
+			  :panels side :current-pos) ))
 	;; else move down by one
 	(t (progn 
-	     (push  (gethash :current-pos (efar-panel side)) affected-item-numbers)
-	     (incf (gethash :current-pos (efar-panel side)))
-	     (push  (gethash :current-pos (efar-panel side)) affected-item-numbers)	     
-	     ))))
+	     (push  curr-pos affected-item-numbers)
+	     (incf curr-pos)
+	     (push  curr-pos affected-item-numbers)
+	     (efar-set curr-pos :panels side :current-pos)))))
       
       ;; if LEFT key is pressed
       ((equal direction :left)
@@ -1293,29 +1295,38 @@ Selected item bacomes actual for panel SIDE."
 	((and (= start-file-number 0) (= curr-pos 0)) nil)
 	
 	;; we are in right column - move left by max-files-in-column
-	((>= curr-pos max-files-in-column) (puthash :current-pos (- curr-pos max-files-in-column) (efar-panel side)))
+	((>= curr-pos max-files-in-column) (efar-set (- curr-pos max-files-in-column)
+						     :panels side :current-pos))
 	
 	;; we are in left column
 	((< curr-pos max-files-in-column)
 	 (cond
-	  ((= start-file-number 0) (puthash :current-pos 0 (efar-panel side)))
-	  ((> start-file-number (* col-number max-files-in-column)) (puthash :start-file-number (- start-file-number max-files-in-column) (efar-panel side)))
+	  ((= start-file-number 0) (efar-set 0
+					     :panels side :current-pos))
+	  ((> start-file-number (* col-number max-files-in-column)) (efar-set (- start-file-number max-files-in-column)
+									      :panels side :start-file-number))
 	  ((<= start-file-number (* col-number max-files-in-column)) (and
-								      (puthash :start-file-number 0 (efar-panel side))
-								      (puthash :current-pos 0 (efar-panel side)) )))) ))
+								      (efar-set 0
+										:panels side :start-file-number)
+								      (efar-set 0
+										:panels side :current-pos)))))))
       
       ;; if HOME key is pressed
       ((equal direction :home)
        (and
-	(puthash :start-file-number 0 (efar-panel side))
-	(puthash :current-pos 0 (efar-panel side)) ))
+	(efar-set 0
+		  :panels side :start-file-number)
+	(efar-set 0
+		  :panels side :current-pos)))
       
       
       ;; if END key is pressed
       ((equal direction :end)
        (and
-	(puthash :start-file-number (if (< max-file-number (* col-number max-files-in-column)) 0 (- max-file-number (* col-number max-files-in-column))) (efar-panel side))
-	(puthash :current-pos (- (if (< max-file-number (* col-number max-files-in-column))  max-file-number (* col-number max-files-in-column)) 1) (efar-panel side)) ))
+	(efar-set (if (< max-file-number (* col-number max-files-in-column)) 0 (- max-file-number (* col-number max-files-in-column)))
+		  :panels side :start-file-number)
+	(efar-set (- (if (< max-file-number (* col-number max-files-in-column))  max-file-number (* col-number max-files-in-column)) 1)
+		  :panels side :current-pos)))
       
       
       ;; if RIGHT key is pressed
@@ -1327,8 +1338,10 @@ Selected item bacomes actual for panel SIDE."
 	;; else if there is more than max-files-in-column left
 	((> (- max-file-number start-file-number curr-pos) max-files-in-column)
 	 (if (< curr-pos (* (- col-number 1) max-files-in-column))
-	     (puthash :current-pos (+ curr-pos max-files-in-column) (efar-panel side))
-	   (puthash :start-file-number (+ start-file-number max-files-in-column) (efar-panel side)))))))
+	     (efar-set (+ curr-pos max-files-in-column)
+		       :panels side :current-pos)
+	   (efar-set (+ start-file-number max-files-in-column)
+		     :panels side :start-file-number))))))
      
      (efar-output-files side affected-item-numbers)
      
@@ -1337,11 +1350,11 @@ Selected item bacomes actual for panel SIDE."
 
 (defun efar-calculate-window-size()
   ""
-  (let ((mode (gethash :mode efar-state)))
+  (let ((mode (efar-get :mode)))
     
-    (puthash :window-width (window-width) efar-state)
-    (puthash :window-height (window-height) efar-state)
-    (puthash :panel-height (- (window-height) 7) efar-state)))
+    (efar-set (window-width) :window-width)
+    (efar-set (window-height) :window-height)
+    (efar-set (- (window-height) 7) :panel-height)))
 
 (defun efar-redraw()
   ""
@@ -1375,7 +1388,7 @@ Selected item bacomes actual for panel SIDE."
 (defun efar-output-file-details(side)
   ""
   
-  (let ((mode (gethash :mode efar-state)))
+  (let ((mode (efar-get :mode)))
     
     (when (or (equal mode :both) (equal mode side))
       
@@ -1383,7 +1396,7 @@ Selected item bacomes actual for panel SIDE."
 	
 	(when current-file-number
 	  
-	  (let* ((file (nth current-file-number (efar-get-value :files side)))
+	  (let* ((file (nth current-file-number (efar-get :panels side :files)))
 		 (file-short-name (efar-get-short-file-name file))
 		 (col-number (cond
 			      ((or (equal side :left) (equal mode :right)) 1)
@@ -1400,7 +1413,7 @@ Selected item bacomes actual for panel SIDE."
 	    
 	    (goto-char 0)
 	    
-	    (forward-line (+ 2 (gethash :panel-height efar-state)))
+	    (forward-line (+ 2 (efar-get :panel-height)))
 	    
 	    (move-to-column col-number)
 	    
@@ -1412,8 +1425,8 @@ Selected item bacomes actual for panel SIDE."
 (defun efar-panel-width(side)
   ""
   (let ((widths (if (equal side :left)
-		    (car (gethash :column-widths efar-state))
-		  (cdr (gethash :column-widths efar-state)))))
+		    (car (efar-get :column-widths))
+		  (cdr (efar-get :column-widths)))))
     
     (+ (apply '+ widths)
        (- (length widths) 1))))
@@ -1422,10 +1435,10 @@ Selected item bacomes actual for panel SIDE."
 (defun efar-output-files(side &optional affected-item-numbers)
   ""
   
-  (let ((mode (gethash :mode efar-state))
+  (let ((mode (efar-get :mode))
 	(widths (if (equal side :left)
-		    (car (gethash :column-widths efar-state))
-		  (cdr (gethash :column-widths efar-state)))))
+		    (car (efar-get :column-widths))
+		  (cdr (efar-get :column-widths)))))
     
     (when (or (equal mode :both) (equal mode side))
       
@@ -1436,21 +1449,21 @@ Selected item bacomes actual for panel SIDE."
 			 ((equal side :left) 1)
 			 ((and (equal side :right) (equal mode :right)) 1)
 			 (t (+ (efar-panel-width :left) 2))))
-	     (max-files-in-column (- (gethash :panel-height efar-state) 1))
+	     (max-files-in-column (- (efar-get :panel-height) 1))
 	     (cnt 0)
 	     (col-number (length widths))
 	     
 	     (files
 	      (append
-	       (subseq  (gethash :files (efar-panel side))
-			(gethash :start-file-number (efar-panel side))  
-			(+ (gethash :start-file-number (efar-panel side)) 
-			   (if (> (- (length (gethash :files (efar-panel side))) (gethash :start-file-number (efar-panel side))) (* max-files-in-column col-number)) (* max-files-in-column col-number)
-			     (- (length (gethash :files (efar-panel side))) (gethash :start-file-number (efar-panel side)))))) 
+	       (subseq  (efar-get :panels side :files)
+			(efar-get :panels side :start-file-number)  
+			(+ (efar-get :panels side :start-file-number) 
+			   (if (> (- (length (efar-get :panels side :files)) (efar-get :panels side :start-file-number)) (* max-files-in-column col-number)) (* max-files-in-column col-number)
+			     (- (length (efar-get :panels side :files)) (efar-get :panels side :start-file-number))))) 
 	       
 	       ;; append empty items if number of files to display is less then max files in panel
 	       ;; needed to overwrite old entries
-	       (make-list (let ((rest (- (length (gethash :files (efar-panel side))) (gethash :start-file-number (efar-panel side)))))
+	       (make-list (let ((rest (- (length (efar-get :panels side :files)) (efar-get :panels side :start-file-number))))
 			    (if (> rest (* max-files-in-column col-number))
 				0 (- (* max-files-in-column col-number) rest))) 
 			  (list "")))))
@@ -1475,9 +1488,9 @@ Selected item bacomes actual for panel SIDE."
 				 (p (point))
 				 (w (nth col widths))
 				 
-				 (marked? (member (+ (gethash :start-file-number (efar-panel side)) cnt) (gethash :selected (efar-panel side))))
+				 (marked? (member (+ (efar-get :panels side :start-file-number) cnt) (efar-get :panels side :selected)))
 				 
-				 (str (efar-prepare-file-name (concat (and marked? "*") (if (string= (efar-get-value :dir side) "Search") (car f) (file-name-nondirectory (car f))) ) w)))
+				 (str (efar-prepare-file-name (concat (and marked? "*") (if (string= (efar-get :panels side :dir) "Search") (car f) (file-name-nondirectory (car f))) ) w)))
 			    
 			    
 			    (replace-rectangle p (+ p (length str)) str)
@@ -1486,8 +1499,8 @@ Selected item bacomes actual for panel SIDE."
 			    (let ((dir? (car (cdr f)))
 				  
 				  (current? (and
-					     (= cnt (gethash :current-pos (efar-panel side)))
-					     (equal side (gethash :current-panel efar-state)))))
+					     (= cnt (efar-get :panels side :current-pos))
+					     (equal side (efar-get :current-panel)))))
 			      (let ((current-face
 				     (cond
 				      ((and dir? current?) 'efar-dir-current-face)
@@ -1508,7 +1521,7 @@ Selected item bacomes actual for panel SIDE."
 
 (defun efar-output-header(side)
   ""
-  (let ((mode (gethash :mode efar-state)))
+  (let ((mode (efar-get :mode)))
     
     (when (or (equal mode :both) (equal mode side))
       
@@ -1519,10 +1532,10 @@ Selected item bacomes actual for panel SIDE."
 			  ((or (equal side :left) (not (equal mode :both))) 1)
 			  (t (+ (efar-panel-width :left) 2))))
 	     
-	     (filter (efar-get-value :file-filter side))
+	     (filter (efar-get :panels side :file-filter))
 	     (str (concat	       
-		   (substring (efar-get-value :sort-function-name side) 0 1)
-		   (if (efar-get-value :sort-order side) (char-to-string 9660) (char-to-string 9650) )
+		   (substring (efar-get :panels side :sort-function-name) 0 1)
+		   (if (efar-get :panels side :sort-order) (char-to-string 9660) (char-to-string 9650) )
 		   (when (not (string-empty-p filter))
 		     (concat " " filter )))))
 	
@@ -1541,16 +1554,16 @@ Selected item bacomes actual for panel SIDE."
 
 (defun efar-output-dir-names(side)
   ""
-  (let ((mode (gethash :mode efar-state)))
+  (let ((mode (efar-get :mode)))
     
     (when (or (equal mode :both) (equal mode side))
       
       (goto-char 0)
       
       (let* ((dir
-	      (if (> (length (gethash :dir (efar-panel side))) (efar-panel-width side))
-		  (subseq (gethash :dir (efar-panel side)) (- (length (gethash :dit (efar-panel side))) (efar-panel-width side)))	     	     
-		(gethash :dir (efar-panel side))))
+	      (if (> (length (efar-get :panels side :dir)) (efar-panel-width side))
+		  (subseq (efar-get :panels side :dir) (- (length (efar-get :panels side :dir)) (efar-panel-width side)))	     	     
+		(efar-get :panels side :dir)))
 	     
 	     (col-number (cond
 			  ((not (equal mode :both))  (- (floor (window-width) 2) (floor (length dir) 2)))
@@ -1560,7 +1573,7 @@ Selected item bacomes actual for panel SIDE."
 	
 	(let ((p (point)))
 	  (replace-rectangle p (+ p (length dir)) dir)
-	  (if (equal side (gethash :current-panel efar-state))
+	  (if (equal side (efar-get :current-panel))
 	      (put-text-property p (+ p (length dir)) 'face 'efar-dir-name-current-face)
 	    (put-text-property p (+ p (length dir)) 'face 'efar-dir-name-face)))))))
 
@@ -1569,7 +1582,7 @@ Selected item bacomes actual for panel SIDE."
   ""
   (goto-char 0)
   
-  (let ((panel-height (gethash :panel-height efar-state)))
+  (let ((panel-height (efar-get :panel-height)))
     
     ;; insert first line
     
@@ -1641,7 +1654,7 @@ Selected item bacomes actual for panel SIDE."
 
 (defun efar-draw-border-line(left center right filler splitter &optional newline)
   ""
-  (let ((mode (gethash :mode efar-state)))
+  (let ((mode (efar-get :mode)))
     
     (loop for side
 	  from (if (or (equal mode :left) (equal mode :both)) 1 2)
@@ -1655,14 +1668,14 @@ Selected item bacomes actual for panel SIDE."
 	  
 	  (let ((s (if (= side 1) :left :right)))
 	    
-	    (loop for col from 0 upto (- (efar-get-value :column-number s) 1)
+	    (loop for col from 0 upto (- (efar-get :panels s :column-number) 1)
 		  do
 		  
-		  (let ((col-number (efar-get-value :column-number s)))
+		  (let ((col-number (efar-get :panels s :column-number)))
 		    
 		    (insert-char filler (nth col (if (= side 1)
-						     (car (gethash :column-widths efar-state))
-						   (cdr (gethash :column-widths efar-state)))))
+						     (car (efar-get :column-widths))
+						   (cdr (efar-get :column-widths)))))
 		    
 		    (if (not (= (+ col 1) col-number))
 			(insert-char (or splitter filler) 1))))
@@ -1680,10 +1693,10 @@ Selected item bacomes actual for panel SIDE."
 	 (left-widths ())
 	 (right-widths ())
 	 
-	 (window-width (gethash :window-width efar-state))
-	 (mode (gethash :mode efar-state))
-	 (cols-left (efar-get-value :column-number :left))
-	 (cols-right (efar-get-value :column-number :right))
+	 (window-width (efar-get :window-width))
+	 (mode (efar-get :mode))
+	 (cols-left (efar-get :panels :left :column-number))
+	 (cols-right (efar-get :panels :right :column-number))
 	 
 	 (left-width (cond
 		      ((equal mode :both) (floor (- window-width 3) 2))
@@ -1694,7 +1707,7 @@ Selected item bacomes actual for panel SIDE."
 		       ((equal mode :both) (ceiling (- window-width 3) 2))
 		       ((equal mode :left) 0)
 		       ((equal mode :right) (- window-width 2)))))
-    
+
     (when (not (zerop left-width))
       (let* ((left-min-col-width (floor (/ (- left-width (- cols-left 1)) cols-left)))
 	     (left-leftover (- left-width (- cols-left 1) (* left-min-col-width cols-left))))
@@ -1727,7 +1740,7 @@ Selected item bacomes actual for panel SIDE."
     
     (setf widths (cons left-widths right-widths))
     
-    (puthash :column-widths widths efar-state)))
+    (efar-set widths :column-widths)))
 
 
 
