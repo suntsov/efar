@@ -1,20 +1,214 @@
 (setq debug-on-error t)
 
+(when (eq window-system 'w32)
+  (set-default 'tramp-auto-save-directory "C:\test")
+  (set-default 'tramp-default-method "plink"))
+
 (require 'cl)
 (require 'ido)
 (require 'tramp)
 (require 'subr-x)
 (require 'filenotify)
 
-(defconst efar-state-file-name (concat user-emacs-directory ".efar-state"))
-(defconst efar-buffer-name "*eFAR*")
 (defvar efar-state nil)
-(defconst efar-default-startup-dirs (cons user-emacs-directory  user-emacs-directory))
-(defconst efar-save-state? t)
 
-(when (eq window-system 'w32)
-  (set-default 'tramp-auto-save-directory "C:\test")
-  (set-default 'tramp-default-method "plink"))
+;;--------------------------------------------------------------------------------
+;; eFar customization
+;;--------------------------------------------------------------------------------
+;; GROUPS
+(defgroup eFar nil
+  "FAR-like file manager"
+  :group 'applications)
+
+(defgroup eFar-parameters nil
+  "eFar main customization parameters"
+  :group 'eFar)
+
+(defgroup eFar-faces nil
+  "eFar faces"
+  :group 'eFar)
+
+(defgroup eFar-keys nil
+  "eFar key bindings"
+  :group 'eFar)
+
+;; MAIN PARAMETERS
+(defcustom efar-buffer-name "*eFAR*"
+  "Name for the Efar buffer"
+  :group 'eFar-parameters)
+
+(defcustom efar-state-file-name (concat user-emacs-directory ".efar-state")
+  "Path to the eFar state save file"
+  :group 'eFar-parameters)
+
+(defcustom efar-default-startup-dirs (cons user-emacs-directory user-emacs-directory)
+  "Default direcotries shown at startup"
+  :group 'eFar-parameters)
+
+(defcustom efar-save-state? t
+  ""
+  :group 'eFar-parameters
+  :type 'boolean)
+
+;; FACES
+(defface efar-border-line-face
+  '((t :foreground "white"
+       :background "navy"
+       :underline nil
+       ))
+  "Border line face"
+  :group 'eFar-faces)
+
+
+(defface efar-file-face
+  '((t :foreground "deep sky blue"
+       :background "navy"
+       :underline nil
+       ))
+  "File item style (default)"
+  :group 'eFar-faces)
+
+(defface efar-file-executable-face
+  '((t :foreground "green"
+       :background "navy"
+       :underline nil
+       ))
+  "File item style (executable file)"
+  :group 'eFar-faces)
+
+(defface efar-dir-face
+  '((t :foreground "white"
+       :background "navy"
+       :underline nil
+       ))
+  "Directory item style"
+  :group 'eFar-faces)
+
+(defface efar-file-current-face
+  '((t :foreground "black"
+       :background "cadet blue"
+       :underline nil
+       ))
+  "Current file item style"
+  :group 'eFar-faces)
+
+
+(defface efar-dir-current-face
+  '((t :foreground "white"
+       :background "cadet blue"
+       :underline nil
+       ))
+  "Current directory item style"
+  :group 'eFar-faces)
+
+(defface efar-marked-face
+  '((t :foreground "gold"
+       :background "navy"
+       :underline nil
+       ))
+  "Marked item style"
+  :group 'eFar-faces)
+
+
+(defface efar-dir-name-face
+  '((t :foreground "white"
+       :background "navy"
+       :underline nil
+       ))
+  "Directory name header style"
+  :group 'eFar-faces)
+
+(defface efar-header-face
+  '((t :foreground "orange"
+       :background "navy"
+       :underline nil
+       ))
+  "Header style"
+  :group 'eFar-faces)
+
+(defface efar-dir-name-current-face
+  '((t :foreground "navy"
+       :background "bisque"
+       :underline nil
+       ))
+  "Current directory name header style"
+  :group 'eFar-faces)
+
+
+;; KEYS
+
+(defvar efar-keys '()
+  "The list of eFar keybindings")
+
+(setq efar-keys '())
+
+(defun efar-register-key(key func arg custom-key-name description)
+  ""
+  (push (list key func arg custom-key-name description) efar-keys))
+
+;;			key-sequence	function to call		arg	variable name to save cusom	Key description
+(efar-register-key 	"C-o" 		'efar-display-console		nil	'efar-display-console-key 	"Open console window")
+(efar-register-key 	"<insert>"	'efar-mark-file			nil	'efar-mark-file-key		"Mark current file/directory")
+(efar-register-key	"<C-insert>"	'efar-deselect-all		nil	'efar-deselect-all-kay		"Unmark all files")
+(efar-register-key	"<f12> <f12>" 	'efar-init			nil	'efar-init-key			"Reinit and redraw eFar buffer")
+(efar-register-key	"<down>" 	'efar-move-cursor		:down 	'efar-move-down-key		"Move cursor down")
+(efar-register-key	"<up>" 		'efar-move-cursor		:up	'efar-move-up-key		"Move cursor up")
+(efar-register-key	"<right>" 	'efar-move-cursor		:right 	'efar-move-right		"Move cursor to the right")
+(efar-register-key	"<left>" 	'efar-move-cursor		:left 	'efar-move-left-key		"Move cursor to the left")
+(efar-register-key	"<home>" 	'efar-move-cursor		:home	'efar-move-home-key		"Move cursor to the first file")
+(efar-register-key	"C-<left>" 	'efar-move-cursor		:home 	'efar-move-home-alt-key		"Move sursor to the first file (alternative)")
+(efar-register-key	"<end>" 	'efar-move-cursor		:end	'efar-move-end-key		"Move cursor to the last file")
+(efar-register-key	"C-<right>" 	'efar-move-cursor		:end	'efar-move-end-alt-key		"Move cursor to the last file (alternative)")
+(efar-register-key	"RET" 		'efar-enter-directory		nil 	'efar-enter-directory-key	"Enter directory under cursor")
+(efar-register-key	"TAB" 		'efar-switch-to-other-panel	nil	'efar-switch-to-other-panel-key	"Go to other panel")
+(efar-register-key	"C-c TAB" 	'efar-open-dir-other-panel	nil	'efar-open-dir-othet-panel-key	"Open current directory in other panel")
+(efar-register-key	"<f4>" 		'efar-edit-file			nil	'efar-open-file-key		"Edit file under cursor")
+(efar-register-key	"<M-f4>" 	'efar-open-file-in-ext-app	nil	'efar-open-file-in-ext-app-key	"Open file in externall application")
+(efar-register-key	"<f5>" 		'efar-copy-or-move-files	:copy	'efar-copy-file-key		"Copy file(s)")
+(efar-register-key	"<f6>"		'efar-copy-or-move-files	:move	'efar-move-file-key		"Move/rename file(s)")
+(efar-register-key	"<M-f1>"	'efar-change-disk		:left	'efar-change-disk-left-key	"Change current disk/mount point (left panel)")
+(efar-register-key	"<M-f2>"	'efar-change-disk		:right	'efar-change-disk-right-key	"Change current disk/mount point (right panel)")
+(efar-register-key	"<C-f1>"	'efar-change-sort-function 	:left	'efar-change-sort-left-key	"Change sort algorythm and/or order (left panel)")
+(efar-register-key	"<C-f2>"	'efar-change-sort-function 	:right	'efar-change-sort-right-key	"Change sort algorythm and/or order (right panel)")
+(efar-register-key	"<f7>"		'efar-create-new-directory	nil	'efar-create-direcotry-key	"Create new directory")
+(efar-register-key	"<f8>"		'efar-delete-selected		nil	'efar-delete-file-key		"Delete selected file(s)")
+(efar-register-key	"<S-f1>"	'efar-filter-files		:left	'efar-filter-files-left-key	"Set/remove filtering for current directory (left panel)")
+(efar-register-key	"<S-f2>"	'efar-filter-files		:right	'efar-filter-files-right-key	"Set/remove filtering for current directory (right panel)")
+(efar-register-key	"<f11>"		'efar-change-mode		nil	'efar-change-mode-key		"Toggle mode: double panel <-> single panel")
+(efar-register-key	"C-c +"		'efar-change-column-number	t	'efar-inc-column-number-key	"Increase number of columns in current panel")
+(efar-register-key	"C-c -"		'efar-change-column-number	nil	'efar-dec-column-number-key	"Decrease number of columns in current panel")
+(efar-register-key	"<f10>"		'efar-copy-current-path		nil	'efar-copy-current-path-key	"Copy to the clipboard the path to the current file")
+(efar-register-key	"C-c C-d"	'efar-cd			nil	'efar-cd-key			"Go to directory")
+
+;; fast-search keys
+(efar-register-key	"<backspace>"	'efar-fast-search		:back	nil				"Backspace for fast search")
+(efar-register-key	"C-n"		'efar-fast-search		:next	nil				"Go to next fast search match")
+(efar-register-key	"C-p"		'efar-fast-search		:prev	nil				"Go to previous fast search match")
+(loop for char in (list ?a ?b ?c ?d ?e ?f ?g ?h ?i ?j ?k ?l ?m ?n ?o ?p ?q ?r ?s ?t ?u ?v ?w ?x ?y ?z
+			?A ?B ?C ?D ?E ?F ?G ?H ?I ?J ?K ?L ?M ?N ?O ?P ?Q ?R ?S ?T ?U ?V ?W ?X ?Y ?Z
+			?1 ?2 ?3 ?4 ?5 ?6 ?7 ?8 ?9 ?0
+			?( ?) ?.
+			?- ?_
+			32) do
+			
+			(efar-register-key	(char-to-string char)	'efar-fast-search	char	nil	""))
+    
+;;(efar-register-key	"<M-f7>"	'efar-start-search		nil	'efar-start-search-key		t	"Start file search")
+			      
+;; create customization entries for key bindings
+(loop for key in efar-keys do
+      (when (nth 3 key)
+	(custom-declare-variable
+	 (intern (symbol-name (nth 3 key)))
+	 (kbd (nth 0 key))
+	 (nth 4 key)
+	 :type 'key-sequence
+	 :group 'eFar-keys)))
+
+  
+;;--------------------------------------------------------------------------------
+;; eFar main functions
+;;--------------------------------------------------------------------------------
 
 (defun efar(arg)
   "Main funtion to run eFar commander.
@@ -70,7 +264,8 @@ If the function called with prefix argument, then go to default-directory of cur
   (when (null efar-state)
     (efar-init-state))
     
-  (efar-set-keys)
+  (efar-set-key-bindings)
+;;  (efar-set-mouse-bindings)
   
   (efar-go-to-dir (efar-get :panels :left :dir) :left)
   (efar-go-to-dir (efar-get :panels :right :dir) :right))
@@ -603,212 +798,41 @@ Notifications in the queue will be processed only if there are no new notificati
        (put-text-property p (+ p w) 'face 'efar-header-face))))
   (sit-for 0.001))
 
-(defun efar-set-keys()
+(defun efar-set-key-bindings()
   "Set up local key bindings"
-  
-;; ToDo: implement mouse interaction
-;;  (local-set-key (kbd "<down-mouse-1>")
-;;		 (lambda (event)
-;;		   (interactive "e")
-;;		   (if (<  (car (nth 6 (nth 1 event))) (+ 2 (efar-get :panel-width) ))
-;;		       (progn
-;;			 (efar-set :left :current-panel)
-;;			 (efar-set default-directory :panels :left :dir))
-;;		     
-;;		     (progn
-;;		       (efar-set :right :current-panel)
-;;		       (efar-set default-directory :panels :right :dir))
-;;		     )
-;;		   (efar-write-enable (efar-redraw))))
-  
-  ;; set up fast-search keys 
-  (let ((characters (list
-		     ?a ?b ?c ?d ?e ?f ?g ?h ?i ?j ?k ?l ?m ?n ?o ?p ?q ?r ?s ?t ?u ?v ?w ?x ?y ?z
-		     ?A ?B ?C ?D ?E ?F ?G ?H ?I ?J ?K ?L ?M ?N ?O ?P ?Q ?R ?S ?T ?U ?V ?W ?X ?Y ?Z
-		     ?1 ?2 ?3 ?4 ?5 ?6 ?7 ?8 ?9 ?0
-		     ?( ?) ?.
-		     ?- ?_
-		     32)))
-    
-    
-    (loop for k in characters do       
-	  (local-set-key (char-to-string k) `(lambda () 
-					       (interactive)
-					       (efar-fast-search ',k)))))
-  
-  (local-set-key (kbd "<backspace>") (lambda()
-				       (interactive)
-				       (efar-fast-search :backspace)))
-  
-  (local-set-key (kbd "C-n") (lambda ()
-			       (interactive)
-			       (efar-fast-search :next)))
-  (local-set-key (kbd "C-b") (lambda ()
-			       (interactive)
-			       (efar-fast-search :prev)))
+  (loop for key in efar-keys do
+	(local-set-key
+	 (kbd (nth 0 key))
+	 `(lambda()
+	    (interactive)
+	    (if (nth 2 ',key)
+		(funcall (nth 1 ',key) (nth 2 ',key))
+	      (funcall (nth 1 ',key)))))))
 
-  ;; set up key to open terminal window
-  (local-set-key (kbd "C-o") (lambda () 
-			       (interactive)
-			       (efar-display-console)))
-  
-  
-  ;; set up key to mark file
-  (local-set-key (kbd "<insert>") (lambda () 
-				    (interactive)
-				    (efar-mark-file)))
-
-  ;; set up key to reinit eFar
-  (local-set-key (kbd "<f12> <f12>") (lambda () 
-				 (interactive) 
-				 (efar-init)))
-
-  ;; set up keys intended to move cursor
-  (local-set-key (kbd "<down>") (lambda () 
-				  (interactive)
-				  (efar-move-cursor  :down)))
-  
-  (local-set-key (kbd "<up>") (lambda () 
-				(interactive)
-				(efar-move-cursor  :up)))
-  
-  (local-set-key (kbd "<right>") (lambda () 
-				   (interactive)
-				   (efar-move-cursor  :right)))
-  
-  (local-set-key (kbd "<left>") (lambda () 
-				  (interactive)
-				  (efar-move-cursor  :left)))
-  
-  (local-set-key (kbd "<home>") (lambda () 
-				  (interactive)
-				  (efar-move-cursor  :home)))
-  
-  (local-set-key (kbd "C-<left>") (lambda () 
-				    (interactive)
-				    (efar-move-cursor  :home)))
-  
-  (local-set-key (kbd "<end>") (lambda () 
-				 (interactive)
-				 (efar-move-cursor  :end)))
-  
-  (local-set-key (kbd "C-<right>") (lambda () 
-				     (interactive)
-				     (efar-move-cursor  :end)))
-
-  ;; set up key to enter directory
-  (local-set-key (kbd "RET") (lambda () 
-			       (interactive)
-			       (efar-enter-directory)))
-
-  ;; set up key to switch the current panel
-  (local-set-key (kbd "TAB") (lambda () 
-			       (interactive)
-			       (efar-switch-to-other-panel)))
-   
-  ;; set up key to open same directory in other panel
-  (local-set-key (kbd "C-c TAB") (lambda ()
-				   (interactive)
-				   (efar-open-same-directory-other-panel)))
-
-  ;; set up key to edit file
-  (local-set-key (kbd "<f4>") (lambda () 
-				(interactive)
-				(efar-edit-file)))
-
-  ;; set up key to open file in external app
-  (local-set-key (kbd "<M-f4>") (lambda () 
-				  (interactive)
-				  (efar-open-file-in-external-app)))
-
-  ;; set up key to copy files
-  (local-set-key (kbd "<f5>") (lambda () 
-				(interactive)
-				(efar-copy-or-move-files :copy)))
-
-  ;; set up key to move/rename files
-  (local-set-key (kbd "<f6>") (lambda () 
-				(interactive)
-				(efar-copy-or-move-files :move)))
-  
-  ;; set up key to unmark all marked files
-  (local-set-key (kbd "<C-insert>") (lambda () 
-				      (interactive)
-				      (efar-deselect-all)))
-
-  ;; set up keys to change disk/mount point
-  (local-set-key (kbd "<M-f1>") (lambda ()
-				  (interactive)
-				  (efar-change-directory :left)))
-
-  (local-set-key (kbd "<M-f2>") (lambda ()
-				  (interactive)
-				  (efar-change-directory :right)))
-
-  ;; set up keys to change sort algorythm
-  (local-set-key (kbd "<C-f1>") (lambda ()
-				  (interactive)
-				  (efar-change-sort-function :left)))
-  
-  (local-set-key (kbd "<C-f2>") (lambda ()
-				  (interactive)
-				  (efar-change-sort-function :right)))
-
-;;  ;; set up key to run search
-;;  (local-set-key (kbd "<M-f7>") (lambda ()
-;;				  (interactive)
-;;				  (efar-start-search)))
- 
-  ;; set up key to create directory
-  (local-set-key (kbd "<f7>") (lambda ()
-				(interactive)
-				(efar-create-new-directory)))
-
-  ;; set up key to delete selected files
-  (local-set-key (kbd "<f8>") (lambda ()
-				(interactive)
-				(efar-delete-selected)))
-
-  ;; set up keys to change filtering in current directory
-  (local-set-key (kbd "<S-f1>") (lambda()
-				  (interactive)
-				  (efar-filter-files :left)))
-  
-  (local-set-key (kbd "<S-f2>") (lambda()
-				  (interactive)
-				  (efar-filter-files :right)))
-
-  ;; set up key to change mode :double <-> :single
-  (local-set-key (kbd "<f11>") (lambda()
-				 (interactive)
-				 (efar-change-mode)))
-  
-  ;; set up keys to change column number
-  (local-set-key (kbd "C-c +") (lambda()
-				 (interactive)
-				 (efar-change-column-number t)))
-  
-  (local-set-key (kbd "C-c -") (lambda()
-				 (interactive)
-				 (efar-change-column-number nil)))
-
-  ;; set up key to copy current file path
-  (local-set-key (kbd "<f10>") (lambda()
-				 (interactive)
-				 (efar-copy-current-path)))
-
-  ;; set up key to change directory "manually"
-  (local-set-key (kbd "C-c C-d") (lambda()
-				  (interactive)
-				  (efar-cd)
-				  )))
+(defun efar-set-mouse-bindings()
+  ""
+  ;; ToDo: implement mouse interaction
+  ;;  (local-set-key (kbd "<down-mouse-1>")
+  ;;		 (lambda (event)
+  ;;		   (interactive "e")
+  ;;		   (if (<  (car (nth 6 (nth 1 event))) (+ 2 (efar-get :panel-width) ))
+  ;;		       (progn
+  ;;			 (efar-set :left :current-panel)
+  ;;			 (efar-set default-directory :panels :left :dir))
+  ;;		     
+  ;;		     (progn
+  ;;		       (efar-set :right :current-panel)
+  ;;		       (efar-set default-directory :panels :right :dir))
+  ;;		     )
+  ;;		   (efar-write-enable (efar-redraw))))
+  )
 
 (defun efar-cd()
   "Open directory selector (read-diretory-name) and go to selected directory."
   (efar-go-to-dir (read-directory-name "Go to directory: " default-directory))
   (efar-write-enable (efar-redraw)))
 
-(defun efar-change-column-number(increase)
+(defun efar-change-column-number(&optional increase)
   ""
   (let ((side (efar-get :current-panel)))
     
@@ -838,7 +862,7 @@ If a double mode is active then actual panel becomes fullscreen."
     
     (efar-write-enable (efar-redraw))))
 
-(defun efar-open-same-directory-other-panel()
+(defun efar-open-dir-other-panel()
   "Opens current pannel's direcotry in other panel."
   (efar-go-to-dir default-directory (efar-other-side))
   (efar-write-enable (efar-redraw)))
@@ -851,7 +875,7 @@ If a double mode is active then actual panel becomes fullscreen."
 	 (fname (expand-file-name (car file) (efar-get :panels side :dir))))
     (kill-new fname)))
 
-(defun efar-open-file-in-external-app()
+(defun efar-open-file-in-ext-app()
   ""
   (let* ((side (efar-get :current-panel))
 	 (fnum (+ (efar-get :panels side :start-file-number) (efar-get :panels side :current-pos) ))
@@ -918,7 +942,7 @@ If a double mode is active then actual panel becomes fullscreen."
   ""
   (if (not (get-buffer "*efar-shell*"))
       (shell "*efar-shell*")
-    (progn
+    (let ((side (efar-get :current-panel)))
       (with-current-buffer (get-buffer "*efar-shell*")
 	(insert (concat "cd " (efar-get :panels side :dir)))
 	(comint-send-input nil t))
@@ -948,13 +972,13 @@ If a double mode is active then actual panel becomes fullscreen."
        
        ((equal k :next)
 	(when (> (length str) 0)
-	  (incf (efar-get :fast-search-occur))))
+	  (efar-set (+ 1 (efar-get :fast-search-occur)) :fast-search-occur)))
        
        ((equal k :prev)
 	(when (> (length str) 0)
-	  (decf (efar-get :fast-search-occur))))
+	  (efar-set (+ 1 (efar-get :fast-search-occur)) :fast-search-occur)))
        
-       ((equal k :backspace)
+       ((equal k :back)
 	(when (> (length str) 0)
 	  (setf str (substring str 0 (- (length str) 1)))))
        
@@ -1113,7 +1137,7 @@ If a double mode is active then actual panel becomes fullscreen."
 
 
 
-(defun efar-change-directory(side)
+(defun efar-change-disk(side)
   "Show menu with available disks (Windows) or mount points (Unix) (*ToDo*).
 Selected item bacomes actual for panel SIDE."
   (let ((dir (concat
@@ -1385,7 +1409,7 @@ Selected item bacomes actual for panel SIDE."
   (erase-buffer)
   (efar-draw-border )
   
-  (put-text-property (point-min) (point-max) 'face 'efar-border-face)
+  (put-text-property (point-min) (point-max) 'face 'efar-border-line-face)
   
   (efar-output-dir-names :left)
   (efar-output-dir-names :right)
@@ -1413,10 +1437,11 @@ Selected item bacomes actual for panel SIDE."
   
   (let ((mode (efar-get :mode)))
     
-    (when (or (equal mode :both) (equal mode side))
+    (when (and (not (null (efar-get :panels side :files)))
+	   (or (equal mode :both) (equal mode side)))
       
       (let ((current-file-number (efar-current-file-number side)))
-	
+
 	(when current-file-number
 	  
 	  (let* ((file (nth current-file-number (efar-get :panels side :files)))
@@ -1443,7 +1468,7 @@ Selected item bacomes actual for panel SIDE."
 	    (let ((p (point)))
 	      (replace-rectangle p (+ p w) status-str)
 	      
-	      (put-text-property p (+ p w) 'face 'efar-border-face))))))))
+	      (put-text-property p (+ p w) 'face 'efar-border-line-face))))))))
 
 (defun efar-panel-width(side)
   ""
@@ -1764,102 +1789,6 @@ Selected item bacomes actual for panel SIDE."
     (setf widths (cons left-widths right-widths))
     
     (efar-set widths :column-widths)))
-
-
-
-(defface efar-border-face
-  '((t :foreground "white"
-       :background "navy"
-       ;;:weight bold 
-       :underline nil
-       ))
-  "The face used for representing the visited link to the file")
-
-
-(defface efar-file-face
-  '((t :foreground "deep sky blue"
-       :background "navy"
-       ;;:weight bold 
-       :underline nil
-       ))
-  "The face used for representing the visited link to the file")
-
-(defface efar-file-executable-face
-  '((t :foreground "green"
-       :background "navy"
-       ;;:weight bold 
-       :underline nil
-       ))
-  "The face used for representing the visited link to the file")
-
-(defface efar-file-marked-face
-  '((t :foreground "gold"
-       :background "navy"
-       ;;:weight bold 
-       :underline nil
-       ))
-  "The face used for representing the visited link to the file")
-
-(defface efar-dir-face
-  '((t :foreground "white"
-       :background "navy"
-       ;;:weight bold
-       :underline nil
-       ))
-  "The face used for representing the visited link to the file")
-
-
-
-(defface efar-file-current-face
-  '((t :foreground "black"
-       :background "cadet blue"
-       ;;:weight bold 
-       :underline nil
-       ))
-  "The face used for representing the visited link to the file")
-
-
-(defface efar-dir-current-face
-  '((t :foreground "white"
-       :background "cadet blue"
-       ;;:weight bold
-       :underline nil
-       ))
-  "The face used for representing the visited link to the file")
-
-(defface efar-marked-face
-  '((t :foreground "gold"
-       :background "navy"
-       ;;:weight bold
-       :underline nil
-       ))
-  "The face used for representing the visited link to the file")
-
-
-(defface efar-dir-name-face
-  '((t :foreground "white"
-       :background "navy"
-       ;;:weight bold 
-       :underline nil
-       ))
-  "The face used for representing the visited link to the file")
-
-(defface efar-header-face
-  '((t :foreground "orange"
-       :background "navy"
-       ;;:weight bold 
-       :underline nil
-       ))
-  
-  "The face used for representing the visited link to the file")
-
-(defface efar-dir-name-current-face
-  '((t :foreground "navy"
-       :background "bisque"
-       ;;:weight bold 
-       :underline nil
-       ))
-  "The face used for representing the visited link to the file")
 
 
 
