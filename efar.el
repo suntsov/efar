@@ -12,8 +12,9 @@
 
 (defvar efar-state nil)
 
+
 ;;--------------------------------------------------------------------------------
-;; eFar customization
+;; eFar customization variables
 ;;--------------------------------------------------------------------------------
 ;; GROUPS
 (defgroup eFar nil
@@ -187,14 +188,14 @@
 (loop for char in (list ?a ?b ?c ?d ?e ?f ?g ?h ?i ?j ?k ?l ?m ?n ?o ?p ?q ?r ?s ?t ?u ?v ?w ?x ?y ?z
 			?A ?B ?C ?D ?E ?F ?G ?H ?I ?J ?K ?L ?M ?N ?O ?P ?Q ?R ?S ?T ?U ?V ?W ?X ?Y ?Z
 			?1 ?2 ?3 ?4 ?5 ?6 ?7 ?8 ?9 ?0
-			?( ?) ?.
+			?( ?) ?.	
 			?- ?_
 			32) do
 			
 			(efar-register-key	(char-to-string char)	'efar-fast-search	char	nil	""))
-    
+
 ;;(efar-register-key	"<M-f7>"	'efar-start-search		nil	'efar-start-search-key		t	"Start file search")
-			      
+
 ;; create customization entries for key bindings
 (loop for key in efar-keys do
       (when (nth 3 key)
@@ -205,7 +206,7 @@
 	 :type 'key-sequence
 	 :group 'eFar-keys)))
 
-  
+
 ;;--------------------------------------------------------------------------------
 ;; eFar main functions
 ;;--------------------------------------------------------------------------------
@@ -222,7 +223,7 @@ If the function called with prefix argument, then go to default-directory of cur
        (efar-buffer (get-buffer-create efar-buffer-name))
        ;; if eFar is called with prefix argument, then go to default-directory of current buffer
        (go-to-dir (when arg
-		     default-directory)))
+		    default-directory)))
     
     (with-current-buffer efar-buffer
       ;; make eFar buffer fullscreen
@@ -263,9 +264,9 @@ If the function called with prefix argument, then go to default-directory of cur
   ;; then initialize state storage with default values
   (when (null efar-state)
     (efar-init-state))
-    
+  
   (efar-set-key-bindings)
-;;  (efar-set-mouse-bindings)
+  ;;  (efar-set-mouse-bindings)
   
   (efar-go-to-dir (efar-get :panels :left :dir) :left)
   (efar-go-to-dir (efar-get :panels :right :dir) :right))
@@ -337,7 +338,7 @@ If the function called with prefix argument, then go to default-directory of cur
   (cdr (assoc name efar-sort-functions)))
 
 
-(defun efar-sort-function-names(&optional side)
+(defun efar-sort-function-names(side)
   "Returns a list of sort function names. 
 The name of a function which is currently used for the panel SIDE (or current panel) becomes a first entry in the list."
   (sort
@@ -410,10 +411,10 @@ Case is ignored."
 (defun efar-change-sort-function(side)
   "Ask user for sort function and order and set them for panel SIDE."
   (efar-set (ido-completing-read "Sort files by: " (efar-sort-function-names side))
-		  :panels side :sort-function-name)
-		  
+	    :panels side :sort-function-name)
+  
   (efar-set (string= (char-to-string 9660) (ido-completing-read "Sort order: " (list (char-to-string 9650) (char-to-string 9660) )))
-		  :panels side :sort-order)
+	    :panels side :sort-order)
 
   (efar-refresh-dir side nil (efar-get-short-file-name (efar-current-file))))
 
@@ -558,39 +559,27 @@ Notifications in the queue will be processed only if there are no new notificati
 
 (defun efar-copy-or-move-files(operation)
   ""
-  
-  (unwind-protect
-      
+  (unwind-protect      
       (progn 
 	(efar-set-status :busy (if (equal operation :copy)
 				   "Copying files..."
 				 "Moving files..."))
-	
-	(let ((start-time (time-to-seconds (current-time))))
-	  
-	  (efar-with-notification-disabled
-	   (let* ((side (efar-get :current-panel))
-		  (todir  (efar-get :panels (efar-other-side) :dir) )	 
-		  (selected (efar-get :panels side :selected))
-		  (start-file-number (efar-get :panels side :start-file-number))
-		  (file-number (+ start-file-number (efar-get :panels side :current-pos)))
-		  
-		  (files (mapcar
-			  (lambda (fn)
-			    (efar-get-short-file-name (nth fn (efar-get :panels side :files))))
-			  
-			  (if selected 
-			      selected
-			    (list file-number )))))
-	     
-	     (when  (> file-number 0)	      
-	       (efar-copy-or-move-files-int operation files (read-directory-name (if (equal operation :copy) "Copy selected files to " "Move selected files to ") todir todir)))
-	     
-	     (efar-refresh-dir :left)
-	     (efar-refresh-dir :right)))
-	  (print (- (time-to-seconds (current-time)) start-time))))
-    
-    (efar-set-status :ready "Ready")))
+
+	(efar-with-notification-disabled
+	 (let* ((side (efar-get :current-panel))
+		(todir  (efar-get :panels (efar-other-side) :dir) )	 
+		(selected (efar-get :panels side :selected))		    
+		(start-file-number (efar-get :panels side :start-file-number))
+		(file-number (+ start-file-number (efar-get :panels side :current-pos)))
+		(files (efar-selected-files side nil)))
+
+	   (when files
+	     (efar-copy-or-move-files-int operation files (read-directory-name (if (equal operation :copy) "Copy selected files to " "Move selected files to ") todir todir)))
+	   
+	   (efar-refresh-dir :left)
+	   (efar-refresh-dir :right)))
+
+	(efar-set-status :ready "Ready"))))
 
 (defun efar-copy-or-move-files-int(operation files todir &optional fromdir overwrite?)
   ""
@@ -603,32 +592,32 @@ Notifications in the queue will be processed only if there are no new notificati
 		       (mapc ;; for each file in FILES		   
 			(lambda (f)
 			  ;; skip files "." and ".."
-			  (unless (or (string= f ".") (string= f ".."))
+			  (unless (or (string= (car f) ".") (string= (car f) ".."))
 			    ;; get new file name in destination folder
 			    (let ((newfile
 				   (if (file-directory-p todir)
-				       (expand-file-name f todir)
+				       (expand-file-name (efar-get-short-file-name f) todir)
 				     todir)))
 			      
 			      (cond 
 			       ;; if file is a real file and doesn't exist in destination folder
-			       ((and (not (file-directory-p f)) (not (file-exists-p newfile)))
+			       ((and (not (car (cdr f))) (not (file-exists-p newfile)))
 				;; we just copy it using elisp function
 				
 				(if (equal operation :copy)
-				    (efar-handle-error (copy-file f newfile))
-				  (efar-handle-error (rename-file f newfile nil))))
+				    (efar-handle-error (copy-file (car f) newfile))
+				  (efar-handle-error (rename-file (car f) newfile nil))))
 			       
 			       
 			       ;; if file is a directory and doesn't exist in destination folder
-			       ((and (file-directory-p f) (not (file-exists-p newfile)))
+			       ((and (car (cdr f)) (not (file-exists-p newfile)))
 				;; we just copy directory using elisp function
 				(if (equal operation :copy)
-				    (efar-handle-error (copy-directory f newfile nil nil nil))
-				  (efar-handle-error (rename-file f newfile))))
+				    (efar-handle-error (copy-directory (car f) newfile nil nil nil))
+				  (efar-handle-error (rename-file (car f) newfile))))
 			       
 			       ;; if file is a real file and does exist in destination folder
-			       ((and (not (file-directory-p f)) (file-exists-p newfile))
+			       ((and (not (car (cdr f))) (file-exists-p newfile))
 				(progn
 				  ;; we ask user what to do (overwrite, not overwrite, overwrite all remaining)
 				  ;; if user was already asked before and the answer was "All", we don't ask again
@@ -639,15 +628,15 @@ Notifications in the queue will be processed only if there are no new notificati
 				  ;; we copy file (overwrite) using elisp function if user approved it
 				  (when (not (string= overwrite? "No")) 
 				    (if (equal operation :copy)
-					(efar-handle-error (copy-file f newfile t nil nil nil))
-				      (efar-handle-error (rename-file f newfile t))))))
+					(efar-handle-error (copy-file (car f) newfile t nil nil nil))
+				      (efar-handle-error (rename-file (car f) newfile t))))))
 			       
 			       ;; if file is a directory and does exist in destination folder
-			       ((and (file-directory-p f) (file-exists-p newfile))
+			       ((and (car (cdr f)) (file-exists-p newfile))
 				;; we call local function recursively 
-				(do-operation operation (directory-files f nil nil t) newfile (expand-file-name f default-directory) )
+				(do-operation operation (directory-files (car f) nil nil t) newfile (expand-file-name (efar-get-short-file-name f) default-directory) )
 				(when (equal operation :move)
-				  (delete-directory f)))))))
+				  (delete-directory (car f))))))))
 			
 			files))))
     ;; call local function first time 
@@ -658,32 +647,20 @@ Notifications in the queue will be processed only if there are no new notificati
   ""
   (efar-set-status :busy "Deleting files...")
   
-  (unwind-protect
-      (progn
-	
+  (let ((side (efar-get :current-panel)))
+				   
+    (unwind-protect
 	(efar-with-notification-disabled
 	 (let* ((side (efar-get :current-panel))
-		(selected (efar-get :panels side :selected))
-		(start-file-number (efar-get :panels side :start-file-number))
-		(file-number (+ start-file-number (efar-get :panels side :current-pos)))
-		
-		(to-delete (if selected 
-			       selected
-			     (list file-number ))))
+		(selected-files (efar-selected-files side nil)))
 	   
-	   (when (and (> file-number 0) (string= "Yes" (ido-completing-read "Delete selected files? " (list "Yes" "No"))))
-	     (mapc
-	      (lambda (e)
-		(let* ((file (nth e (efar-get :panels side :files)))
-		       (file-name (car file))
-		       (dir? (car (cdr file)))
-		       )
+	   (when (and selected-files (string= "Yes" (ido-completing-read "Delete selected files? " (list "Yes" "No"))))
+	     (mapc(lambda (f)
+		    (if (car (cdr f))
+			(efar-handle-error (delete-directory (car f) t))
+		      (efar-handle-error (delete-file (car f)))))
 		  
-		  (if dir?
-		      (efar-handle-error (delete-directory file-name t))
-		    (efar-handle-error (delete-file file-name)))))
-	      
-	      to-delete)
+		  selected-files)
 	     
 	     (efar-refresh-dir side)
 	     
@@ -739,7 +716,7 @@ Notifications in the queue will be processed only if there are no new notificati
        (if value
 	   (setf value (gethash key value))
 	 (setf value (gethash key efar-state))))
-       keys)
+     keys)
     value))
 
 (defun efar-set(value &rest keys)
@@ -749,7 +726,7 @@ Notifications in the queue will be processed only if there are no new notificati
 
      (lambda(key)
        (if place
-	     (setf place (puthash key (gethash key place (make-hash-table :test `equal)) place))
+	   (setf place (puthash key (gethash key place (make-hash-table :test `equal)) place))
 	 (setf place (puthash key (gethash key efar-state (make-hash-table :test `equal)) efar-state))))
 
      (subseq keys 0 -1))
@@ -958,13 +935,13 @@ If a double mode is active then actual panel becomes fullscreen."
     (when timer (cancel-timer timer))
     
     (efar-set (run-at-time "5 sec" nil
-			  (lambda()
-			    (when (not (null efar-state))
-			      (efar-set "" :fast-search-string)
-			      (efar-output-status)
-			      (efar-set 0 :fast-search-occur)
-			      (efar-set nil :fast-search-timer))))
-	     :fast-search-timer)
+			   (lambda()
+			     (when (not (null efar-state))
+			       (efar-set "" :fast-search-string)
+			       (efar-output-status)
+			       (efar-set 0 :fast-search-occur)
+			       (efar-set nil :fast-search-timer))))
+	      :fast-search-timer)
     
     (let ((str (efar-get :fast-search-string)))
       
@@ -986,13 +963,13 @@ If a double mode is active then actual panel becomes fullscreen."
 	(setf str (concat str (format "%c" k)))))
       
       (let* ((side (efar-get :current-panel))
-	    (file-name (nth
-			(efar-get :fast-search-occur)
-			
-			(mapcan (lambda (e)
-				  (when (string-match str (efar-get-short-file-name e))
-				    (list (car e))))
-				(efar-get :panels side :files)))))
+	     (file-name (nth
+			 (efar-get :fast-search-occur)
+			 
+			 (mapcan (lambda (e)
+				   (when (string-match str (efar-get-short-file-name e))
+				     (list (car e))))
+				 (efar-get :panels side :files)))))
 	(when file-name
 	  (efar-go-to-file file-name nil 0)
 	  (efar-write-enable (efar-redraw))))
@@ -1007,7 +984,7 @@ If a double mode is active then actual panel becomes fullscreen."
   
   ;; if directory PATH exists or is accessible
   (if (and (file-exists-p path)
-		(file-accessible-directory-p path))
+	   (file-accessible-directory-p path))
       ;; return this directory
       path
     
@@ -1038,7 +1015,8 @@ If a double mode is active then actual panel becomes fullscreen."
       
       (efar-get-file-list side)
       
-      (efar-go-to-file current-file-name side current-file-number))
+      (when (> (length (efar-get :panels side :files)) 0)
+	(efar-go-to-file current-file-name side current-file-number)))
     
     (efar-write-enable (efar-redraw))))
 
@@ -1058,7 +1036,7 @@ If a double mode is active then actual panel becomes fullscreen."
     (efar-set () :panels side :selected)
     (efar-set dir :panels side :dir)
     
-    (efar-set "" :panels side :file-filter)
+    ;;(efar-set "" :panels side :file-filter)
     (efar-set "" :fast-search-string)
     
     (efar-get-file-list side)        
@@ -1161,7 +1139,7 @@ Selected item bacomes actual for panel SIDE."
 
 
 (defun efar-files-as-string(file-numbers)
-  ""
+  "Not used"
   (let ((side (efar-get :current-panel)))
     (mapconcat
      (lambda(x)
@@ -1196,11 +1174,9 @@ Selected item bacomes actual for panel SIDE."
 (defun efar-edit-file()
   ""
   (let* ((side (efar-get :current-panel))
-	 (fnum (+ (efar-get :panels side :start-file-number) (efar-get :panels side :current-pos) ))
-	 (file (nth fnum (efar-get :panels side :files)))
-	 (fdir (expand-file-name (car file) (efar-get :panes side :dir))))
-    (find-file fdir)))
-
+	 (file (car (car (efar-selected-files side t)))))
+    (when file
+      (find-file file))))
 
 (defun efar-set-files-order(files side)
   ""
@@ -1231,7 +1207,8 @@ Selected item bacomes actual for panel SIDE."
 		      (lambda (f)  (or		       
 				    (string-suffix-p "/." (car f))
 				    (string-suffix-p "/.." (car f))					    
-				    (and (not (string-suffix-p "/.." (car f)))
+				    (and (not (car (cdr f)))
+					 (not (string-suffix-p "/.." (car f)))
 					 (> (length filter) 0 )
 					 (not (string-match (wildcard-to-regexp filter) (car f))))))
 		      
@@ -1251,113 +1228,115 @@ Selected item bacomes actual for panel SIDE."
 
 (defun efar-move-cursor (direction)
   ""
-  (efar-reset-status)
-  
-  (efar-write-enable
-   (let* ((side (efar-get :current-panel))
-	  (curr-pos (efar-get :panels side :current-pos))
-	  (max-files-in-column (- (efar-get :panel-height) 1))
-	  (max-file-number (length (efar-get :panels side :files)))
-	  (start-file-number (efar-get :panels side :start-file-number))
-	  (col-number (efar-get :panels side :column-number))
-	  (affected-item-numbers ()))
-     
-     (cond 
-      ;; if UP key pressed
-      ((equal direction :up) 
-       (cond
-	;; if we are on the first file in the list - do nothing
-	((and (= start-file-number 0) (= curr-pos 0)) nil)
-	;; if we are on first item
-	((= curr-pos 0)
-	 (progn (let ((rest (- start-file-number (* col-number max-files-in-column))))
-		  (efar-set (if (< rest 0) 0 rest)
-			    :panels side :start-file-number)
-		  (efar-set (if (< rest 0) (- start-file-number 1) (- (* col-number max-files-in-column) 1))
-			    :panels side :current-pos))))
-	;; else move up by one
-	(t (progn
-	     (push  curr-pos affected-item-numbers)
-	     (decf curr-pos)
-	     (push  curr-pos affected-item-numbers)
-	     (efar-set curr-pos :panels side :current-pos)))))
+  (let ((side (efar-get :current-panel)))
+
+    (unless (= 0 (length (efar-get :panels side :files)))
+
+      (efar-reset-status)
       
-      ;; if DOWN key is pressed
-      ((equal direction :down) 
-       (cond 
-	;; if we are on the last file in the list - do nohing
-	((= (+ start-file-number curr-pos) (- max-file-number 1)) nil)
-	;; else if we are on last item 
-	((= curr-pos (- (* max-files-in-column col-number) 1)) 
-	 (progn (efar-set (+ start-file-number curr-pos 1)
-			  :panels side :start-file-number)
-		(efar-set 0
-			  :panels side :current-pos) ))
-	;; else move down by one
-	(t (progn 
-	     (push  curr-pos affected-item-numbers)
-	     (incf curr-pos)
-	     (push  curr-pos affected-item-numbers)
-	     (efar-set curr-pos :panels side :current-pos)))))
-      
-      ;; if LEFT key is pressed
-      ((equal direction :left)
-       (cond
-	;; if we are on the first file in the list - do nothing
-	((and (= start-file-number 0) (= curr-pos 0)) nil)
-	
-	;; we are in right column - move left by max-files-in-column
-	((>= curr-pos max-files-in-column) (efar-set (- curr-pos max-files-in-column)
-						     :panels side :current-pos))
-	
-	;; we are in left column
-	((< curr-pos max-files-in-column)
-	 (cond
-	  ((= start-file-number 0) (efar-set 0
-					     :panels side :current-pos))
-	  ((> start-file-number (* col-number max-files-in-column)) (efar-set (- start-file-number max-files-in-column)
-									      :panels side :start-file-number))
-	  ((<= start-file-number (* col-number max-files-in-column)) (and
-								      (efar-set 0
-										:panels side :start-file-number)
-								      (efar-set 0
-										:panels side :current-pos)))))))
-      
-      ;; if HOME key is pressed
-      ((equal direction :home)
-       (and
-	(efar-set 0
-		  :panels side :start-file-number)
-	(efar-set 0
-		  :panels side :current-pos)))
-      
-      
-      ;; if END key is pressed
-      ((equal direction :end)
-       (and
-	(efar-set (if (< max-file-number (* col-number max-files-in-column)) 0 (- max-file-number (* col-number max-files-in-column)))
-		  :panels side :start-file-number)
-	(efar-set (- (if (< max-file-number (* col-number max-files-in-column))  max-file-number (* col-number max-files-in-column)) 1)
-		  :panels side :current-pos)))
-      
-      
-      ;; if RIGHT key is pressed
-      ((equal direction :right)
-       (cond
-	;; if we are on the last file in the list - do nohing
-	((= (+ start-file-number curr-pos) (- max-file-number 1)) nil)
-	
-	;; else if there is more than max-files-in-column left
-	((> (- max-file-number start-file-number curr-pos) max-files-in-column)
-	 (if (< curr-pos (* (- col-number 1) max-files-in-column))
-	     (efar-set (+ curr-pos max-files-in-column)
-		       :panels side :current-pos)
-	   (efar-set (+ start-file-number max-files-in-column)
-		     :panels side :start-file-number))))))
-     
-     (efar-output-files side affected-item-numbers)
-     
-     (efar-output-file-details side))))
+      (efar-write-enable
+       (let* ((curr-pos (efar-get :panels side :current-pos))
+	      (max-files-in-column (- (efar-get :panel-height) 1))
+	      (max-file-number (length (efar-get :panels side :files)))
+	      (start-file-number (efar-get :panels side :start-file-number))
+	      (col-number (efar-get :panels side :column-number))
+	      (affected-item-numbers ()))
+	 (cond 
+	  ;; if UP key pressed
+	  ((equal direction :up) 
+	   (cond
+	    ;; if we are on the first file in the list - do nothing
+	    ((and (= start-file-number 0) (= curr-pos 0)) nil)
+	    ;; if we are on first item
+	    ((= curr-pos 0)
+	     (progn (let ((rest (- start-file-number (* col-number max-files-in-column))))
+		      (efar-set (if (< rest 0) 0 rest)
+				:panels side :start-file-number)
+		      (efar-set (if (< rest 0) (- start-file-number 1) (- (* col-number max-files-in-column) 1))
+				:panels side :current-pos))))
+	    ;; else move up by one
+	    (t (progn
+		 (push  curr-pos affected-item-numbers)
+		 (decf curr-pos)
+		 (push  curr-pos affected-item-numbers)
+		 (efar-set curr-pos :panels side :current-pos)))))
+	  
+	  ;; if DOWN key is pressed
+	  ((equal direction :down) 
+	   (cond 
+	    ;; if we are on the last file in the list - do nohing
+	    ((= (+ start-file-number curr-pos) (- max-file-number 1)) nil)
+	    ;; else if we are on last item 
+	    ((= curr-pos (- (* max-files-in-column col-number) 1)) 
+	     (progn (efar-set (+ start-file-number curr-pos 1)
+			      :panels side :start-file-number)
+		    (efar-set 0
+			      :panels side :current-pos) ))
+	    ;; else move down by one
+	    (t (progn 
+		 (push  curr-pos affected-item-numbers)
+		 (incf curr-pos)
+		 (push  curr-pos affected-item-numbers)
+		 (efar-set curr-pos :panels side :current-pos)))))
+	  
+	  ;; if LEFT key is pressed
+	  ((equal direction :left)
+	   (cond
+	    ;; if we are on the first file in the list - do nothing
+	    ((and (= start-file-number 0) (= curr-pos 0)) nil)
+	    
+	    ;; we are in right column - move left by max-files-in-column
+	    ((>= curr-pos max-files-in-column) (efar-set (- curr-pos max-files-in-column)
+							 :panels side :current-pos))
+	    
+	    ;; we are in left column
+	    ((< curr-pos max-files-in-column)
+	     (cond
+	      ((= start-file-number 0) (efar-set 0
+						 :panels side :current-pos))
+	      ((> start-file-number (* col-number max-files-in-column)) (efar-set (- start-file-number max-files-in-column)
+										  :panels side :start-file-number))
+	      ((<= start-file-number (* col-number max-files-in-column)) (and
+									  (efar-set 0
+										    :panels side :start-file-number)
+									  (efar-set 0
+										    :panels side :current-pos)))))))
+	  
+	  ;; if HOME key is pressed
+	  ((equal direction :home)
+	   (and
+	    (efar-set 0
+		      :panels side :start-file-number)
+	    (efar-set 0
+		      :panels side :current-pos)))
+	  
+	  
+	  ;; if END key is pressed
+	  ((equal direction :end)
+	   (and
+	    (efar-set (if (< max-file-number (* col-number max-files-in-column)) 0 (- max-file-number (* col-number max-files-in-column)))
+		      :panels side :start-file-number)
+	    (efar-set (- (if (< max-file-number (* col-number max-files-in-column))  max-file-number (* col-number max-files-in-column)) 1)
+		      :panels side :current-pos)))
+	  
+	  
+	  ;; if RIGHT key is pressed
+	  ((equal direction :right)
+	   (cond
+	    ;; if we are on the last file in the list - do nohing
+	    ((= (+ start-file-number curr-pos) (- max-file-number 1)) nil)
+	    
+	    ;; else if there is more than max-files-in-column left
+	    ((> (- max-file-number start-file-number curr-pos) max-files-in-column)
+	     (if (< curr-pos (* (- col-number 1) max-files-in-column))
+		 (efar-set (+ curr-pos max-files-in-column)
+			   :panels side :current-pos)
+	       (efar-set (+ start-file-number max-files-in-column)
+			 :panels side :start-file-number))))))
+	 
+	 (efar-output-files side affected-item-numbers)
+	 
+	 (efar-output-file-details side))))))
 
 
 (defun efar-enter-directory()
@@ -1438,7 +1417,7 @@ Selected item bacomes actual for panel SIDE."
   (let ((mode (efar-get :mode)))
     
     (when (and (not (null (efar-get :panels side :files)))
-	   (or (equal mode :both) (equal mode side)))
+	       (or (equal mode :both) (equal mode side)))
       
       (let ((current-file-number (efar-current-file-number side)))
 
@@ -1482,88 +1461,86 @@ Selected item bacomes actual for panel SIDE."
 
 (defun efar-output-files(side &optional affected-item-numbers)
   ""
-  
-  (let ((mode (efar-get :mode))
-	(widths (if (equal side :left)
-		    (car (efar-get :column-widths))
-		  (cdr (efar-get :column-widths)))))
-    
-    (when (or (equal mode :both) (equal mode side))
+  (unless (= 0 (length (efar-get :panels side :files)))
+    (let ((mode (efar-get :mode))
+	  (widths (if (equal side :left)
+		      (car (efar-get :column-widths))
+		    (cdr (efar-get :column-widths)))))
       
-      (goto-char 0)
-      (forward-line)
-      
-      (let* ((start-pos (cond
-			 ((equal side :left) 1)
-			 ((and (equal side :right) (equal mode :right)) 1)
-			 (t (+ (efar-panel-width :left) 2))))
-	     (max-files-in-column (- (efar-get :panel-height) 1))
-	     (cnt 0)
-	     (col-number (length widths))
-	     
-	     (files
-	      (append
-	       (subseq  (efar-get :panels side :files)
-			(efar-get :panels side :start-file-number)  
-			(+ (efar-get :panels side :start-file-number) 
-			   (if (> (- (length (efar-get :panels side :files)) (efar-get :panels side :start-file-number)) (* max-files-in-column col-number)) (* max-files-in-column col-number)
-			     (- (length (efar-get :panels side :files)) (efar-get :panels side :start-file-number))))) 
+      (when (or (equal mode :both) (equal mode side))
+	
+	(goto-char 0)
+	(forward-line)
+	
+	(let* ((start-pos (cond
+			   ((equal side :left) 1)
+			   ((and (equal side :right) (equal mode :right)) 1)
+			   (t (+ (efar-panel-width :left) 2))))
+	       (max-files-in-column (- (efar-get :panel-height) 1))
+	       (cnt 0)
+	       (col-number (length widths))
 	       
-	       ;; append empty items if number of files to display is less then max files in panel
-	       ;; needed to overwrite old entries
-	       (make-list (let ((rest (- (length (efar-get :panels side :files)) (efar-get :panels side :start-file-number))))
-			    (if (> rest (* max-files-in-column col-number))
-				0 (- (* max-files-in-column col-number) rest))) 
-			  (list "")))))
-	
-	
-	(loop for col from 0 upto (- col-number 1) do
-	      
-	      (let ((files-in-column (subseq files (* col max-files-in-column) (* (+ col 1) max-files-in-column))))
+	       (files	 
+		(append
+		 (subseq  (efar-get :panels side :files)
+			  (efar-get :panels side :start-file-number)  
+			  (+ (efar-get :panels side :start-file-number) 
+			     (if (> (- (length (efar-get :panels side :files)) (efar-get :panels side :start-file-number)) (* max-files-in-column col-number)) (* max-files-in-column col-number)
+			       (- (length (efar-get :panels side :files)) (efar-get :panels side :start-file-number)))))
+		 
+		 ;; append empty items if number of files to display is less then max files in panel
+		 ;; needed to overwrite old entries
+		 (make-list (let ((rest (- (length (efar-get :panels side :files)) (efar-get :panels side :start-file-number))))
+			      (if (> rest (* max-files-in-column col-number))
+				  0 (- (* max-files-in-column col-number) rest))) 
+			    (list "")))))
+	  
+	  (loop for col from 0 upto (- col-number 1) do
 		
-		(loop repeat (length files-in-column)  do
-		      
-		      (forward-line)
-		      
-		      (when (or (null affected-item-numbers) (member cnt affected-item-numbers)) 
-			(let ((shift (+ start-pos
-					(apply '+ (subseq widths 0 col))
-					col)))
-			  
-			  (move-to-column shift)
-			  
-			  (let* ((f (nth cnt files))
-				 (p (point))
-				 (w (nth col widths))
-				 
-				 (marked? (member (+ (efar-get :panels side :start-file-number) cnt) (efar-get :panels side :selected)))
-				 
-				 (str (efar-prepare-file-name (concat (and marked? "*") (if (string= (efar-get :panels side :dir) "Search") (car f) (file-name-nondirectory (car f))) ) w)))
+		(let ((files-in-column (subseq files (* col max-files-in-column) (* (+ col 1) max-files-in-column))))
+		  
+		  (loop repeat (length files-in-column)  do
+			
+			(forward-line)
+			
+			(when (or (null affected-item-numbers) (member cnt affected-item-numbers)) 
+			  (let ((shift (+ start-pos
+					  (apply '+ (subseq widths 0 col))
+					  col)))
 			    
+			    (move-to-column shift)
 			    
-			    (replace-rectangle p (+ p (length str)) str)
-			    
-			    
-			    (let ((dir? (car (cdr f)))
-				  
-				  (current? (and
-					     (= cnt (efar-get :panels side :current-pos))
-					     (equal side (efar-get :current-panel)))))
-			      (let ((current-face
-				     (cond
-				      ((and dir? current?) 'efar-dir-current-face)
-				      ((and (not dir?) current?) 'efar-file-current-face)
-				      (marked? 'efar-marked-face)
-				      ((and dir? (not current?)) 'efar-dir-face)
-				      ((and (not dir?) (not current?)) 'efar-file-face) )))
-				(put-text-property p (+ p w) 'face current-face))))))
-		      
-       		      
-		      (incf cnt)))
-	      
-	      (goto-char 0)
-	      (forward-line))))))
-
+			    (let* ((f (nth cnt files))
+				   (p (point))
+				   (w (nth col widths))
+				   
+				   (marked? (member (+ (efar-get :panels side :start-file-number) cnt) (efar-get :panels side :selected)))
+				   
+				   (str (efar-prepare-file-name (concat (and marked? "*") (if (string= (efar-get :panels side :dir) "Search") (car f) (file-name-nondirectory (car f))) ) w)))
+			      
+			      
+			      (replace-rectangle p (+ p (length str)) str)
+			      
+			      
+			      (let ((dir? (car (cdr f)))
+				    
+				    (current? (and
+					       (= cnt (efar-get :panels side :current-pos))
+					       (equal side (efar-get :current-panel)))))
+				(let ((current-face
+				       (cond
+					((and dir? current?) 'efar-dir-current-face)
+					((and (not dir?) current?) 'efar-file-current-face)
+					(marked? 'efar-marked-face)
+					((and dir? (not current?)) 'efar-dir-face)
+					((and (not dir?) (not current?)) 'efar-file-face) )))
+				  (put-text-property p (+ p w) 'face current-face))))))
+			
+			
+			(incf cnt)))
+		
+		(goto-char 0)
+		(forward-line)))))))
 
 
 
@@ -1837,5 +1814,22 @@ Selected item bacomes actual for panel SIDE."
 	path
       ;; otherwise check parent directory
       (efar-get-root-directory parent-dir ))))
-  
-  
+
+
+(defun efar-selected-files(side current?)
+  ""
+  (let* ((marked-files (efar-get :panels side :selected))
+	 (start-file-number (efar-get :panels side :start-file-number))
+	 (current-file-number (+ start-file-number (efar-get :panels side :current-pos)))
+	 (files (efar-get :panels side :files))
+		      
+	 (selected-files (when (> (length files) 0)
+			   (remove (list ".." t)
+				   (mapcar
+				    (lambda (fn)
+				      (nth fn files))
+				    (if (or current? (not marked-files))
+					(list current-file-number)
+				      marked-files))))))
+    selected-files))
+    
