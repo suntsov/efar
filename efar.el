@@ -156,7 +156,7 @@
 (efar-register-key 	"C-o" 		'efar-display-console		nil	'efar-display-console-key 	"Open console window")
 (efar-register-key 	"<insert>"	'efar-mark-file			nil	'efar-mark-file-key		"Mark current file/directory")
 (efar-register-key	"<C-insert>"	'efar-deselect-all		nil	'efar-deselect-all-kay		"Unmark all files")
-(efar-register-key	"<f12> <f12>" 	'efar-init			nil	'efar-init-key			"Reinit and redraw eFar buffer")
+(efar-register-key	"<f12> <f12>" 	'efar-init			t	'efar-init-key			"Reinit and redraw eFar buffer")
 (efar-register-key	"<down>" 	'efar-move-cursor		:down 	'efar-move-down-key		"Move cursor down")
 (efar-register-key	"<up>" 		'efar-move-cursor		:up	'efar-move-up-key		"Move cursor up")
 (efar-register-key	"<right>" 	'efar-move-cursor		:right 	'efar-move-right		"Move cursor to the right")
@@ -184,7 +184,8 @@
 (efar-register-key	"C-c +"		'efar-change-column-number	t	'efar-inc-column-number-key	"Increase number of columns in current panel")
 (efar-register-key	"C-c -"		'efar-change-column-number	nil	'efar-dec-column-number-key	"Decrease number of columns in current panel")
 (efar-register-key	"<f10>"		'efar-copy-current-path		nil	'efar-copy-current-path-key	"Copy to the clipboard the path to the current file")
-(efar-register-key	"C-c C-d"	'efar-cd			nil	'efar-cd-key			"Go to directory")
+(efar-register-key	"C-c d"		'efar-cd			nil	'efar-cd-key			"Go to directory")
+(efar-register-key	"C-c m"		'efar-change-file-disp-mode	nil	'efar-change-file-disp-mode-key	"Change file display mode (short, long, detailed")
 
 (efar-register-key	"C-g"	'efar-abort		nil	nil				"Abort operation")
 
@@ -253,7 +254,7 @@ If the function called with prefix argument, then go to default-directory of cur
     (switch-to-buffer efar-buffer)))
 
 
-(defun efar-init()
+(defun efar-init(&optional reinit?)
   "Set up main eFAR configuration. Initialize state storage. This function is executed only once when eFAR buffer is created."
   
   ;; forbid resizing of eFAR window
@@ -270,14 +271,19 @@ If the function called with prefix argument, then go to default-directory of cur
   
   ;; if eFAR state cannot be restored from file (missing or broken file) or saving/restoring of state is disabled
   ;; then initialize state storage with default values
-  (when (null efar-state)
+  (when (or reinit?
+	    (null efar-state))
+    (setf efar-state nil)
     (efar-init-state))
   
   (efar-set-key-bindings)
   ;;  (efar-set-mouse-bindings)
   
   (efar-go-to-dir (efar-get :panels :left :dir) :left)
-  (efar-go-to-dir (efar-get :panels :right :dir) :right))
+  (efar-go-to-dir (efar-get :panels :right :dir) :right)
+
+  (when reinit?
+    (efar-write-enable (efar-redraw))))
 
 (defun efar-init-state()
   ""
@@ -328,6 +334,9 @@ If the function called with prefix argument, then go to default-directory of cur
   (efar-set "Ready" :status-string)
   (efar-set :ready :status)
   (efar-set nil :reset-status?)
+
+  (efar-set (list :short :detailed :long) :panels :left :file-disp-mode)
+  (efar-set (list :short :detailed :long) :panels :right :file-disp-mode)
   
   (efar-set (make-hash-table :test `equal) :directory-history))
 
@@ -1059,6 +1068,7 @@ If a double mode is active then actual panel becomes fullscreen."
   (let* ((side (or side (efar-get :current-panel)))
 	 (file (directory-file-name (expand-file-name file (efar-get :panels side :dir))))
 	 (number-of-files (length (efar-get :panels side :files)))
+	 (column-number (efar-get :panels side :column-number))
 	 (new-file-number
 	  (or
 	   (cl-position file
@@ -1072,12 +1082,12 @@ If a double mode is active then actual panel becomes fullscreen."
      
      ((and
        (>= new-file-number (efar-get :panels side :start-file-number))
-       (< new-file-number (+ (efar-get :panels side :start-file-number) (* 2 (efar-get :panel-height)))))
+       (< new-file-number (+ (efar-get :panels side :start-file-number) (* column-number (efar-get :panel-height)))))
       
       (progn
 	(efar-set (- new-file-number (efar-get :panels side :start-file-number)) :panels side :current-pos)))
      
-     ((< new-file-number (* 2 (efar-get :panel-height)))
+     ((< new-file-number (* column-number (efar-get :panel-height)))
       (progn
 	(efar-set 0 :panels side :start-file-number)
 	(efar-set new-file-number :panels side :current-pos)))
@@ -1516,7 +1526,12 @@ Selected item bacomes actual for panel SIDE."
 				   
 				   (marked? (member (+ (efar-get :panels side :start-file-number) cnt) (efar-get :panels side :selected)))
 				   
-				   (str (efar-prepare-file-name (concat (and marked? "*") (if (string= (efar-get :panels side :dir) "Search") (car f) (file-name-nondirectory (car f))) ) w)))
+				   (str (efar-prepare-file-name (concat (and marked? "*")
+									(pcase (car (efar-get :panels side :file-disp-mode))
+									  (:short (file-name-nondirectory (car f)))
+									  (:long (car f))
+									  (:detailed (efar-prepare-detailed-file-info f w))))
+								w)))
 			      
 			      
 			      (replace-rectangle p (+ p (length str)) str)
@@ -1836,3 +1851,46 @@ Selected item bacomes actual for panel SIDE."
 (defun efar-abort()
   ""
   (efar-quit-fast-search))
+
+(defun efar-change-file-disp-mode()
+  ""
+  (let* ((side (efar-get :current-panel))
+	(modes (efar-get :panels side :file-disp-mode)))
+    (efar-set (reverse (cons (car modes) (reverse (cdr modes))))
+	      :panels side :file-disp-mode))
+  (efar-write-enable (efar-redraw)))
+
+(defun efar-prepare-detailed-file-info(file width)
+  ""
+  (if (or (equal (car file) "..") (equal (car file) ""))
+      (car file)
+    (let ((size (if (car (cdr f))
+		    "DIR"
+		  (efar-file-size-as-string (nth 8 file))
+	   ))
+	  (name (file-name-nondirectory  (car file)))
+	  (time (format-time-string "%D %T" (nth 6 file))))
+      
+      (if (< width 35)
+	  (concat (cond ((< (length name) 6)
+			 (concat name " "))
+			(t
+			 (concat (subseq name 0 4)) "> "))
+		  (format "%7s" size) "   " time)
+	
+	(let ((max-name-width (- width 30)))
+
+	  (if (> (length name) max-name-width)
+	      (concat (subseq name 0 (- max-name-width 1)) ">   " (format "%7s" size) "   " time)
+	    (concat name (make-string (- max-name-width (length name)) ?\s) "   " (format "%7s" size) "   " time)))))))
+
+(defun efar-file-size-as-string(size)
+  ""
+  (cond ((< size 1024)
+	 (concat (int-to-string size) "  B"))
+	((< size 1048576)
+	 (concat (int-to-string (/ size 1024)) " KB"))
+	((< size 1073741824)
+	 (concat (int-to-string (/ size 1024 1024)) " MB"))
+	(t
+	 (concat (int-to-string (/ size 1024 1024 1024)) " GB"))))
