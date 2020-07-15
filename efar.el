@@ -192,6 +192,7 @@
 (efar-register-key	"<backspace>"	'efar-fast-search		:back	nil				"Backspace for fast search")
 (efar-register-key	"C-s"		'efar-fast-search		:next	nil				"Go to next fast search match")
 (efar-register-key	"C-r"		'efar-fast-search		:prev	nil				"Go to previous fast search match")
+
 (loop for char in (list ?a ?b ?c ?d ?e ?f ?g ?h ?i ?j ?k ?l ?m ?n ?o ?p ?q ?r ?s ?t ?u ?v ?w ?x ?y ?z
 			?A ?B ?C ?D ?E ?F ?G ?H ?I ?J ?K ?L ?M ?N ?O ?P ?Q ?R ?S ?T ?U ?V ?W ?X ?Y ?Z
 			?1 ?2 ?3 ?4 ?5 ?6 ?7 ?8 ?9 ?0
@@ -975,7 +976,7 @@ If a double mode is active then actual panel becomes fullscreen."
     (efar-set "" :fast-search-string)
     (efar-output-status)
     (efar-set 0 :fast-search-occur)))
-
+  
 (defun efar-get-accessible-directory-in-path (path)
   "Return first accessible directory in the PATH going from bottom to up. If there are no accessible directories in the given path, return user-emacs-directory."
   
