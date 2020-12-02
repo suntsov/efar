@@ -903,6 +903,7 @@ User also can select an option to overwrite all remaining files to not be asked 
        (replace-rectangle p (+ p w) status-string)
        (put-text-property p (+ p w) 'face 'efar-header-face))))
   (sit-for 0.001))
+ 
 
 (defun efar-set-key-bindings()
   "Set up local key bindings"
@@ -2289,7 +2290,7 @@ Selected item bacomes actual for current panel."
 (defvar efar-search-process-manager nil)
 (defvar efar-search-results '())
 (defvar efar-start-search-time nil)
-
+(defvar efar-accepting-process-count 0)
 
 (defun efar-start-search()
   ""
@@ -2307,15 +2308,22 @@ Selected item bacomes actual for current panel."
 	  (efar-search-start-search (list (cons :dir (caar selected-files))
 					  (cons :wildcard wildcard)
 					  (cons :text (if (string-empty-p text) nil text))
-					  (cons :ignore-case ignore-case?)
-					  (cons :regexp? regexp?)))
-	  
-
-	  ))))
+					  (cons :ignore-case? ignore-case?)
+					  (cons :regexp? regexp?)))))))
 	
+
+(defvar efar-update-search-results-timer nil)
 
 (defun efar-search-start-search(params)
   ""
+  (setq efar-update-search-results-timer
+	 (run-at-time nil 1
+		      (lambda()
+			(when (equal :search (efar-get :panels :left :mode))
+			  (efar-show-search-results :left ))
+			
+			(when (equal :search (efar-get :panels :right :mode))
+			  (efar-show-search-results :right )))))
   (setq efar-search-results '())
   (efar-show-search-results)
   (setq efar-start-search-time (time-to-seconds (current-time)))
@@ -2375,19 +2383,20 @@ Selected item bacomes actual for current panel."
 			   " second(s)")
 		   nil t)
   
+  (cancel-timer efar-update-search-results-timer)
+  (setq efar-update-search-results-timer nil)
+  
   (efar-show-search-results))
 
-  
-(defvar efar-search-results-displaying-in-progress nil)
 
-(defun efar-show-search-results(&optional side)
+
+(defun efar-show-search-results(&optional side temp-results)
   ""
-  (setq efar-search-results-displaying-in-progress t)
   (let ((side (or side (efar-get :current-panel))))
     (efar-set (mapcar (lambda(d) (list
 				  (cdr (assoc :name d))
 				  nil))
-		      (remove nil efar-search-results))
+		      (remove nil (or temp-results efar-search-results)))
 	      :panels side :files)
     
     (efar-set "Search results" :panels side :dir)
@@ -2396,8 +2405,7 @@ Selected item bacomes actual for current panel."
     (efar-set :search :panels side :mode))
   
   (efar-calculate-widths)
-  (efar-write-enable (efar-redraw))
-  (setq efar-search-results-displaying-in-progress nil))
+  (efar-write-enable (efar-redraw)))
  
 (defvar efar-search-process-pending-messages '())
 
@@ -2426,6 +2434,15 @@ Selected item bacomes actual for current panel."
     
     (setcdr pending message)))
 
+
+
+(defun efar-search-process-message(proc message-type data)
+  ""
+  (if (equal proc efar-search-process-manager)
+
+	(push data efar-search-results)
+
+      (princ (concat (prin1-to-string (cons :found-file data)) "\n"))))
 
 (defun efar-search-int-start-search(args)
   ""
@@ -2555,27 +2572,6 @@ Selected item bacomes actual for current panel."
 	   ((equal command :process-file)
 	    (efar-search-process-file args))))))))
 
-
-
-(defun efar-search-process-message(proc message-type data)
-  ""
-  (if (equal proc efar-search-process-manager)
-      (progn
-	;;(cl-incf efar-count)
-	;;(message  (int-to-string efar-count))
-	;;(print data t))
-	(push data efar-search-results)
-
-;;	(when (and (equal :search (efar-get :panels :left :mode))
-;;		   (not efar-search-results-displaying-in-progress ))
-;;	  (efar-show-search-results :left))
-	
-;;	(when (and (equal :search (efar-get :panels :right :mode))
-;;		   (not efar-search-results-displaying-in-progress ))
-;;	  (efar-show-search-results :right))
-	)
-    (progn
-      (princ (concat (prin1-to-string (cons :found-file data)) "\n")))))
 
 
 (defun efar-next-search-process()
