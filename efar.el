@@ -214,7 +214,7 @@
 (efar-register-key "C-<left>"  'efar-move-cursor  :home  'efar-move-home-alt-key  "move cursor to the beginning of the list (alternative)" t)
 (efar-register-key "<end>"  'efar-move-cursor  :end 'efar-move-end-key  "move cursot to the end of the list" t)
 (efar-register-key "C-<right>"  'efar-move-cursor  :end 'efar-move-end-alt-key  "move cursot to the end of the list (alternative)" t)
-(efar-register-key "RET" '((:files . efar-enter-directory) (:dir-hist . efar-navigate-to-file) (:bookmark . efar-navigate-to-file) (:disks . efar-navigate-to-file))  nil  'efar-enter-directory-key "go into or to the item under cursor" :space-after)
+(efar-register-key "RET" '((:files . efar-enter-directory) (:dir-hist . efar-navigate-to-file) (:bookmark . efar-navigate-to-file) (:disks . efar-navigate-to-file) (:search . efar-navigate-to-file))  nil  'efar-enter-directory-key "go into or to the item under cursor" :space-after)
 
 (efar-register-key "C-<down>" 'efar-scroll-other-window :down 'efar-scroll-other-down-key "scroll other window down" t)
 (efar-register-key "C-<up>" 'efar-scroll-other-window :up 'efar-scroll-other-up-key "scroll other window up" t)
@@ -1310,15 +1310,26 @@ If a double mode is active then actual panel becomes fullscreen."
 (defun efar-edit-file(&optional for-read?)
   ""
   (let* ((side (efar-get :current-panel))
-	 (file (car (car (efar-selected-files side t)))))
-    
+	 (file (car (car (efar-selected-files side t))))
+	 (mode (efar-get :panels side :mode)))
+
+    ;; open file in other window
     (when file
       (let ((buffer (find-file-other-window file)))
-	
+
+	;; if file is opened from search result list then enable isearch mode
+	(when (and (equal mode :search)
+		   efar-last-search-text)
+	  (setq case-fold-search (car (cdr efar-last-search-text)))
+	  (isearch-mode t (cdr (cdr efar-last-search-text)))
+	  (isearch-yank-string (car efar-last-search-text)))
+
+	;; if file opened for editing unmark its buffer to prevent auto kill of the buffer
 	(when (and (equal buffer (efar-get :last-auto-read-buffer))
 		   (not for-read?))
 	  (efar-set nil :last-auto-read-buffer))
-	
+
+	;; if file opened for reading only then goto back to eFar
 	(when for-read?
 	  (select-window (get-buffer-window (get-buffer efar-buffer-name))))
 	
@@ -1505,7 +1516,10 @@ If a double mode is active then actual panel becomes fullscreen."
 			     (and file-ext (cl-member file-ext efar-auto-read-file-extensions :test 'equal)))) ;; or if files type is configured to be ato read
 		    
 		    (and efar-auto-read-directories ;; if directory auto read is enabled
-			 (file-directory-p file)))) ;; current item under cursor is a directory
+			 (file-directory-p file)) ;; current item under cursor is a directory
+
+		    (and (not (file-directory-p file)) ;; if current-item under cursor is a file
+			 (equal :search (efar-get :panels (efar-get :current-panel) :mode))))) ;; in a file search result
       
       (let ((last-auto-read-buffer (efar-get :last-auto-read-buffer))) ;; get the last auto read buffer
 	;; we don't want to keep opened too unnecessary buffers for auto opened files
@@ -2060,12 +2074,13 @@ If a double mode is active then actual panel becomes fullscreen."
 
 (defun efar-abort()
   ""
-  (efar-quit-fast-search)
+  (when (string-empty-p (efar-get :fast-search-string))
+    (let ((side (efar-get :current-panel)))
+      (when (cl-member (efar-get :panels side :mode) '(:search :bookmark :dir-hist))
+	(efar-go-to-dir (efar-last-visited-dir side) side)
+	(efar-write-enable (efar-redraw)))))
 
-  (let ((side (efar-get :current-panel)))
-    (when (cl-member (efar-get :panels side :mode) '(:search :bookmark :dir-hist))
-      (efar-go-to-dir (efar-last-visited-dir side) side)
-      (efar-write-enable (efar-redraw)))))
+  (efar-quit-fast-search))
 
 (defun efar-last-visited-dir(&optional side)
   ""
@@ -2303,6 +2318,7 @@ Selected item bacomes actual for current panel."
 (defvar efar-search-results '())
 (defvar efar-start-search-time nil)
 (defvar efar-accepting-process-count 0)
+(defvar efar-last-search-text nil)
 
 (defun efar-start-search()
   ""
@@ -2321,6 +2337,10 @@ Selected item bacomes actual for current panel."
 					   (when (not (string-empty-p text))
 					     (concat " and containing text '" text "'"))
 					   " ..."))
+
+	  (setq efar-last-search-text nil)
+	  (when (not (string-empty-p text))
+	    (setq efar-last-search-text (cons text (cons ignore-case? regexp?))))
 	  
 	  (efar-search-start-search (list (cons :dir (caar selected-files))
 					  (cons :wildcard wildcard)
@@ -2385,7 +2405,8 @@ Selected item bacomes actual for current panel."
 
 (defun efar-search-process-sentinel (process message)
   ""
-  (cancel-timer efar-update-search-results-timer)
+  (when (timerp efar-update-search-results-timer)
+    (cancel-timer efar-update-search-results-timer))
   (setq efar-update-search-results-timer nil)
   
   (when (and (equal process efar-search-process-manager) (string= message "finished\n"))
@@ -2410,9 +2431,10 @@ Selected item bacomes actual for current panel."
 (defun efar-show-search-results(&optional side preserve-position?)
   ""
   (let ((side (or side (efar-get :current-panel))))
-    (efar-set (mapcar (lambda(d) (list
-				  (cdr (assoc :name d))
-				  nil))
+    (efar-set (mapcar (lambda(d)
+			(let* ((file (cdr (assoc :name d)))
+			      (attrs (file-attributes file)))
+			  (push file attrs)))
 		      (remove nil efar-search-results))
 	      :panels side :files)
     
@@ -2456,12 +2478,18 @@ Selected item bacomes actual for current panel."
 
 (defun efar-search-process-message(proc message-type data)
   ""
-  (if (equal proc efar-search-process-manager)
-
+  (when (equal message-type :found-file)
+    (if (equal proc efar-search-process-manager)
+	
 	(push data efar-search-results)
 
       (princ (concat (prin1-to-string (cons :found-file data)) "\n"))))
-
+  
+  (when (equal message-type :error)
+    (if (equal proc efar-search-process-manager)
+	(efar-set :ready (concat "Error occured during search: " data))
+      (princ (concat (prin1-to-string (cons :error data)) "\n")))))    
+  
 (defun efar-search-int-start-search(args)
   ""
   (let ((dir (cdr (assoc :dir args)))
@@ -2498,7 +2526,7 @@ Selected item bacomes actual for current panel."
 	     ;; if file name matches given WILDCARD
 	     (when (string-match-p (wildcard-to-regexp wildcard) (expand-file-name (car entry) dir))
 
-	       ;; when text to search is given then send file to subprocess to search the text inside
+	       ;; if text to search is given then send file to subprocess to search the text inside
 	       (if text (progn
 			  (let* ((proc (efar-next-search-process))
 				 (file (expand-file-name (car entry) dir))
@@ -2508,7 +2536,7 @@ Selected item bacomes actual for current panel."
 							 (prin1-to-string
 							  request)
 							 "\n")))))
-		 ;; report about found file
+		 ;; otherwise report about found file
 		 (princ (concat (prin1-to-string (cons :found-file (list (cons :name (expand-file-name (car entry) dir)) (cons :lines '())))) "\n")))))))
 
 
@@ -2535,15 +2563,13 @@ Selected item bacomes actual for current panel."
 	(with-temp-buffer
 	  (insert-file-contents file)
 	  
-	  (goto-char 1)
+	  (goto-char 0)
 	  
 	  (while (funcall search-func text nil t)
-	    
-	    
+	    	    
 	    (push
 	     (cons
-	      (line-number-at-pos)
-	      
+	      (line-number-at-pos)	      
 	      (replace-regexp-in-string "\n" "" (thing-at-point 'line t)))
 	     hits)))
 	
@@ -2556,41 +2582,46 @@ Selected item bacomes actual for current panel."
 
 (defun efar-process-search-request()
   ""
-  (let ((command nil)
-	(args nil))
-    
-    (while (not (equal command :exit))
+  (condition-case err
       
-      (if (equal command :loop)
-	  (progn
-	    (let ((finished? (not efar-search-processes)))
-	      (while (not finished?)
-		(cl-loop for proc in efar-search-processes do
-			 (if (process-live-p proc)
-			     (setq finished? nil)
-			   (setq finished? t))
-			 (while (accept-process-output proc))))
+      (let ((command nil)
+	    (args nil))
+	
+	(while (not (equal command :exit))
+	  
+	  (if (equal command :loop)
+	      (progn
+		(let ((finished? (not efar-search-processes)))
+		  (while (not finished?)
+		    (cl-loop for proc in efar-search-processes do
+			     (if (process-live-p proc)
+				 (setq finished? nil)
+			       (setq finished? t))
+			     (while (accept-process-output proc))))
+		  
+		  (while (accept-process-output)))
+		(setq command :exit)))
+	  
+	  (when (not (equal command :exit)) 
+	    (let* ((request-string (read-from-minibuffer ""))
+		   (request (car (read-from-string request-string))))
 	      
-	      (while (accept-process-output)))
-	    (setq command :exit)))
-      
-      (when (not (equal command :exit)) 
-	(let* ((request-string (read-from-minibuffer ""))
-	       (request (car (read-from-string request-string))))
-	  
-	  
-	  (setf command (car request))
-	  (setf args (cdr request))
-	  
-	  
-	  (cond
-	   
-	   ((equal command :start-search)
-	    (efar-search-int-start-search args)
-	    (setq command :loop))
-	   
-	   ((equal command :process-file)
-	    (efar-search-process-file args))))))))
+	      
+	      (setf command (car request))
+	      (setf args (cdr request))
+	      
+	      
+	      (cond
+	       
+	       ((equal command :start-search)
+		(efar-search-int-start-search args)
+		(setq command :loop))
+	       
+	       ((equal command :process-file)
+		(efar-search-process-file args)))))))
+  
+   (error
+    (princ (concat (prin1-to-string (cons :error (error-message-string err))) "\n")))))
 
 
 
