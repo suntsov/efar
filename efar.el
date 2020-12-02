@@ -2334,13 +2334,13 @@ Selected item bacomes actual for current panel."
 (defun efar-search-start-search(params)
   ""
   (setq efar-update-search-results-timer
-	 (run-at-time nil 1
+	 (run-at-time nil 2
 		      (lambda()
 			(when (equal :search (efar-get :panels :left :mode))
-			  (efar-show-search-results :left ))
+			  (efar-show-search-results :left t))
 			
 			(when (equal :search (efar-get :panels :right :mode))
-			  (efar-show-search-results :right )))))
+			  (efar-show-search-results :right t)))))
   (setq efar-search-results '())
   (efar-show-search-results)
   (setq efar-start-search-time (time-to-seconds (current-time)))
@@ -2385,6 +2385,9 @@ Selected item bacomes actual for current panel."
 
 (defun efar-search-process-sentinel (process message)
   ""
+  (cancel-timer efar-update-search-results-timer)
+  (setq efar-update-search-results-timer nil)
+  
   (when (and (equal process efar-search-process-manager) (string= message "finished\n"))
     (while (accept-process-output efar-search-process-manager))
     (efar-search-finished)))
@@ -2400,25 +2403,23 @@ Selected item bacomes actual for current panel."
 			   " second(s)")
 		   nil t)
   
-  (cancel-timer efar-update-search-results-timer)
-  (setq efar-update-search-results-timer nil)
-  
   (efar-show-search-results))
 
 
 
-(defun efar-show-search-results(&optional side temp-results)
+(defun efar-show-search-results(&optional side preserve-position?)
   ""
   (let ((side (or side (efar-get :current-panel))))
     (efar-set (mapcar (lambda(d) (list
 				  (cdr (assoc :name d))
 				  nil))
-		      (remove nil (or temp-results efar-search-results)))
+		      (remove nil efar-search-results))
 	      :panels side :files)
     
     (efar-set "Search results" :panels side :dir)
     (efar-remove-notifier side)
-    (efar-set 0 :panels side :current-pos)
+    (unless preserve-position?
+      (efar-set 0 :panels side :current-pos))
     (efar-set :search :panels side :mode))
   
   (efar-calculate-widths)
@@ -2483,30 +2484,33 @@ Selected item bacomes actual for current panel."
 
 (defun efar-files-recursively(dir wildcard &optional text regexp? ignore-case?)
   ""
-  (mapc
-   (lambda(f)
-     
-     (cond
-      ((car (cdr f)) (efar-files-recursively (expand-file-name (car f) dir) wildcard text regexp? ignore-case?))     
-      
-      ((string-match-p (wildcard-to-regexp wildcard) (car f))
-       
-       (if text
-	   
-	   (progn
-	     (let* ((proc (efar-next-search-process))
-		    (file (expand-file-name (car f) dir))
-		    (request (cons :process-file (list (cons :file file) (cons :text text) (cons :regexp? regexp?) (cons :ignore-case? ignore-case?)))))
-	       (when file 
-		 (process-send-string proc (concat
-					    (prin1-to-string
-					     request)
-					    "\n")))))
-	 
-	 (princ (concat (prin1-to-string (cons :found-file (list (cons :name (expand-file-name (car f) dir)) (cons :lines '())))) "\n"))))))
-   
-   
-   (cl-remove-if (lambda(e) (or (string= (car e) ".") (string= (car e) ".."))) (directory-files-and-attributes dir nil nil t))))
+  ;; loop over all entries in the DIR
+  (cl-loop for entry in (cl-remove-if (lambda(e) (or (string= (car e) ".") (string= (car e) ".."))) (directory-files-and-attributes dir nil nil t)) do
+
+	   ;; when entry is a directory call function recursivelly for it
+	   (when (cadr entry)
+	     (efar-files-recursively (expand-file-name (car entry) dir) wildcard text regexp? ignore-case?))
+
+	   ;; when entry is a file or text for search inside files is not given
+	   (when (or (not (cadr entry))
+		     (not text))
+	     
+	     ;; if file name matches given WILDCARD
+	     (when (string-match-p (wildcard-to-regexp wildcard) (expand-file-name (car entry) dir))
+
+	       ;; when text to search is given then send file to subprocess to search the text inside
+	       (if text (progn
+			  (let* ((proc (efar-next-search-process))
+				 (file (expand-file-name (car entry) dir))
+				 (request (cons :process-file (list (cons :file file) (cons :text text) (cons :regexp? regexp?) (cons :ignore-case? ignore-case?)))))
+			    (when file 
+			      (process-send-string proc (concat
+							 (prin1-to-string
+							  request)
+							 "\n")))))
+		 ;; report about found file
+		 (princ (concat (prin1-to-string (cons :found-file (list (cons :name (expand-file-name (car entry) dir)) (cons :lines '())))) "\n")))))))
+
 
 
 (defun efar-search-process-file(args)
