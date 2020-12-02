@@ -1197,10 +1197,10 @@ If a double mode is active then actual panel becomes fullscreen."
 	(efar-set 0 :panels side :current-pos)))
     
     (let* ((current-hist (efar-get :directory-history))
-	   (new-hist (cl-subseq (cl-remove dir current-hist :test 'equal)
+	   (new-hist (cl-subseq (cl-remove-if (lambda(e) (equal dir (car e))) current-hist)
 				0 (when (> (length current-hist) efar-max-items-in-directory-history)
 				    (- efar-max-items-in-directory-history 1)))))
-      (push (string-trim-right dir "[/]") new-hist)
+      (push (cons (string-trim-right dir "[/]") side) new-hist)
       
       (efar-set new-hist :directory-history))
     
@@ -1610,7 +1610,6 @@ If a double mode is active then actual panel becomes fullscreen."
 
 (defun efar-output-file-details(side)
   ""
-  
   (let ((mode (efar-get :mode)))
     
     (when (and (not (null (efar-get :panels side :files)))
@@ -2058,9 +2057,23 @@ If a double mode is active then actual panel becomes fullscreen."
 				      marked-files))))))
     selected-files))
 
+
 (defun efar-abort()
   ""
-  (efar-quit-fast-search))
+  (efar-quit-fast-search)
+
+  (let ((side (efar-get :current-panel)))
+    (when (cl-member (efar-get :panels side :mode) '(:search :bookmark :dir-hist))
+      (efar-go-to-dir (efar-last-visited-dir side) side)
+      (efar-write-enable (efar-redraw)))))
+
+(defun efar-last-visited-dir(&optional side)
+  ""
+  (let ((side (or side (efar-get :current-panel))))
+    (catch 'dir
+      (cl-loop for d in (efar-get :directory-history) do
+	       (when (equal (cdr d) side)
+		 (throw 'dir (car d)))))))
 
 (defun efar-change-file-disp-mode()
   ""
@@ -2173,7 +2186,7 @@ If a double mode is active then actual panel becomes fullscreen."
   ""
   
   (let ((side (or side (efar-get :current-panel))))
-    (efar-set (mapcar (lambda(d) (list d t))
+    (efar-set (mapcar (lambda(d) (list (car d) t))
 		      (efar-get :directory-history))
 	      :panels side :files)
     
@@ -2273,7 +2286,6 @@ Selected item bacomes actual for current panel."
 
 
 
-
 ;; Search functionality
 
 
@@ -2295,7 +2307,7 @@ Selected item bacomes actual for current panel."
 (defun efar-start-search()
   ""
   (let* ((side (efar-get :current-panel))
-	 (selected-files (efar-selected-files side t)))
+	 (selected-files (or (efar-selected-files side t) (list (list default-directory)))))
     
       (if (not (file-directory-p (caar selected-files)))
 	  (efar-set-status :ready "Please select a directory to search files in" nil t)
@@ -2305,6 +2317,11 @@ Selected item bacomes actual for current panel."
 	      (ignore-case? (and (not (string-empty-p text)) (string=  "Yes" (ido-completing-read "Ignore case for text search? " (list "Yes" "No")))))
 	      (regexp? (and (not (string-empty-p text)) (string=  "Yes" (ido-completing-read "Use regexp for textsearch? " (list "No" "Yes"))))))
 
+	  (efar-set-status :search (concat "Searching files in " (caar selected-files) " using mask " wildcard
+					   (when (not (string-empty-p text))
+					     (concat " and containing text '" text "'"))
+					   " ..."))
+	  
 	  (efar-search-start-search (list (cons :dir (caar selected-files))
 					  (cons :wildcard wildcard)
 					  (cons :text (if (string-empty-p text) nil text))
@@ -2466,7 +2483,6 @@ Selected item bacomes actual for current panel."
 
 (defun efar-files-recursively(dir wildcard &optional text regexp? ignore-case?)
   ""
-  
   (mapc
    (lambda(f)
      
