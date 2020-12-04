@@ -2389,11 +2389,6 @@ Selected item bacomes actual for current panel."
 		 (ignore-case? (and (not (string-empty-p text)) (string=  "Yes" (ido-completing-read "Ignore case for text search? " (list "Yes" "No")))))
 		 (regexp? (and (not (string-empty-p text)) (string=  "Yes" (ido-completing-read "Use regexp for textsearch? " (list "No" "Yes"))))))
 	    
-	    (efar-set-status :search (concat "Searching files in " (caar selected-files) " using mask " wildcard
-					     (when (not (string-empty-p text))
-					       (concat " and containing text '" text "'"))
-					     " ..."))
-	    
 	    (setq efar-last-search-params nil)
 	    (setq efar-last-search-params (list (cons :dir (caar selected-files))
 						(cons :wildcard wildcard)
@@ -2417,8 +2412,8 @@ Selected item bacomes actual for current panel."
 			(when (equal :search (efar-get :panels :right :mode))
 			  (efar-show-search-results :right t)))))
   (setq efar-search-results '())
-  (efar-show-search-results)
   (setq efar-search-process-manager (efar-make-search-process))
+  (efar-show-search-results)
   (efar-search-send-command efar-search-process-manager :start-search params))
   
 
@@ -2460,15 +2455,7 @@ Selected item bacomes actual for current panel."
 
 (defun efar-search-finished()
   ""
-  (efar-set-status :ready
-		   (concat "Search finished. "
-			   (int-to-string (length efar-search-results))
-			   " file(s) found in "
-			   (int-to-string (round (- (time-to-seconds (current-time)) (cdr (assoc :start-time efar-last-search-params)))))
-			   " second(s)")
-		   nil t)
   (push (cons :end-time (time-to-seconds (current-time))) efar-last-search-params)
-  
   (efar-show-search-results))
 
 
@@ -2483,14 +2470,30 @@ Selected item bacomes actual for current panel."
 		      (remove nil efar-search-results))
 	      :panels side :files)
     
-    (efar-set "Search results" :panels side :dir)
+    (efar-set (concat "Search results" (when efar-last-search-params (if (cdr (assoc :end-time efar-last-search-params)) " (finished)" " (in progress)" ))) :panels side :dir)
     (efar-remove-notifier side)
     (unless preserve-position?
       (efar-set 0 :panels side :current-pos))
     (efar-set :search :panels side :mode))
   
   (efar-calculate-widths)
-  (efar-write-enable (efar-redraw)))
+  (efar-write-enable (efar-redraw))
+  (let ((status-string (cond ((and efar-search-process-manager
+				   (process-live-p efar-search-process-manager))
+			      "Search running for files ")
+			     ((cdr (assoc :end-time efar-last-search-params))
+			      (concat "Search finished in " (int-to-string (round (- (cdr (assoc :end-time efar-last-search-params)) (cdr (assoc :start-time efar-last-search-params))))) " second(s) for files "))
+			     (t
+			      "No search has been executed yet"))))
+
+    (when (cdr (assoc :start-time efar-last-search-params))
+      (setq status-string (concat status-string 
+				  "in " (cdr (assoc :dir efar-last-search-params))
+				  " matching mask '" (cdr (assoc :wildcard efar-last-search-params)) "'"
+				  (when (cdr (assoc :text efar-last-search-params))
+				    (concat " and containing text '" (cdr (assoc :text efar-last-search-params)) "'"
+					    " (" (if (cdr (assoc :ignore-case? efar-last-search-params)) "CI" "CS") ")")))))
+    (efar-set-status :ready status-string nil t)))
  
 (defvar efar-search-process-pending-messages '())
 
