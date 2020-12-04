@@ -262,6 +262,7 @@
 
 (efar-register-key "<M-f7>" 'efar-start-search nil 'efar-start-search-key "start search files" t)
 (efar-register-key "<S-f7>" 'efar-show-search-results nil 'efar-show-search-results-key "show last search results" t)
+(efar-register-key "C-c c r" 'efar-show-search-results-in-buffer nil 'efar-show-search-results-in-buffer-key "display search results in a separate buffer" :space-after (list :dir-hist :bookmark :disks :files))
 
 (efar-register-key "C-g" 'efar-abort  nil nil    "abort current operation" t)
 
@@ -366,7 +367,8 @@ If the function called with prefix argument, then go to default-directory of cur
     (:files (efar-go-to-dir (efar-get :panels side :dir) side))
     (:dir-hist (efar-show-directory-history side))
     (:bookmark (efar-show-bookmarks side))
-    (:disks (efar-show-disk-selector))))
+    (:disks (efar-show-disk-selector))
+    (:search (efar-go-to-dir (efar-last-visited-dir side)))))
 
 (defun efar-init-state()
   "Initialize state with default values"
@@ -443,7 +445,7 @@ If the function called with prefix argument, then go to default-directory of cur
   
   (efar-set nil :last-auto-read-buffer)
   
-  (efar-set (make-hash-table :test `equal) :last-visited-dirs)
+  ;;(efar-set (make-hash-table :test `equal) :last-visited-dirs)
   (efar-set '() :directory-history)
   (efar-set '() :bookmarks)
 
@@ -1017,8 +1019,8 @@ If a double mode is active then actual panel becomes fullscreen."
 (defun efar-copy-current-path()
   "Copies to the clipboard the full path to the current file or directory."
   (kill-new
-   (car (car
-	 (efar-selected-files (efar-get :current-panel) t)))))
+   (caar
+    (efar-selected-files (efar-get :current-panel) t t))))
 
 (defun efar-open-file-in-ext-app()
   ""
@@ -1204,7 +1206,7 @@ If a double mode is active then actual panel becomes fullscreen."
       
       (efar-set new-hist :directory-history))
     
-    (efar-set dir :last-visited-dirs (efar-get-root-directory dir))
+    ;;(efar-set dir :last-visited-dirs (efar-get-root-directory dir))
     (efar-setup-notifier dir side)
     
     (efar-set :files :panels side :mode)))
@@ -1283,8 +1285,6 @@ If a double mode is active then actual panel becomes fullscreen."
      file-numbers
      ", ")))
 
-
-
 (defun efar-deselect-all()
   ""
   (efar-write-enable
@@ -1319,10 +1319,16 @@ If a double mode is active then actual panel becomes fullscreen."
 
 	;; if file is opened from search result list then enable isearch mode
 	(when (and (equal mode :search)
-		   efar-last-search-text)
-	  (setq case-fold-search (car (cdr efar-last-search-text)))
-	  (isearch-mode t (cdr (cdr efar-last-search-text)))
-	  (isearch-yank-string (car efar-last-search-text)))
+		   (not (string-empty-p (or (cdr(assoc :text efar-last-search-params)) ""))))
+	  (setq case-fold-search (cdr (assoc :ignore-case? efar-last-search-params)))
+
+	  (isearch-mode t (cdr (assoc :regexp? efar-last-search-params)))
+
+	  (let ((string (cdr (assoc :text efar-last-search-params))))
+	    (if case-fold-search
+		(setq string (downcase string)))
+	    (isearch-process-search-string string
+					   (mapconcat 'isearch-text-char-description string ""))))	 
 
 	;; if file opened for editing unmark its buffer to prevent auto kill of the buffer
 	(when (and (equal buffer (efar-get :last-auto-read-buffer))
@@ -1738,7 +1744,9 @@ If a double mode is active then actual panel becomes fullscreen."
 					     (str (efar-prepare-file-name (concat (and marked? "*")
 										  (pcase disp-mode
 										    (:short (concat (file-name-nondirectory (car f)) (when (and efar-add-slash-to-directories (car (cdr f))) "/")))
-										    (:long (concat (car f) (when (and efar-add-slash-to-directories (car (cdr f))) "/")))
+										    (:long (concat (car f)
+												   (when (and efar-add-slash-to-directories (car (cdr f))) "/")
+												   (when (nth 13 f) (concat " (" (int-to-string (length (nth 13 f))) ")"))))
 										    (:detailed (efar-prepare-detailed-file-info f w))))
 									  w
 									  (eq :long disp-mode))))
@@ -2076,7 +2084,7 @@ If a double mode is active then actual panel becomes fullscreen."
   ""
   (when (string-empty-p (efar-get :fast-search-string))
     (let ((side (efar-get :current-panel)))
-      (when (cl-member (efar-get :panels side :mode) '(:search :bookmark :dir-hist))
+      (when (cl-member (efar-get :panels side :mode) '(:search :bookmark :dir-hist :disks))
 	(efar-go-to-dir (efar-last-visited-dir side) side)
 	(efar-write-enable (efar-redraw)))))
 
@@ -2316,38 +2324,47 @@ Selected item bacomes actual for current panel."
 (defvar efar-search-processes '())
 (defvar efar-search-process-manager nil)
 (defvar efar-search-results '())
-(defvar efar-start-search-time nil)
 (defvar efar-accepting-process-count 0)
-(defvar efar-last-search-text nil)
+(defvar efar-last-search-params nil)
 
 (defun efar-start-search()
   ""
-  (let* ((side (efar-get :current-panel))
-	 (selected-files (or (efar-selected-files side t) (list (list default-directory)))))
-    
-      (if (not (file-directory-p (caar selected-files)))
-	  (efar-set-status :ready "Please select a directory to search files in" nil t)
-    
-	(let* ((wildcard (read-string "File name mask: " "*.txt"))
-	      (text (read-string "Text to search inside files: " "")) 
-	      (ignore-case? (and (not (string-empty-p text)) (string=  "Yes" (ido-completing-read "Ignore case for text search? " (list "Yes" "No")))))
-	      (regexp? (and (not (string-empty-p text)) (string=  "Yes" (ido-completing-read "Use regexp for textsearch? " (list "No" "Yes"))))))
-
-	  (efar-set-status :search (concat "Searching files in " (caar selected-files) " using mask " wildcard
-					   (when (not (string-empty-p text))
-					     (concat " and containing text '" text "'"))
-					   " ..."))
-
-	  (setq efar-last-search-text nil)
-	  (when (not (string-empty-p text))
-	    (setq efar-last-search-text (cons text (cons ignore-case? regexp?))))
-	  
-	  (efar-search-start-search (list (cons :dir (caar selected-files))
-					  (cons :wildcard wildcard)
-					  (cons :text (if (string-empty-p text) nil text))
-					  (cons :ignore-case? ignore-case?)
-					  (cons :regexp? regexp?)))))))
+  (let ((run? t))
+    (when (and efar-search-process-manager
+	       (process-live-p efar-search-process-manager))
+      
+      (if (string= "Yes" (ido-completing-read "Search is still running. Kill it? " (list "Yes" "No" )))
+	    (efar-search-kill-all-processes)
+	(setq run? nil)))
+		    
+    (when run?
+      (let* ((side (efar-get :current-panel))
+	     (selected-files (or (efar-selected-files side t) (list (list default-directory)))))
 	
+	(if (not (file-directory-p (caar selected-files)))
+	    (efar-set-status :ready "Please select a directory to search files in" nil t)
+	  
+	  (let* ((wildcard (read-string "File name mask: " "*.txt"))
+		 (text (read-string "Text to search inside files: " "")) 
+		 (ignore-case? (and (not (string-empty-p text)) (string=  "Yes" (ido-completing-read "Ignore case for text search? " (list "Yes" "No")))))
+		 (regexp? (and (not (string-empty-p text)) (string=  "Yes" (ido-completing-read "Use regexp for textsearch? " (list "No" "Yes"))))))
+	    
+	    (efar-set-status :search (concat "Searching files in " (caar selected-files) " using mask " wildcard
+					     (when (not (string-empty-p text))
+					       (concat " and containing text '" text "'"))
+					     " ..."))
+	    
+	    (setq efar-last-search-params nil)
+	    (setq efar-last-search-params (list (cons :dir (caar selected-files))
+						(cons :wildcard wildcard)
+						(cons :text (if (string-empty-p text) nil text))
+						(cons :ignore-case? ignore-case?)
+						(cons :regexp? regexp?)
+						(cons :start-time (time-to-seconds (current-time)))))
+	    
+	    
+	    (efar-search-start-search efar-last-search-params)))))))
+
 
 (defvar efar-update-search-results-timer nil)
 
@@ -2363,20 +2380,9 @@ Selected item bacomes actual for current panel."
 			  (efar-show-search-results :right t)))))
   (setq efar-search-results '())
   (efar-show-search-results)
-  (setq efar-start-search-time (time-to-seconds (current-time)))
-  (efar-search-run-search-manager)
+  (setq efar-search-process-manager (efar-make-search-process))
   (efar-search-send-command efar-search-process-manager :start-search params))
   
-
-(defun efar-search-run-search-manager()
-  ""
-  (let ((restart? t))
-    (when (and efar-search-process-manager (process-live-p efar-search-process-manager))
-      (setq restart? (string= "Yes" (ido-completing-read "Search is still running. Kill it? " (list "Yes" "No" )))))
-    
-    (when restart?
-      (efar-search-kill-all-processes)
-      (setq efar-search-process-manager (efar-make-search-process)))))
 
 (defun efar-search-kill-all-processes()
   ""
@@ -2420,9 +2426,10 @@ Selected item bacomes actual for current panel."
 		   (concat "Search finished. "
 			   (int-to-string (length efar-search-results))
 			   " file(s) found in "
-			   (int-to-string (round (- (time-to-seconds (current-time)) efar-start-search-time)))
+			   (int-to-string (round (- (time-to-seconds (current-time)) (cdr (assoc :start-time efar-last-search-params)))))
 			   " second(s)")
 		   nil t)
+  (push (cons :end-time (time-to-seconds (current-time))) efar-last-search-params)
   
   (efar-show-search-results))
 
@@ -2434,7 +2441,7 @@ Selected item bacomes actual for current panel."
     (efar-set (mapcar (lambda(d)
 			(let* ((file (cdr (assoc :name d)))
 			      (attrs (file-attributes file)))
-			  (push file attrs)))
+			  (append (push file attrs) (list (cdr (assoc :lines d))))))
 		      (remove nil efar-search-results))
 	      :panels side :files)
     
@@ -2571,7 +2578,8 @@ Selected item bacomes actual for current panel."
 	     (cons
 	      (line-number-at-pos)	      
 	      (replace-regexp-in-string "\n" "" (thing-at-point 'line t)))
-	     hits)))
+	     hits)
+	    (forward-line)))
 	
 	(reverse hits))
     
@@ -2631,3 +2639,117 @@ Selected item bacomes actual for current panel."
 	 (last (car (last processes))))
     (setq efar-search-processes (cons last (remove last processes)))
     (car efar-search-processes)))
+
+(define-button-type 'efar-search-find-file-button
+  'follow-link t
+  'action #'efar-search-find-file-button
+  'face 'efar-search-file-link-face)
+
+(defface efar-search-file-link-face
+  '((t :foreground "black"
+       :background "snow2"
+       :height 1.3
+       :underline t
+       ))
+  "The face used for representing the link to the file")
+
+
+(define-button-type 'efar-search-find-line-button
+  'follow-link t
+  'action #'efar-search-find-file-button
+  'face 'efar-search-line-link-face)
+
+(defface efar-search-line-link-face
+  '((t :foreground "black"
+       :background "ivory"
+       ))
+  "The face used for representing the link to the source code line")
+
+
+(defun efar-show-search-results-in-buffer()
+  ""
+  (if (and efar-search-process-manager
+	   (process-live-p efar-search-process-manager))
+      
+      (efar-set-status :ready "Search is still running" nil t)
+    
+    (efar-set-status :busy "Generating report with search results...")
+    (and (get-buffer "*eFar search results") (kill-buffer "*eFar search results"))
+
+    (let ((buffer (get-buffer-create "*eFar search results"))
+	  (dir (cdr (assoc :dir efar-last-search-params)))
+	  (wildcard (cdr (assoc :wildcard efar-last-search-params)))
+	  (text (cdr (assoc :text efar-last-search-params)))
+	  (ignore-case? (cdr (assoc :ignore-case? efar-last-search-params)))
+	  (regexp? (cdr (assoc :regexp? efar-last-search-params))))
+      
+      (with-current-buffer buffer
+	(read-only-mode 0)
+	(erase-buffer)
+	
+	;; insert header with description of search parameters
+	(insert (concat "Found " (int-to-string (length (efar-get :panels (efar-get :current-panel) :files)))
+			" files in " (int-to-string (round (- (cdr (assoc :end-time efar-last-search-params)) (cdr (assoc :start-time efar-last-search-params))))) " second(s).\n"
+			"Directory: " dir "\n"
+			"File name mask: " wildcard "\n"
+			(when text
+			  (concat "Text: " text "\n"
+				  "Ignore case: " (if ignore-case? "yes" "no") "\n"
+				  "Use regexp: " (if regexp? "yes" "no") "\n")) 
+			"\n"))
+	
+	(cl-loop for file in (efar-get :panels (efar-get :current-panel) :files) do
+		 
+		 ;; create a link to the file
+		 (setq file-button (insert-button (car file)
+						  :type 'efar-search-find-file-button
+						  :file (car file)))
+		 (insert "\n")
+
+		 ;; create links to source code lines
+		 (cl-loop for line in (nth 13 file) do
+			
+			  (let ((line-number (car line))
+				(line-text (cdr line)))
+			    (insert-button (concat (int-to-string line-number) ":\t" line-text) 
+					   :type 'efar-search-find-line-button
+					   :file (car file)
+					   :line-number line-number
+					   :text text
+					   :ignore-case? ignore-case?
+					   :regexp? regexp?))
+			  (insert "\n"))
+		 (insert "\n"))
+	
+	;; highlight searched text
+	(beginning-of-buffer)
+	(if (cdr (assoc :regexp? efar-last-search-params))
+	    (highlight-regexp text 'hi-yellow)
+	  (highlight-phrase text 'hi-yellow))
+	
+	(read-only-mode 1))
+      
+      (switch-to-buffer-other-window buffer)
+      (efar-set-status :ready "Ready"))))
+
+(defun efar-search-find-file-button(button)
+  "Open file from search results buffer and navigate to search text."
+  (let ((file (button-get button :file))
+	(line-number (button-get button :line-number))
+	(text (button-get button :text))
+	(ignore-case? (button-get button :ignore-case?))
+	(regexp? (button-get button :regexp?)))
+
+    ;; open file in other window
+    (find-file-other-window file)
+    (goto-char 0)
+
+    ;; navigate to the line containing searched text
+    ;; and activate isearch for the text
+    (when line-number
+      (forward-line (- line-number 1))
+      (isearch-mode t regexp?)
+      (if ignore-case?
+	  (setq text (downcase text)))
+      (isearch-process-search-string text
+				     (mapconcat 'isearch-text-char-description text "")))))
