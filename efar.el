@@ -257,8 +257,8 @@
 (efar-register-key "C-<down>" 'efar-scroll-other-window :down 'efar-scroll-other-down-key "scroll other window down" t)
 (efar-register-key "C-<up>" 'efar-scroll-other-window :up 'efar-scroll-other-up-key "scroll other window up" t)
 
-(efar-register-key  "<insert>" 'efar-mark-file   nil 'efar-mark-file-key  "mark item under cursor" t (list :dir-hist :bookmark :disks))
-(efar-register-key "<C-insert>" 'efar-deselect-all  nil 'efar-deselect-all-kay  "unmark all items in the list" :space-after (list :dir-hist :bookmark :disks))
+(efar-register-key  "<insert>" 'efar-mark-file   nil 'efar-mark-file-key  "mark item under cursor" t (list :dir-hist :bookmark :disks :search))
+(efar-register-key "<C-insert>" 'efar-deselect-all  nil 'efar-deselect-all-kay  "unmark all items in the list" :space-after (list :dir-hist :bookmark :disks :search))
 
 (efar-register-key "TAB"   'efar-switch-to-other-panel nil 'efar-switch-to-other-panel-key "switch to other panel" t)
 (efar-register-key "C-c TAB"  'efar-open-dir-other-panel nil 'efar-open-dir-othet-panel-key "open current directory in other panel" :space-after)
@@ -267,15 +267,15 @@
 (efar-register-key "<M-f4>"  'efar-open-file-in-ext-app nil 'efar-open-file-in-ext-app-key "open file under cursor in externall application" t)
 (efar-register-key "<f3>"  'efar-edit-file   t 'efar-read-file-key  "show content of the file in other window" :space-after)
 
-(efar-register-key "<f5>"   'efar-copy-or-move-files :copy 'efar-copy-file-key  "copy marked file(s)" t (list :dir-hist :bookmark :disks))
-(efar-register-key "<f6>"  'efar-copy-or-move-files :move 'efar-move-file-key  "move/rename marked file(s)" t (list :dir-hist :bookmark :disks))
-(efar-register-key "<f7>"  'efar-create-new-directory nil 'efar-create-direcotry-key "create new directory" t (list :dir-hist :bookmark :disks))
-(efar-register-key "<f8>"  '((:files . efar-delete-selected) (:bookmark . efar-delete-bookmark))   nil 'efar-delete-file-key  "delete selected file(s) or bookmark" :space-after '(:dir-hist :disks))
+(efar-register-key "<f5>"   'efar-copy-or-move-files :copy 'efar-copy-file-key  "copy marked file(s)" t (list :dir-hist :bookmark :disks :search))
+(efar-register-key "<f6>"  'efar-copy-or-move-files :move 'efar-move-file-key  "move/rename marked file(s)" t (list :dir-hist :bookmark :disks :search))
+(efar-register-key "<f7>"  'efar-create-new-directory nil 'efar-create-direcotry-key "create new directory" t (list :dir-hist :bookmark :disks :search))
+(efar-register-key "<f8>"  '((:files . efar-delete-selected) (:bookmark . efar-delete-bookmark))   nil 'efar-delete-file-key  "delete selected file(s) or bookmark" :space-after '(:dir-hist :disks :search))
 
 
 (efar-register-key "C-c f d" 'efar-show-disk-selector  nil 'efar-show-disk-selector-key "show list of available disks (Windows) or mount points (Unix)" t)
-(efar-register-key "C-c f s" 'efar-change-sort-function  nil 'efar-change-sort-key "change sort function and/or order for current panel" t (list :dir-hist :bookmark :disks))
-(efar-register-key "C-c f f" 'efar-filter-files  nil 'efar-filter-files-key "set/remove filtering for current panel" :space-after (list :dir-hist :bookmark :disks))
+(efar-register-key "C-c f s" 'efar-change-sort-function  nil 'efar-change-sort-key "change sort function and/or order for current panel" t (list :dir-hist :bookmark :disks :search))
+(efar-register-key "C-c f f" 'efar-filter-files  nil 'efar-filter-files-key "set/remove filtering for current panel" :space-after (list :dir-hist :bookmark :disks :search))
 
 (efar-register-key "C-c v M" 'efar-change-mode  nil 'efar-change-mode-key  "toggle mode: double panel <-> single panel" t)
 (efar-register-key "C-c v +" 'efar-change-column-number t 'efar-inc-column-number-key "increase number of columns in current panel" t)
@@ -284,7 +284,7 @@
 
 (efar-register-key "C-c c p" 'efar-copy-current-path  nil 'efar-copy-current-path-key "copy to the clipboard the path to the current file" t)
 (efar-register-key "C-c c d" 'efar-cd   nil 'efar-cd-key   "go to specific directory" t)
-(efar-register-key "C-c c e" 'efar-ediff-files  nil 'efar-ediff-files-key  "run ediff for selected files" t (list :dir-hist :bookmark :disks))
+(efar-register-key "C-c c e" 'efar-ediff-files  nil 'efar-ediff-files-key  "run ediff for selected files" t (list :dir-hist :bookmark :disks :search))
 (efar-register-key "C-c c s" 'efar-current-file-stat  nil 'efar-current-file-stat-key "show directory stats (size and files number)" t)
 (efar-register-key  "C-c c o" 'efar-display-console  nil 'efar-display-console-key  "open console window"  t)
 (efar-register-key "<f12> <f12>"  'efar-init   t 'efar-init-key   "reinit and redraw eFar buffer" t)
