@@ -36,9 +36,17 @@
   "eFar main customization parameters"
   :group 'eFar)
 
+(defgroup eFar-search-parameters nil
+  "eFar file search parameters"
+  :group 'eFar-parameters)
+
 (defgroup eFar-faces nil
   "eFar faces"
   :group 'eFar)
+
+(defgroup eFar-search-faces nil
+  "eFar faces"
+  :group 'eFar-search-parameters)
 
 (defgroup eFar-keys nil
   "eFar key bindings"
@@ -94,6 +102,19 @@
 (defcustom efar-max-items-in-directory-history 40
   "Maximum number of directories to be stored in directory history"
   :group 'eFar-parameters)
+
+(defcustom efar-max-search-processes 4
+  "Number of subprocesses to use for file search"
+  :group 'eFar-search-parameters)
+
+(defcustom efar-search-results-buffer-name "*eFar search results*"
+  "Name of the buffer to display search results in"
+  :group 'eFar-search-parameters)
+
+(defcustom efar-search-default-file-mask "*.el"
+  "Default file name mask to use for file search"
+  :group 'eFar-search-parameters)
+
 
 ;; FACES
 (defface efar-border-line-face
@@ -193,6 +214,23 @@
        ))
   "Style for non-existing current files (in bookmarks and directory history"
   :group 'eFar-faces)
+
+(defface efar-search-file-link-face
+  '((t :foreground "black"
+       :background "snow2"
+       :bold t
+       :underline t
+       ))
+  "The face used for representing the link to the file"
+  :group 'eFar-search-faces)
+
+(defface efar-search-line-link-face
+  '((t :foreground "black"
+       :background "ivory"
+       ))
+  "The face used for representing the link to the source code line"
+  :group 'eFar-search-faces)
+
 
 ;; KEY bindings
 
@@ -2308,24 +2346,23 @@ Selected item bacomes actual for current panel."
     (efar-set hint-number :next-hint-number)))
 
 
+;;--------------------------------------------------------------------------------
+;; File search functionality
+;;--------------------------------------------------------------------------------
 
-;; Search functionality
-
-
-(defconst efar-max-search-processes 4)
-
-(defvar efar-search-process-command
+(defconst efar-search-process-command
   (list (expand-file-name invocation-name invocation-directory)
 	"--batch"
 	"-q"
 	"-l" "c:/projects/efar/efar.el"
 	"-eval" "(efar-process-search-request)"))
 ;;	"-l" "c:/projects/efar/efar.el"
+
 (defvar efar-search-processes '())
 (defvar efar-search-process-manager nil)
 (defvar efar-search-results '())
-(defvar efar-accepting-process-count 0)
 (defvar efar-last-search-params nil)
+(defvar efar-update-search-results-timer nil)
 
 (defun efar-start-search()
   ""
@@ -2344,7 +2381,7 @@ Selected item bacomes actual for current panel."
 	(if (not (file-directory-p (caar selected-files)))
 	    (efar-set-status :ready "Please select a directory to search files in" nil t)
 	  
-	  (let* ((wildcard (read-string "File name mask: " "*.txt"))
+	  (let* ((wildcard (read-string "File name mask: " efar-search-default-file-mask))
 		 (text (read-string "Text to search inside files: " "")) 
 		 (ignore-case? (and (not (string-empty-p text)) (string=  "Yes" (ido-completing-read "Ignore case for text search? " (list "Yes" "No")))))
 		 (regexp? (and (not (string-empty-p text)) (string=  "Yes" (ido-completing-read "Use regexp for textsearch? " (list "No" "Yes"))))))
@@ -2365,8 +2402,6 @@ Selected item bacomes actual for current panel."
 	    
 	    (efar-search-start-search efar-last-search-params)))))))
 
-
-(defvar efar-update-search-results-timer nil)
 
 (defun efar-search-start-search(params)
   ""
@@ -2395,7 +2430,7 @@ Selected item bacomes actual for current panel."
   ""
   (make-process
    :name "efar-search-process"
-   :stderr (get-buffer-create "err")
+   :stderr (get-buffer-create "*eFar search error*")
    :command efar-search-process-command
    :filter #'efar-search-process-filter
    :sentinel #'efar-search-process-sentinel))
@@ -2645,25 +2680,10 @@ Selected item bacomes actual for current panel."
   'action #'efar-search-find-file-button
   'face 'efar-search-file-link-face)
 
-(defface efar-search-file-link-face
-  '((t :foreground "black"
-       :background "snow2"
-       :height 1.3
-       :underline t
-       ))
-  "The face used for representing the link to the file")
-
-
 (define-button-type 'efar-search-find-line-button
   'follow-link t
   'action #'efar-search-find-file-button
   'face 'efar-search-line-link-face)
-
-(defface efar-search-line-link-face
-  '((t :foreground "black"
-       :background "ivory"
-       ))
-  "The face used for representing the link to the source code line")
 
 
 (defun efar-show-search-results-in-buffer()
@@ -2674,9 +2694,10 @@ Selected item bacomes actual for current panel."
       (efar-set-status :ready "Search is still running" nil t)
     
     (efar-set-status :busy "Generating report with search results...")
-    (and (get-buffer "*eFar search results") (kill-buffer "*eFar search results"))
+    
+    (and (get-buffer efar-search-results-buffer-name) (kill-buffer efar-search-results-buffer-name))
 
-    (let ((buffer (get-buffer-create "*eFar search results"))
+    (let ((buffer (get-buffer-create efar-search-results-buffer-name))
 	  (dir (cdr (assoc :dir efar-last-search-params)))
 	  (wildcard (cdr (assoc :wildcard efar-last-search-params)))
 	  (text (cdr (assoc :text efar-last-search-params)))
