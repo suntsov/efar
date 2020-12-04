@@ -2247,7 +2247,8 @@ If a double mode is active then actual panel becomes fullscreen."
   ""
   
   (let ((side (or side (efar-get :current-panel))))
-    (efar-set (mapcar (lambda(d) (list (car d) t))
+    (efar-set (mapcar (lambda(d) (let ((attrs (file-attributes (car d))))
+				   (push (car d) attrs)))
 		      (efar-get :directory-history))
 	      :panels side :files)
     
@@ -2270,10 +2271,12 @@ If a double mode is active then actual panel becomes fullscreen."
   (when (equal (efar-get :panels :right :mode) :bookmark)
     (efar-show-bookmarks :right)))
 
+
 (defun efar-show-bookmarks(&optional side)
   ""
   (let ((side (or side (efar-get :current-panel))))
-    (efar-set (mapcar (lambda(d) (list d (file-directory-p d)))
+    (efar-set (mapcar (lambda(d) (let ((attrs (file-attributes d)))
+				   (push d attrs)))			
 		      (efar-get :bookmarks))
 	      :panels side :files)
     
