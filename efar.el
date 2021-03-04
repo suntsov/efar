@@ -103,7 +103,7 @@
   "Maximum number of directories to be stored in directory history"
   :group 'eFar-parameters)
 
-(defcustom efar-max-search-processes 8
+(defcustom efar-max-search-processes 4
   "Number of subprocesses to use for file search"
   :group 'eFar-search-parameters)
 
@@ -401,6 +401,11 @@ If the function called with prefix argument, then go to default-directory of cur
       ;; do initialisation if necessary and redraw the content of the buffer
       (when need-init?
 	(efar-init)
+	
+	;; make search processes
+	;; we do this in advance to speed up search process
+	(make-thread 'efar-run-search-processes)
+
 	(efar-calculate-window-size)
 	(efar-calculate-widths)
 	(efar-write-enable
@@ -1046,12 +1051,12 @@ User also can select an option to overwrite all remaining files to not be asked 
 		   (interactive "e")	      
 		   (if (<  (car (nth 6 (nth 1 event))) (+ 2 (efar-panel-width :left) ))
 		       (progn
-			 (efar-set :left :current-panel)
-			 (efar-set default-directory :panels :left :dir))
+			 (efar-set :left :current-panel))
+			 ;;(efar-set default-directory :panels :left :dir))
 		     
 		     (progn
-		       (efar-set :right :current-panel)
-		       (efar-set default-directory :panels :right :dir))
+		       (efar-set :right :current-panel))
+		       ;;(efar-set default-directory :panels :right :dir)
 		     )
 		   (efar-write-enable (efar-redraw))))
   )
@@ -2087,6 +2092,7 @@ If a double mode is active then actual panel becomes fullscreen."
 (defun efar-buffer-killed()
   ""
   (when (string= (buffer-name) efar-buffer-name)
+    (efar-search-kill-all-processes)
     (when (and
 	   efar-save-state?
 	   
@@ -2098,6 +2104,7 @@ If a double mode is active then actual panel becomes fullscreen."
 
 (defun efar-emacs-killed()
   ""
+  (efar-search-kill-all-processes)
   (when (and
 	 efar-save-state?
 	 (get-buffer efar-buffer-name))
@@ -2392,53 +2399,65 @@ Selected item bacomes actual for current panel."
 (defvar efar-search-server nil)
 (defvar efar-search-server-port nil)
 (defvar efar-search-clients '())
+(defvar efar-search-running? nil)
+
+(defun efar-run-search-processes()
+  ""
+  (efar-search-kill-all-processes)
+  (sleep-for 1)
+  (efar-search-start-server)
+  (setq efar-search-clients '())
+  (setq efar-search-process-manager (efar-make-search-process))
+  (efar-search-send-command efar-search-process-manager
+			    :run-search-processes
+			    '()))
+
+(defun efar-int-run-search-processes()
+  ""
+  (cl-loop for n in (number-sequence 0 (- efar-max-search-processes 1)) do
+	   (push (efar-make-search-process) efar-search-processes)))    
 
 (defun efar-start-search()
   ""
-  (let ((run? t))
-    (when (and efar-search-process-manager
-	       (process-live-p efar-search-process-manager))
-      
-      (if (string= "Yes" (ido-completing-read "Search is still running. Kill it? " (list "Yes" "No" )))
-	  (efar-search-kill-all-processes)
-	(setq run? nil)))
+  (when efar-search-running?
+    (when (string= "Yes" (ido-completing-read "Search is still running. Kill it? " (list "Yes" "No" )))
+      (efar-run-search-processes)
+      (setq efar-search-running? nil)))
     
-    (when run?
-      (let* ((side (efar-get :current-panel))
-	     (selected-files (or (efar-selected-files side t) (list (list default-directory)))))
+  (unless efar-search-running?
+    (let* ((side (efar-get :current-panel))
+	   (selected-files (or (efar-selected-files side t) (list (list default-directory)))))
+      
+      (if (not (file-directory-p (caar selected-files)))
+	  (efar-set-status :ready "Please select a directory to search files in" nil t)
 	
-	(if (not (file-directory-p (caar selected-files)))
-	    (efar-set-status :ready "Please select a directory to search files in" nil t)
+	(let* ((wildcard (read-string "File name mask: " efar-search-default-file-mask))
+	       (text (read-string "Text to search: " "")) 
+	       (ignore-case? (and (not (string-empty-p text)) (string=  "Yes" (ido-completing-read "Ignore case? " (list "Yes" "No")))))
+	       (regexp? (and (not (string-empty-p text)) (string=  "Yes" (ido-completing-read "Use regexp? " (list "No" "Yes"))))))
 	  
-	  (let* ((wildcard (read-string "File name mask: " efar-search-default-file-mask))
-		 (text (read-string "Text to search: " "")) 
-		 (ignore-case? (and (not (string-empty-p text)) (string=  "Yes" (ido-completing-read "Ignore case? " (list "Yes" "No")))))
-		 (regexp? (and (not (string-empty-p text)) (string=  "Yes" (ido-completing-read "Use regexp? " (list "No" "Yes"))))))
-	    
-	    (setq efar-last-search-params nil)
-	    (setq efar-last-search-params (list (cons :dir (caar selected-files))
-						(cons :wildcard wildcard)
-						(cons :text (if (string-empty-p text) nil text))
-						(cons :ignore-case? ignore-case?)
-						(cons :regexp? regexp?)
-						(cons :start-time (time-to-seconds (current-time)))))
-	    
-	    (setq efar-update-search-results-timer
-		  (run-at-time nil 3
-			       (lambda()
-				 (when (equal :search (efar-get :panels :left :mode))
-				   (efar-show-search-results nil :left t))
-				 
-				 (when (equal :search (efar-get :panels :right :mode))
-				   (efar-show-search-results nil :right t)))))
-	    (setq efar-search-results '())
-	    (setq efar-search-clients '())
-	    (efar-search-start-server)
-	    (setq efar-search-process-manager (efar-make-search-process))
-	    (efar-show-search-results)
-	    (efar-search-send-command efar-search-process-manager
-				      :start-search
-				      efar-last-search-params)))))))
+	  (setq efar-last-search-params nil)
+	  (setq efar-last-search-params (list (cons :dir (caar selected-files))
+					      (cons :wildcard wildcard)
+					      (cons :text (if (string-empty-p text) nil text))
+					      (cons :ignore-case? ignore-case?)
+					      (cons :regexp? regexp?)
+					      (cons :start-time (time-to-seconds (current-time)))))
+	  
+	  (setq efar-update-search-results-timer
+		(run-at-time nil 1
+			     (lambda()
+			       (when (equal :search (efar-get :panels :left :mode))
+				 (efar-show-search-results nil :left t))
+			       
+			       (when (equal :search (efar-get :panels :right :mode))
+				 (efar-show-search-results nil :right t)))))
+	  (setq efar-search-results '())
+	  (setq efar-search-running? t)
+	  (efar-show-search-results)
+	  (efar-search-send-command efar-search-process-manager
+				    :start-search
+				    efar-last-search-params))))))
 
 
 (defun efar-search-kill-all-processes()
@@ -2461,26 +2480,27 @@ Selected item bacomes actual for current panel."
 			      :filter #'efar-search-process-filter
 			      :sentinel #'efar-search-server-sentinel
 			      :noquery t))
-  
-  (setq efar-search-server-port (car (cdr (process-contact efar-search-server)))))
+  (set-process-query-on-exit-flag efar-search-server nil)
+  (setq efar-search-server-port (cadr (process-contact efar-search-server))))
 
 (defun efar-search-server-sentinel(proc message)
   ""
   (unless (equal proc efar-search-server)
-    (if (process-live-p proc)
-	(push (process-name proc) efar-search-clients)
-      (setq efar-search-clients (cl-remove (process-name proc) efar-search-clients :test 'equal)))
-    
-    (unless efar-search-clients
-      (efar-search-finished))))
+    (when (process-live-p proc)
+      (push (process-name proc) efar-search-clients))))
 
 (defun efar-search-finished()
   ""
+  (while (accept-process-output))
+  
   (when (timerp efar-update-search-results-timer)
     (cancel-timer efar-update-search-results-timer))
   (setq efar-update-search-results-timer nil)
   
   (push (cons :end-time (time-to-seconds (current-time))) efar-last-search-params)
+
+  (setq efar-search-running? nil)
+
   (efar-show-search-results 'sorted nil nil))
 
 (defun efar-make-search-process()
@@ -2492,7 +2512,10 @@ Selected item bacomes actual for current panel."
 	       :filter #'efar-search-process-filter
 	       :coding efar-search-coding
 	       :noquery t)))
-    (efar-search-send-command proc :server-port efar-search-server-port)
+
+    (set-process-query-on-exit-flag proc nil)
+    
+    (efar-search-send-command proc :setup-server-connection efar-search-server-port)
     
     proc))
 
@@ -2538,8 +2561,15 @@ Selected item bacomes actual for current panel."
     (let* ((file (cdr (assoc :name data)))
 	   (attrs (file-attributes file)))
       (push (append (push file attrs) (list (cdr (assoc :lines data)))) efar-search-results)))
+
+  (when (equal message-type :finished)
+    (setq efar-search-clients (cl-remove (process-name proc) efar-search-clients :test 'equal))
+
+    (unless efar-search-clients
+      (efar-search-finished)))
   
   (when (equal message-type :error)
+    (print data t)
     (efar-set :ready (concat "Error occured during search: " data))))
 
 (defun efar-search-int-start-search(args)
@@ -2550,15 +2580,12 @@ Selected item bacomes actual for current panel."
 	(regexp? (or (cdr (assoc :regexp? args)) nil))
 	(ignore-case? (or (cdr (assoc :ignore-case? args)) nil)))
     
-    (if text
-	(cl-loop for n in (number-sequence 0 (- efar-max-search-processes 1)) do
-		 (push (efar-make-search-process) efar-search-processes)))
-    
     (efar-files-recursively dir wildcard text regexp? ignore-case?)
     
     (cl-loop for proc in efar-search-processes do
-	     (efar-search-send-command proc :exit '()))))
+	     (efar-search-send-command proc :finished '()))
 
+    (process-send-string efar-search-server (concat (prin1-to-string (cons :finished '())) "\n"))))
 
 (defun efar-files-recursively(dir wildcard &optional text regexp? ignore-case?)
   ""
@@ -2637,47 +2664,40 @@ Selected item bacomes actual for current panel."
   (let ((coding-system-for-write efar-search-coding))
     (condition-case err
 	
-	(let ((command nil)
-	      (args nil))
+	(while t
 	  
-	  (while (not (equal command :exit))
+	  (let* ((request-string (read-from-minibuffer ""))
+		 (request (car (read-from-string request-string)))
+		 (command (car request))
+		 (args (cdr request)))
 	    
-	    (if (equal command :loop)
-		(progn
-		  (let ((finished? (not efar-search-processes)))
-		    (while (not finished?)
-		      (cl-loop for proc in efar-search-processes do
-			       (if (process-live-p proc)
-				   (setq finished? nil)
-				 (setq finished? t))
-			       (while (accept-process-output proc))))
-		    
-		    (while (accept-process-output)))
-		  (setq command :exit)))
-	    
-	    (unless (equal command :exit)
-	      (let* ((request-string (read-from-minibuffer ""))
-		     (request (car (read-from-string request-string))))
-		
-		
-		(setf command (car request))
-		(setf args (cdr request))
-		
-		
-		(cond
-		 
-		 ((equal command :server-port)
-		  (setq efar-search-server (make-network-process :name "efar-server"
-								 :host "localhost"
-								 :service args))
-		  (setq efar-search-server-port args))
-		 
-		 ((equal command :start-search)
-		  (efar-search-int-start-search args)
-		  (setq command :loop))
-		 
-		 ((equal command :process-file)
-		  (efar-search-process-file args)))))))
+	    (pcase command
+	     
+	      (:setup-server-connection
+	       (setq efar-search-server (make-network-process :name "efar-server"
+							      :host "localhost"
+							      :service args
+							      :noquery t
+							      :nowait t))
+	       (set-process-query-on-exit-flag efar-search-server nil)
+	       (setq efar-search-server-port args))
+
+	      
+	      (:run-search-processes
+	       (efar-int-run-search-processes))
+	     
+	      (:start-search
+	       (progn
+		 (efar-search-int-start-search args)
+		 (cl-loop for proc in efar-search-processes do
+			  (while (accept-process-output proc 1)))
+		 (while (accept-process-output nil 1))))
+	      
+	      (:finished
+	       (process-send-string  efar-search-server (concat (prin1-to-string (cons :finished '())) "\n")))
+	     
+	      (:process-file
+	       (efar-search-process-file args)))))
       
       (error
        (process-send-string  efar-search-server (concat (prin1-to-string (cons :error (error-message-string err))) "\n"))))))
@@ -2724,8 +2744,7 @@ Selected item bacomes actual for current panel."
   (efar-calculate-widths)
   (efar-write-enable (efar-redraw))
 
-  (let ((status-string (cond ((and efar-search-process-manager
-				   (process-live-p efar-search-process-manager))
+  (let ((status-string (cond (efar-search-running?
 			      "Search running for files ")
 			     ((cdr (assoc :end-time efar-last-search-params))
 			      (concat "Search finished in " (int-to-string (round (- (cdr (assoc :end-time efar-last-search-params)) (cdr (assoc :start-time efar-last-search-params))))) " second(s) for files "))
@@ -2744,8 +2763,7 @@ Selected item bacomes actual for current panel."
 
 (defun efar-show-search-results-in-buffer()
   ""
-  (if (and efar-search-process-manager
-	   (process-live-p efar-search-process-manager))
+  (if efar-search-running?
       
       (efar-set-status :ready "Search is still running" nil t)
     
