@@ -823,7 +823,7 @@ User also can select an option to overwrite all remaining files to not be asked 
 			      
 			      (cond 
 			       ;; if file is a real file and doesn't exist in destination folder
-			       ((and (not (cadr f)) (not (file-exists-p newfile)))
+			       ((and (not (equal (cadr f) t)) (not (file-exists-p newfile)))
 				;; we just copy it using elisp function
 				
 				(if (equal operation :copy)
@@ -832,14 +832,14 @@ User also can select an option to overwrite all remaining files to not be asked 
 			       
 			       
 			       ;; if file is a directory and doesn't exist in destination folder
-			       ((and (cadr f) (not (file-exists-p newfile)))
+			       ((and (equal (cadr f) t) (not (file-exists-p newfile)))
 				;; we just copy directory using elisp function
 				(if (equal operation :copy)
 				    (efar-retry-when-error (copy-directory (car f) newfile nil nil nil))
 				  (efar-retry-when-error (rename-file (car f) newfile))))
 			       
 			       ;; if file is a real file and does exist in destination folder
-			       ((and (not (cadr f)) (file-exists-p newfile))
+			       ((and (not (equal (cadr f) t)) (file-exists-p newfile))
 				(progn
 				  ;; we ask user what to do (overwrite, not overwrite, overwrite all remaining)
 				  ;; if user was already asked before and the answer was "All", we don't ask again
@@ -854,7 +854,7 @@ User also can select an option to overwrite all remaining files to not be asked 
 				      (efar-retry-when-error (rename-file (car f) newfile t))))))
 			       
 			       ;; if file is a directory and does exist in destination folder
-			       ((and (cadr f) (file-exists-p newfile))
+			       ((and (equal (cadr f) t) (file-exists-p newfile))
 				;; we call local function recursively 
 				(do-operation operation (directory-files (car f) nil nil t) newfile (expand-file-name (efar-get-short-file-name f) default-directory) )
 				(when (equal operation :move)
@@ -878,7 +878,7 @@ User also can select an option to overwrite all remaining files to not be asked 
 	   
 	   (when (and selected-files (string= "Yes" (ido-completing-read "Delete selected files? " (list "Yes" "No"))))
 	     (mapc(lambda (f)
-		    (if (cadr f)
+		    (if (equal (cadr f) t)
 			(efar-retry-when-error (delete-directory (car f) t))
 		      (efar-retry-when-error (delete-file (car f)))))
 		  
@@ -1639,7 +1639,7 @@ If a double mode is active then actual panel becomes fullscreen."
 	 (file (car (efar-selected-files side t t)))
 	 (current-dir-path (efar-get :panels side :dir)))
     (efar-quit-fast-search)
-    (when (cadr file)
+    (when (equal (cadr file) t)
       (let ((newdir (expand-file-name (car file) current-dir-path)))
 	(cond
 	 
@@ -1818,12 +1818,25 @@ If a double mode is active then actual panel becomes fullscreen."
 					     (marked? (member (+ (efar-get :panels side :start-file-number) cnt) (efar-get :panels side :selected)))				  
 					     
 					     (disp-mode (car (efar-get :panels side :view (efar-get :panels side :mode) :file-disp-mode)))
+
+					     (exists? (file-exists-p (car f)))
+					     (real-file (if (not (stringp (cadr f)))
+							    (cdr f)
+							  (file-attributes (cadr f))))
+					     
+					     (dir? (car real-file))
+					     (file? (not (car real-file)))
+
+					     (current? (and
+							(= cnt (efar-get :panels side :current-pos))
+							(equal side (efar-get :current-panel))))
+					     
 					     
 					     (str (efar-prepare-file-name (concat (and marked? "*")
 										  (pcase disp-mode
-										    (:short (concat (file-name-nondirectory (car f)) (when (and efar-add-slash-to-directories (cadr f)) "/")))
+										    (:short (concat (file-name-nondirectory (car f)) (when (and efar-add-slash-to-directories (car real-file)) "/")))
 										    (:long (concat (car f)
-												   (when (and efar-add-slash-to-directories (cadr f)) "/")
+												   (when (and efar-add-slash-to-directories (car real-file)) "/")
 												   (when (nth 13 f) (concat " (" (int-to-string (length (nth 13 f))) ")"))))
 										    (:detailed (efar-prepare-detailed-file-info f w))))
 									  w
@@ -1832,23 +1845,18 @@ If a double mode is active then actual panel becomes fullscreen."
 					(replace-rectangle p (+ p (length str)) str)
 					
 					
-					(let ((exists? (file-exists-p (car f)))
-					      
-					      (dir? (cadr f))
-					      
-					      (current? (and
-							 (= cnt (efar-get :panels side :current-pos))
-							 (equal side (efar-get :current-panel)))))
-					  (let ((current-face
-						 (cond
-						  ((and (not exists?) current?) 'efar-non-existing-current-file-face)
-						  ((not exists?) 'efar-non-existing-file-face)
-						  ((and dir? current?) 'efar-dir-current-face)
-						  ((and (not dir?) current?) 'efar-file-current-face)
-						  (marked? 'efar-marked-face)
-						  ((and dir? (not current?)) 'efar-dir-face)
-						  ((and (not dir?) (not current?)) 'efar-file-face) )))
-					    (put-text-property p (+ p w) 'face current-face))))))
+					(let ((current-face
+					       (cond
+						((and (not exists?) current?) 'efar-non-existing-current-file-face)
+						((not exists?) 'efar-non-existing-file-face)
+						
+						((and dir? current?) 'efar-dir-current-face)
+						((and file? current?) 'efar-file-current-face)
+						(marked? 'efar-marked-face)
+						
+						((and dir? (not current?)) 'efar-dir-face)
+						((and file? (not current?)) 'efar-file-face) )))
+					  (put-text-property p (+ p w) 'face current-face)))))
 				  
 				  
 				  (cl-incf cnt)))
