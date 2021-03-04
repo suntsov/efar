@@ -439,7 +439,7 @@ If the function called with prefix argument, then go to default-directory of cur
     (efar-init-state))
   
   (efar-set-key-bindings)
-  ;;  (efar-set-mouse-bindings)
+  (efar-set-mouse-bindings)
   
   (efar-init-panel :left)
   (efar-init-panel :right)
@@ -1040,21 +1040,20 @@ User also can select an option to overwrite all remaining files to not be asked 
 
 
 (defun efar-set-mouse-bindings()
-  ""
-  ;; ToDo: implement mouse interaction
-  ;;  (local-set-key (kbd "<down-mouse-1>")
-  ;;		 (lambda (event)
-  ;;		   (interactive "e")
-  ;;		   (if (<  (car (nth 6 (nth 1 event))) (+ 2 (efar-get :panel-width) ))
-  ;;		       (progn
-  ;;			 (efar-set :left :current-panel)
-  ;;			 (efar-set default-directory :panels :left :dir))
-  ;;		     
-  ;;		     (progn
-  ;;		       (efar-set :right :current-panel)
-  ;;		       (efar-set default-directory :panels :right :dir))
-  ;;		     )
-  ;;		   (efar-write-enable (efar-redraw))))
+  "ToDo: implement mouse interaction"
+  (local-set-key (kbd "<down-mouse-1>")
+		 (lambda (event)
+		   (interactive "e")	      
+		   (if (<  (car (nth 6 (nth 1 event))) (+ 2 (efar-panel-width :left) ))
+		       (progn
+			 (efar-set :left :current-panel)
+			 (efar-set default-directory :panels :left :dir))
+		     
+		     (progn
+		       (efar-set :right :current-panel)
+		       (efar-set default-directory :panels :right :dir))
+		     )
+		   (efar-write-enable (efar-redraw))))
   )
 
 (defun efar-cd()
@@ -1610,7 +1609,7 @@ If a double mode is active then actual panel becomes fullscreen."
 			 (equal :search (efar-get :panels (efar-get :current-panel) :mode))))) ;; in a file search result
       
       (let ((last-auto-read-buffer (efar-get :last-auto-read-buffer))) ;; get the last auto read buffer
-	;; we don't want to keep opened too unnecessary buffers for auto opened files
+	;; we don't want to keep buffers for auto-opened files/dirs
 	;; so we kill last auto read buffer if:
 	;; - now we open different file
 	;; - last auto read buffer is not modified
@@ -1634,7 +1633,6 @@ If a double mode is active then actual panel becomes fullscreen."
   (let* ((side (efar-get :current-panel))				       
 	 (file (car (efar-selected-files side t t)))
 	 (current-dir-path (efar-get :panels side :dir)))
-    
     (efar-quit-fast-search)
     (when (cadr file)
       (let ((newdir (expand-file-name (car file) current-dir-path)))
@@ -1787,7 +1785,7 @@ If a double mode is active then actual panel becomes fullscreen."
 				      (- (length (efar-get :panels side :files)) (efar-get :panels side :start-file-number)))))
 		     
 		     ;; append empty items if number of files to display is less then max files in panel
-		     ;; needed to overwrite old entries
+		     ;; in order to overwrite old entries
 		     (make-list (let ((rest (- (length (efar-get :panels side :files)) (efar-get :panels side :start-file-number))))
 				  (if (> rest (* max-files-in-column col-number))
 				      0 (- (* max-files-in-column col-number) rest))) 
@@ -2325,11 +2323,13 @@ If a double mode is active then actual panel becomes fullscreen."
 (defun efar-navigate-to-file()
   ""
   (let ((entry (caar (efar-selected-files (efar-get :current-panel) t))))
-    (efar-go-to-dir (file-name-directory entry))
-    (when (and (file-name-nondirectory entry) (not (string-empty-p (file-name-nondirectory entry))))
-      (efar-go-to-file (file-name-nondirectory entry))))
-  (efar-calculate-widths)
-  (efar-write-enable (efar-redraw)))
+    (efar-quit-fast-search)
+    (when entry
+      (efar-go-to-dir (file-name-directory entry))
+      (when (and (file-name-nondirectory entry) (not (string-empty-p (file-name-nondirectory entry))))
+	(efar-go-to-file (file-name-nondirectory entry)))
+      (efar-calculate-widths)
+      (efar-write-enable (efar-redraw)))))
 
 
 (defun efar-show-disk-selector()
@@ -2677,12 +2677,10 @@ Selected item bacomes actual for current panel."
 		  (setq command :loop))
 		 
 		 ((equal command :process-file)
-		  (efar-search-process-file args)
-		  ))))))
+		  (efar-search-process-file args)))))))
       
       (error
        (process-send-string  efar-search-server (concat (prin1-to-string (cons :error (error-message-string err))) "\n"))))))
-
 
 (defun efar-next-search-process()
   ""
@@ -2725,6 +2723,7 @@ Selected item bacomes actual for current panel."
   
   (efar-calculate-widths)
   (efar-write-enable (efar-redraw))
+
   (let ((status-string (cond ((and efar-search-process-manager
 				   (process-live-p efar-search-process-manager))
 			      "Search running for files ")
@@ -2802,7 +2801,7 @@ Selected item bacomes actual for current panel."
 					   :regexp? regexp?))
 			  (insert "\n"))
 		 (insert "\n"))
-	
+
 	;; highlight searched text
 	(beginning-of-buffer)
 	(when text
@@ -2828,7 +2827,7 @@ Selected item bacomes actual for current panel."
     (goto-char 0)
     
     ;; navigate to the line containing searched text
-    ;; and activate isearch for the text
+    ;; and activate isearch for the searched text
     (when line-number
       (forward-line (- line-number 1))
       (isearch-mode t regexp?)
