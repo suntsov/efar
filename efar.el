@@ -1,7 +1,7 @@
 ;;; efar.el --- FAR-like file manager for Emacs     
-;; Copyright (C) 2020 Free Software Foundation, Inc.
+;; Copyright (C) 2021 Free Software Foundation, Inc.
 ;; Author: V. Suntsov <vladimir@suntsov.online>
-;; Version: 1.0
+;; Version: 0.9
 ;; Keywords: files
 ;; URL: https://github.com/suntsov/efar
 
@@ -9,8 +9,7 @@
 
 ;; This package provides FAR-like file manager.
 
-
-(setq debug-on-error t)
+;;(setq debug-on-error t)
 
 (require 'ido)
 (require 'subr-x)
@@ -999,8 +998,6 @@ User also can select an option to overwrite all remaining files to not be asked 
 	   (let ((key-seq (if (null (nth 3 key)) (nth 0 key) (symbol-value (nth 3 key)))))
 	     (local-set-key
 	      key-seq
-	      ;;(kbd (if (null (nth 3 key)) (nth 0 key) (symbol-name (nth 3 key))))
-	      
 	      `(lambda()
 		 (interactive)
 		 (efar-key-press-handle (nth 1 ',key) (nth 2 ',key) (nth 6 ',key)))))))
@@ -2399,13 +2396,6 @@ Selected item bacomes actual for current panel."
 ;; File search functionality
 ;;--------------------------------------------------------------------------------
 
-(defconst efar-search-process-command
-  (list (expand-file-name invocation-name invocation-directory)
-	"--batch"
-	"-l" "c:/projects/efar/efar.el"
-	"-eval" "(efar-process-search-request)"))
-;;	"-l" "efar"
-
 (defvar efar-search-processes '())
 (defvar efar-search-process-manager nil)
 (defvar efar-search-results '())
@@ -2415,6 +2405,13 @@ Selected item bacomes actual for current panel."
 (defvar efar-search-server-port nil)
 (defvar efar-search-clients '())
 (defvar efar-search-running? nil)
+
+(defun efar-search-process-command()
+  ""
+  (list (expand-file-name invocation-name invocation-directory)
+	"--batch"
+	"-l" (symbol-file 'efar)
+	"-eval" "(efar-process-search-request)"))
 
 (defun efar-run-search-processes()
   ""
@@ -2531,7 +2528,7 @@ Selected item bacomes actual for current panel."
   (let ((proc (make-process
 	       :name "efar-search-process"
 	       :stderr (get-buffer-create "*eFar search error*")
-	       :command efar-search-process-command
+	       :command (efar-search-process-command)
 	       :filter #'efar-search-process-filter
 	       :coding efar-search-coding
 	       :noquery t)))
