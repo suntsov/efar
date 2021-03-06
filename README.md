@@ -4,6 +4,7 @@ This package provides FAR-like file manager for Emacs.
 
 ## Usage
 To start eFar just load file efar.el and type M-x efar.
+
 When Efar is called with universal argument default-directory of actual buffer is automatically opened in left panel - C-u M-x efar
 
 ## Features
