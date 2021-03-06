@@ -5,7 +5,7 @@ This package provides FAR-like file manager for Emacs.
 ## Features
 
 ### Navigation
-* moving cursor - <up>, <down>, <left>, <right>
+* moving cursor - \<up\>, \<down\>, \<left\>, \<right\>
 * go to first/last file in current directory - <home>/<end> or <C-left>/<C-right>
 * enter directory under cursor - RET
 * switch to other panel - TAB
