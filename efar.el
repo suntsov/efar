@@ -345,7 +345,7 @@
 		   "run file search" t)
 (efar-register-key (kbd "<S-f7>") 'efar-show-search-results t 'efar-show-search-results-key
 		   "show file search results" t)
-(efar-register-key (kbd "C-c c r") 'efar-show-search-results-in-buffer nil 'efar-show-search-results-in-buffer-key
+(efar-register-key (kbd "<C-M-f7>") 'efar-show-search-results-in-buffer nil 'efar-show-search-results-in-buffer-key
 		   "display search results in a separate buffer" :space-after (list :dir-hist :bookmark :disks :files))
 
 (efar-register-key (kbd "C-g") 'efar-abort  nil nil
