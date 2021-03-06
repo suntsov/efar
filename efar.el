@@ -1,7 +1,8 @@
-;;; efar.el --- FAR-like file manager for Emacs     
+;;; efar.el --- FAR-like file manager -*- lexical-binding: t; -*-
 ;; Copyright (C) 2021 Free Software Foundation, Inc.
 ;; Author: V. Suntsov <vladimir@suntsov.online>
 ;; Version: 0.9
+;; Package-Requires: ((emacs "26.1"))
 ;; Keywords: files
 ;; URL: https://github.com/suntsov/efar
 
@@ -17,32 +18,32 @@
 
 (defvar efar-state nil)
 
-
+(provide 'efar)
 ;;--------------------------------------------------------------------------------
 ;; eFar customization variables
 ;;--------------------------------------------------------------------------------
 ;; GROUPS
-(defgroup eFar nil
+(defgroup efar nil
   "FAR-like file manager"
   :group 'applications)
 
-(defgroup eFar-parameters nil
+(defgroup efar-parameters nil
   "eFar main customization parameters"
   :group 'eFar)
 
-(defgroup eFar-search-parameters nil
+(defgroup efar-search-parameters nil
   "eFar file search parameters"
   :group 'eFar-parameters)
 
-(defgroup eFar-faces nil
+(defgroup efar-faces nil
   "eFar faces"
   :group 'eFar)
 
-(defgroup eFar-search-faces nil
+(defgroup efar-search-faces nil
   "eFar faces"
   :group 'eFar-search-parameters)
 
-(defgroup eFar-keys nil
+(defgroup efar-keys nil
   "eFar key bindings"
   :group 'eFar)
 
@@ -121,8 +122,7 @@
 (defface efar-border-line-face
   '((t :foreground "white"
        :background "navy"
-       :underline nil
-       ))
+       :underline nil))
   "Border line face"
   :group 'eFar-faces)
 
@@ -130,48 +130,42 @@
 (defface efar-file-face
   '((t :foreground "deep sky blue"
        :background "navy"
-       :underline nil
-       ))
+       :underline nil))
   "File item style (default)"
   :group 'eFar-faces)
 
 (defface efar-file-executable-face
   '((t :foreground "green"
        :background "navy"
-       :underline nil
-       ))
+       :underline nil))
   "File item style (executable file)"
   :group 'eFar-faces)
 
 (defface efar-dir-face
   '((t :foreground "white"
        :background "navy"
-       :underline nil
-       ))
+       :underline nil))
   "Directory item style"
   :group 'eFar-faces)
 
 (defface efar-file-current-face
   '((t :foreground "black"
        :background "cadet blue"
-       :underline nil
-       ))
+       :underline nil))
   "Current file item style"
   :group 'eFar-faces)
 
 (defface efar-dir-current-face
   '((t :foreground "white"
        :background "cadet blue"
-       :underline nil
-       ))
+       :underline nil))
   "Current directory item style"
   :group 'eFar-faces)
 
 (defface efar-marked-face
   '((t :foreground "gold"
        :background "navy"
-       :underline nil
-       ))
+       :underline nil))
   "Marked item style"
   :group 'eFar-faces)
 
@@ -179,40 +173,35 @@
 (defface efar-dir-name-face
   '((t :foreground "white"
        :background "navy"
-       :underline nil
-       ))
+       :underline nil))
   "Directory name header style"
   :group 'eFar-faces)
 
 (defface efar-header-face
   '((t :foreground "orange"
        :background "navy"
-       :underline nil
-       ))
+       :underline nil))
   "Header style"
   :group 'eFar-faces)
 
 (defface efar-dir-name-current-face
   '((t :foreground "navy"
        :background "bisque"
-       :underline nil
-       ))
+       :underline nil))
   "Current directory name header style"
   :group 'eFar-faces)
 
 (defface efar-non-existing-file-face
   '((t :foreground "red"
        :background "navy"
-       :underline nil
-       ))
+       :underline nil))
   "Style for non-existing files (in bookmarks and directory history"
   :group 'eFar-faces)
 
 (defface efar-non-existing-current-file-face
   '((t :foreground "red"
        :background "bisque"
-       :underline nil
-       ))
+       :underline nil))
   "Style for non-existing current files (in bookmarks and directory history"
   :group 'eFar-faces)
 
@@ -220,15 +209,13 @@
   '((t :foreground "black"
        :background "snow2"
        :bold t
-       :underline t
-       ))
+       :underline t))
   "The face used for representing the link to the file"
   :group 'eFar-search-faces)
 
 (defface efar-search-line-link-face
   '((t :foreground "black"
-       :background "ivory"
-       ))
+       :background "ivory"))
   "The face used for representing the link to the source code line"
   :group 'eFar-search-faces)
 
@@ -1047,14 +1034,10 @@ User also can select an option to overwrite all remaining files to not be asked 
 		   (if (<  (car (nth 6 (nth 1 event))) (+ 2 (efar-panel-width :left) ))
 		       (progn
 			 (efar-set :left :current-panel))
-			 ;;(efar-set default-directory :panels :left :dir))
 		     
 		     (progn
-		       (efar-set :right :current-panel))
-		       ;;(efar-set default-directory :panels :right :dir)
-		     )
-		   (efar-write-enable (efar-redraw))))
-  )
+		       (efar-set :right :current-panel)))
+		   (efar-write-enable (efar-redraw)))))
 
 (defun efar-cd()
   "Open directory selector (read-diretory-name) and go to selected directory."
@@ -2189,8 +2172,7 @@ If a double mode is active then actual panel becomes fullscreen."
       (car file)
     (let ((size (if (cadr file)
 		    "DIR"
-		  (efar-file-size-as-string (nth 8 file))
-		  ))
+		  (efar-file-size-as-string (nth 8 file))))
 	  (name (file-name-nondirectory  (car file)))
 	  (time (format-time-string "%D %T" (nth 6 file))))
       
@@ -2355,9 +2337,7 @@ Selected item bacomes actual for current panel."
 			 (mapcar (lambda(e) (car (split-string e " " t)))
 				 (cdr (split-string  (downcase (shell-command-to-string "wmic LogicalDisk get Caption"))
 						     "\r\n" t)))
-		       (split-string (shell-command-to-string "df -h --output=target | tail -n +2") "\n" t)
-		       )
-		     ))	
+		       (split-string (shell-command-to-string "df -h --output=target | tail -n +2") "\n" t))))	
 	(side (efar-get :current-panel)))
     
     (efar-set (mapcar (lambda(d) (list d (file-directory-p d)))
@@ -2890,3 +2870,4 @@ Selected item bacomes actual for current panel."
       (isearch-process-search-string text
 				     (mapconcat 'isearch-text-char-description text "")))))
 
+;;; efar.el ends here
