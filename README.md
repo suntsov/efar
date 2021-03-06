@@ -54,13 +54,15 @@ When Efar is called with universal argument, default-directory of actual buffer 
 * change sort order and direction - **C-c f s**
 * set/remove filtering by file mask - **C-c f f**
 
-### Files search
+### File search
 * start search in current directory - **\<M-f7\>**
 * display last search results - **\<S-f7\>**
 * go to the file from search result list - **RET**
 * show buffer with detailed search results - **\<C-M-f7\>**
 * it's possible to search for text in files using simple string or Emacs regular expressions
 * when opening file from the file search results an incremental search is automatically activated for the searched text
+* no external tools used for search functionality, it's completely implemented using pure elisp
+* multiprocessing used when searching for text inside files
 
 ### Last visited directories
 * display list of last visited directories - **C-c c h**
