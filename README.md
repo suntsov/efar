@@ -2,6 +2,8 @@
 
 This package provides FAR-like file manager for Emacs.
 
+![](efar.png)
+
 ## Usage
 Package is not available in MELPA yet (there is a plan to publish it in nearest future, though).
 
