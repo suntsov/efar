@@ -39,8 +39,20 @@
 (require 'ido)
 (require 'subr-x)
 (require 'filenotify)
+(require 'dired)
 
 (defvar efar-state nil)
+;;variables for file search 
+(defvar efar-search-processes '())
+(defvar efar-search-process-manager nil)
+(defvar efar-search-results '())
+(defvar efar-last-search-params nil)
+(defvar efar-update-search-results-timer nil)
+(defvar efar-search-server nil)
+(defvar efar-search-server-port nil)
+(defvar efar-search-clients '())
+(defvar efar-search-running? nil)
+(defvar efar-search-process-pending-messages '())
 
 (provide 'efar)
 
@@ -73,10 +85,11 @@
   :group 'efar)
 
 ;; MAIN PARAMETERS
-(defcustom efar-buffer-name "*eFAR*"
-  "Name for the Efar buffer."
-  :group 'efar-parameters
-  :type 'string)
+(eval-and-compile
+  (defcustom efar-buffer-name "*eFAR*"
+    "Name for the Efar buffer."
+    :group 'efar-parameters
+    :type 'string))
 
 (defcustom efar-state-file-name (concat user-emacs-directory ".efar-state")
   "Path to the eFar state save file."
@@ -633,12 +646,13 @@ REINIT? is a boolean indicating that configuration should be generated enew."
 (defun efar-sort-function-names(side)
   "Return a list of sort function names.
 The name of a function which is currently used for the panel SIDE (or current panel) becomes a first entry in the list."
-  (sort
-   (mapcar
-    (lambda(e)
-      (car e))
-    efar-sort-functions)
-   (lambda(a b) (when (string= a (efar-get :panels side :sort-function-name)) t))))
+  (let ((current-function-name (efar-get :panels side :sort-function-name)))
+    (append (list current-function-name)
+	    (cl-remove current-function-name
+		       (mapcar
+			(lambda(e)
+			  (car e))
+			efar-sort-functions)))))
 
 (defun efar-sort-files-by-name(a b)
   "Function to sort files A and B by name.
@@ -2439,17 +2453,6 @@ Truncate string to WIDTH characters."
 ;;--------------------------------------------------------------------------------
 ;; File search functionality
 ;;--------------------------------------------------------------------------------
-
-(defvar efar-search-processes '())
-(defvar efar-search-process-manager nil)
-(defvar efar-search-results '())
-(defvar efar-last-search-params nil)
-(defvar efar-update-search-results-timer nil)
-(defvar efar-search-server nil)
-(defvar efar-search-server-port nil)
-(defvar efar-search-clients '())
-(defvar efar-search-running? nil)
-(defvar efar-search-process-pending-messages '())
 
 (define-button-type 'efar-search-find-file-button
   'follow-link t
