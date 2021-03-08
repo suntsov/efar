@@ -389,8 +389,7 @@ IGNORE-IN-MODES is a list of modes which should ignore this key binding."
 			   ?1 ?2 ?3 ?4 ?5 ?6 ?7 ?8 ?9 ?0
 			   ?\( ?\) ?.
 			   ?- ?_
-			   32) do
-			   
+			   32) do			   
 			   (efar-register-key	(char-to-string char)	'efar-fast-search	char	nil	""))
 
 ;; create customization entries for key bindings
