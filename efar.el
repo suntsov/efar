@@ -1627,13 +1627,15 @@ When FOR-READ? is t switch back to eFar buffer."
 	    ;; if we are on the last file in the list - do nohing
 	    ((= (+ start-file-number curr-pos) (- max-file-number 1)) nil)
 	    
-	    ;; else if there is more than max-files-in-column left
+	    ;; if there is more than max-files-in-column left then "scroll-down" column
 	    ((> (- max-file-number start-file-number curr-pos) max-files-in-column)
 	     (if (< curr-pos (* (- col-number 1) max-files-in-column))
 		 (efar-set (+ curr-pos max-files-in-column)
 			   :panels side :current-pos)
 	       (efar-set (+ start-file-number max-files-in-column)
-			 :panels side :start-file-number))))))
+			 :panels side :start-file-number)))
+	    ;; else go to the last file in the list
+	    (t (efar-set (- max-file-number start-file-number 1) :panels side :current-pos)))))
 	 
 	 (efar-output-files side affected-item-numbers)
 	 
@@ -1646,9 +1648,8 @@ When FOR-READ? is t switch back to eFar buffer."
 (defun efar-auto-read-file()
   "Automatically show content of the directory or file under cursor."
   
-  (let*((file (caar (efar-selected-files (efar-get :current-panel) t)))
-	(file-ext (file-name-extension (downcase (or file "")))))
-    
+  (let* ((file (caar (efar-selected-files (efar-get :current-panel) t nil t)))
+	 (file-ext (file-name-extension (downcase (or file "")))))
     (when (and file
 	       (not (one-window-p)) ;; don't show when eFar occupies whole frame
 	       (or  (and efar-auto-read-files ;; if file auto read is enabled
@@ -1764,40 +1765,37 @@ When FOR-READ? is t switch back to eFar buffer."
 
 (defun efar-output-file-details(side)
   "Output detailes of the file under cursor in panel SIDE."
-  (let ((mode (efar-get :mode)))
-    
-    (when (and (not (null (efar-get :panels side :files)))
+  (let ((mode (efar-get :mode))
+	(file (car (efar-selected-files side t nil t)))
+	(width (efar-panel-width side))
+	(status-string "Non-existing or not-accessible file!"))
+
+    (when (and file
+	       (not (null (efar-get :panels side :files)))
 	       (or (equal mode :both) (equal mode side)))
       
-      (let ((current-file-number (efar-current-file-number side)))
+      (let ((file-short-name (efar-get-short-file-name file)))
+
+	(setf status-string (concat  (if (nth 1 file) "Directory: " "File: ")
+				  file-short-name
+				  "  Modified: "
+				  (format-time-string "%D %T" (nth 6 file))
+				  (if (and (not (nth 1 file)) (numberp (nth 8 file)))
+				      (concat "  Size: " (int-to-string (nth 8 file))))))))
+
+    (let ((col-number (cond
+		       ((or (equal side :left) (equal mode :right)) 1)
+		       (t (+ (efar-panel-width (efar-other-side side)) 2)))))
+      (goto-char 0)
+
+      (forward-line (+ 2 (efar-get :panel-height)))
+      
+      (move-to-column col-number)
+      
+      (let ((p (point)))
+	(replace-rectangle p (+ p width) (efar-prepare-file-name status-string width))
 	
-	(when current-file-number
-	  
-	  (let* ((file (nth current-file-number (efar-get :panels side :files)))
-		 (file-short-name (efar-get-short-file-name file))
-		 (col-number (cond
-			      ((or (equal side :left) (equal mode :right)) 1)
-			      (t (+ (efar-panel-width (efar-other-side side)) 2))))
-		 
-		 (w (efar-panel-width side))
-		 
-		 (status-str (efar-prepare-file-name (concat  (if (nth 1 file) "Directory: " "File: ")
-							      file-short-name
-							      "  Modified: "
-							      (format-time-string "%D %T" (nth 6 file))
-							      (if (and (not (nth 1 file)) (numberp (nth 8 file)))
-								  (concat "  Size: " (int-to-string (nth 8 file))))) w)))
-	    
-	    (goto-char 0)
-	    
-	    (forward-line (+ 2 (efar-get :panel-height)))
-	    
-	    (move-to-column col-number)
-	    
-	    (let ((p (point)))
-	      (replace-rectangle p (+ p w) status-str)
-	      
-	      (put-text-property p (+ p w) 'face 'efar-border-line-face))))))))
+	(put-text-property p (+ p width) 'face 'efar-border-line-face)))))
 
 (defun efar-panel-width(side)
   "Calculate and return the width of panel SIDE."
@@ -2201,23 +2199,25 @@ Saves eFar state and kills all subprocesses."
       ;; otherwise check parent directory
       (efar-get-root-directory parent-dir ))))
 
-(defun efar-selected-files(side current? &optional up-included?)
+(defun efar-selected-files(side current? &optional up-included? skip-non-existing?)
   "Return a list of selected files in panel SIDE.
 When CURRENT? is t return file under cursor only even if some more files marked.
-When UP-INCLUDED? is t include '..' directory in the list."
+When UP-INCLUDED? is t include '..' directory in the list.
+When SKIP-NON-EXISTING? is t then non-existing files removed from the list."
   (let* ((marked-files (efar-get :panels side :selected))
 	 (start-file-number (efar-get :panels side :start-file-number))
 	 (current-file-number (+ start-file-number (efar-get :panels side :current-pos)))
 	 (files (efar-get :panels side :files))
 	 
 	 (selected-files (when (> (length files) 0)
-			   (remove (unless up-included? (list ".." t))
-				   (mapcar
-				    (lambda (fn)
-				      (nth fn files))
-				    (if (or current? (not marked-files))
-					(list current-file-number)
-				      marked-files))))))
+			   (cl-remove-if (lambda(f) (and skip-non-existing? (not (file-exists-p (car f)))))
+					 (remove (unless up-included? (list ".." t))
+						 (mapcar
+						  (lambda (fn)
+						    (nth fn files))
+						  (if (or current? (not marked-files))
+						      (list current-file-number)
+						    marked-files)))))))
     selected-files))
 
 
@@ -2400,7 +2400,7 @@ Truncate string to WIDTH characters."
 
 (defun efar-navigate-to-file()
   "Go to the file under cursor."
-  (let ((entry (caar (efar-selected-files (efar-get :current-panel) t))))
+  (let ((entry (caar (efar-selected-files (efar-get :current-panel) t nil t))))
     (efar-quit-fast-search)
     (when entry
       (efar-go-to-dir (file-name-directory entry))
