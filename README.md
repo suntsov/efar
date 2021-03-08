@@ -25,7 +25,7 @@ When Efar is called with universal argument, default-directory of actual buffer 
 * go to the given directory - **C-c c d**
 
 ### Appearance
-* change mode from double-panel to single-panel - **C-c v M**
+* change mode double-panel <-> single-panel - **C-c v M**
 * change number of columns in current panel - **C-c v +   or   C-c v -**
 * change file display mode (short, long, detailed) - **C-c v m**
 
