@@ -43,6 +43,7 @@
 (defvar efar-state nil)
 
 (provide 'efar)
+
 ;;--------------------------------------------------------------------------------
 ;; eFar customization variables
 ;;--------------------------------------------------------------------------------
@@ -252,6 +253,47 @@
        :background "ivory"))
   "The face used for representing the link to the source code line"
   :group 'efar-search-faces)
+
+
+;; macros
+(defmacro efar-with-notification-disabled(&rest body)
+  "Execute BODY with efar-notifications disabled."
+  `(let ((file-notifier-left (efar-get :panels :left :file-notifier))
+	 (file-notifier-right (efar-get :panels :right :file-notifier)))
+     
+     (when (file-notify-valid-p (cdr file-notifier-left))
+       (efar-remove-notifier :left))
+     
+     (when (file-notify-valid-p (cdr file-notifier-right))
+       (efar-remove-notifier :right))
+     
+     ,@body
+     
+     (efar-setup-notifier (efar-get :panels :left :dir) :left)
+     (efar-setup-notifier (efar-get :panels :right :dir) :right)))
+
+(defmacro efar-write-enable (&rest body)
+  "Make eFar buffer writable, execute BODY and then make it back read-only."
+  `(with-current-buffer ,efar-buffer-name
+     (read-only-mode -1)
+     ,@body
+     (read-only-mode 1)))
+
+(defmacro efar-retry-when-error (&rest body)
+  "Retry BODY until success or user answer 'No'."
+  `(while
+       (string=
+	"error"
+	(condition-case err
+	    
+	    ,@body
+	  
+	  (error (when
+		     (string= "Yes"
+			      (ido-completing-read
+			       (concat "Error: \"" (error-message-string err) "\". Try again? ")
+			       (list "Yes" "No")))
+		   "error"))))))
 
 
 ;; KEY bindings
@@ -920,47 +962,6 @@ User also can select an option to overwrite all remaining files to not be asked 
 	       (efar-refresh-panel (efar-other-side)))))))
     
     (efar-set-status :ready "Ready"))
-
-
-(defmacro efar-with-notification-disabled(&rest body)
-  "Execute BODY with efar-notifications disabled."
-  `(let ((file-notifier-left (efar-get :panels :left :file-notifier))
-	 (file-notifier-right (efar-get :panels :right :file-notifier)))
-     
-     (when (file-notify-valid-p (cdr file-notifier-left))
-       (efar-remove-notifier :left))
-     
-     (when (file-notify-valid-p (cdr file-notifier-right))
-       (efar-remove-notifier :right))
-     
-     ,@body
-     
-     (efar-setup-notifier (efar-get :panels :left :dir) :left)
-     (efar-setup-notifier (efar-get :panels :right :dir) :right)))
-
-(defmacro efar-write-enable (&rest body)
-  "Make eFar buffer writable, execute BODY and then make it back read-only."
-  `(with-current-buffer ,efar-buffer-name
-     (read-only-mode -1)
-     ,@body
-     (read-only-mode 1)))
-
-(defmacro efar-retry-when-error (&rest body)
-  "Retry BODY until success or user answer 'No'."
-  `(while
-       (string=
-	"error"
-	(condition-case err
-	    
-	    ,@body
-	  
-	  (error (when
-		     (string= "Yes"
-			      (ido-completing-read
-			       (concat "Error: \"" (error-message-string err) "\". Try again? ")
-			       (list "Yes" "No")))
-		   "error"))))))
-
 
 (defun efar-get(&rest keys)
   "Get value stored by KEYS."
