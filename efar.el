@@ -4,7 +4,7 @@
 
 ;; Author: "Vladimir Suntsov" <vladimir@suntsov.online>
 ;; Maintainer: vladimir@suntsov.online
-;; Version: 0.9
+;; Version: 1.0
 ;; Package-Requires: ((emacs "26.1"))
 ;; Keywords: files
 ;; URL: https://github.com/suntsov/efar
@@ -2563,6 +2563,7 @@ this subprocess is registered in the list."
   (unless (equal proc efar-search-server)
     (when (and (process-live-p proc)
 	       (equal message "open from 127.0.0.1\n"))
+      (set-process-query-on-exit-flag proc nil)
       (push (process-name proc) efar-search-clients))))
 
 (defun efar-search-finished()
