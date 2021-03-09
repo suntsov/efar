@@ -42,7 +42,7 @@
 (require 'dired)
 
 (defvar efar-state nil)
-;;variables for file search 
+;;variables for file search
 (defvar efar-search-processes '())
 (defvar efar-search-process-manager nil)
 (defvar efar-search-results '())
@@ -445,7 +445,7 @@ IGNORE-IN-MODES is a list of modes which should ignore this key binding."
 			   ?1 ?2 ?3 ?4 ?5 ?6 ?7 ?8 ?9 ?0
 			   ?\( ?\) ?.
 			   ?- ?_
-			   32) do			   
+			   32) do
 			   (efar-register-key	(char-to-string char)	'efar-fast-search	char	nil	""))
 
 ;; create customization entries for key bindings
@@ -2566,8 +2566,7 @@ this subprocess is registered in the list."
       (push (process-name proc) efar-search-clients))))
 
 (defun efar-search-finished()
-  "Function is called when search is finished.
-Display search results."
+  "Function is called when search is finished."
   (while (accept-process-output))
   
   (when (timerp efar-update-search-results-timer)
@@ -2644,10 +2643,19 @@ Message consists of MESSAGE-TYPE and DATA."
 
     (unless efar-search-clients
       (efar-search-finished)))
+
+  (when (equal message-type :file-error)
+    (let ((errors (cdr (assoc :errors efar-last-search-params))))
+      (push data errors)
+      (push (cons :errors errors) efar-last-search-params)))
   
-  (when (equal message-type :error)
-    (print data t)
-    (efar-set :ready (concat "Error occured during search: " data))))
+  (when (equal message-type :common-error)
+    ;; restart search processes
+    (push (cons :errors data) efar-last-search-params)
+    (efar-search-kill-all-processes)
+    (make-thread 'efar-run-search-processes)
+    (efar-search-finished)
+    (efar-set-status :ready (concat "Error occured during search: " data))))
 
 (defun efar-search-int-start-search(args)
   "Start file search with parameters defined in ARGS in the subprocess."
@@ -2683,30 +2691,42 @@ Case is ignored when IGNORE-CASE? is t."
 						      (car entry))
 						    dir)))
 	     
-	     ;; when entry is a directory or a symlink pointing to the directory call function recursivelly for it
-	     (when (and dir?
-			(or (not symlink?)
-			    efar-search-follow-symlinks?))
-	       (efar-search-files-recursively real-file-name wildcard text regexp? ignore-case?))
-	     
-	     ;; when entry is a file or text for search inside files is not given
-	     (when (or (not dir?)
-		       (not text))
+	     ;; we process directory only if it is readable
+	     ;; otherwise we skip it and report an error
+	     (if (and dir?
+		      (not (file-readable-p real-file-name)))
+		 (process-send-string  efar-search-server (concat (prin1-to-string (cons :file-error real-file-name)) "\n"))
 	       
-	       ;; if file name matches given WILDCARD
-	       (when (string-match-p (wildcard-to-regexp wildcard) real-file-name)
+	       ;; when entry is a directory or a symlink pointing to the directory call function recursivelly for it
+	       (when (and dir?
+			  (or (not symlink?)
+			      efar-search-follow-symlinks?))
+		 (efar-search-files-recursively real-file-name wildcard text regexp? ignore-case?))
+	       
+	       ;; when entry is a file or text for search inside files is not given
+	       (when (or (not dir?)
+			 (not text))
 		 
-		 ;; if text to search is given then send file to subprocess to search the text inside
-		 (if text (progn
-			    (let* ((proc (efar-next-search-process))
-				   (request (cons :process-file (list (cons :file real-file-name) (cons :text text) (cons :regexp? regexp?) (cons :ignore-case? ignore-case?)))))
-			      (when real-file-name
-				(process-send-string proc (concat
-							   (prin1-to-string
-							    request)
-							   "\n")))))
-		   ;; otherwise report about found file
-		   (process-send-string  efar-search-server (concat (prin1-to-string (cons :found-file (list (cons :name real-file-name) (cons :lines '())))) "\n"))))))))
+		 ;; if file name matches given WILDCARD
+		 (when (string-match-p (wildcard-to-regexp wildcard) real-file-name)
+		   
+		   ;; if text to search is given
+		   (if text
+		       ;; if file is readable then send file to subprocess to search the text inside
+		       (if (file-readable-p real-file-name)
+			   (progn
+			     (let* ((proc (efar-next-search-process))
+				    (request (cons :process-file (list (cons :file real-file-name) (cons :text text) (cons :regexp? regexp?) (cons :ignore-case? ignore-case?)))))
+			       (when real-file-name
+				 (process-send-string proc (concat
+							    (prin1-to-string
+							     request)
+							    "\n")))))
+			 ;; otherwise skip it and report a file error
+			 (process-send-string  efar-search-server (concat (prin1-to-string (cons :file-error real-file-name)) "\n")))
+		     
+		     ;; otherwise report about found file
+		     (process-send-string  efar-search-server (concat (prin1-to-string (cons :found-file (list (cons :name real-file-name) (cons :lines '())))) "\n")))))))))
 
 
 (defun efar-search-process-file(args)
@@ -2717,31 +2737,25 @@ Case is ignored when IGNORE-CASE? is t."
 	(ignore-case? (or (cdr (assoc :ignore-case? args)) nil)))
     (when (and file text)
       
-      (let ((hits (condition-case err
-		      
-		      (let ((hits '())
-			    (case-fold-search ignore-case?)
-			    (search-func (if regexp? 're-search-forward 'search-forward)))
-			
-			(with-temp-buffer
-			  (insert-file-contents file)
-			  
-			  (goto-char 0)
-			  
-			  (while (funcall search-func text nil t)
-			    
-			    (push
-			     (cons
-			      (line-number-at-pos)
-			      (replace-regexp-in-string "\n" "" (thing-at-point 'line t)))
-			     hits)
-			    (forward-line)))
-			
-			(reverse hits))
+      (let ((hits (let ((hits '())
+			(case-fold-search ignore-case?)
+			(search-func (if regexp? 're-search-forward 'search-forward)))
 		    
-		    (error
-		     
-		     (error-message-string err)))))
+		    (with-temp-buffer
+		      (insert-file-contents file)
+		      
+		      (goto-char 0)
+		      
+		      (while (funcall search-func text nil t)
+			
+			(push
+			 (cons
+			  (line-number-at-pos)
+			  (replace-regexp-in-string "\n" "" (thing-at-point 'line t)))
+			 hits)
+			(forward-line)))
+		    
+		    (reverse hits))))
 	
 	(when hits
 	  (process-send-string  efar-search-server (concat (prin1-to-string (cons :found-file (list (cons :name file) (cons :lines hits)))) "\n")))))))
@@ -2797,7 +2811,7 @@ Waits for commands in standard input."
 		   (throw :exit t))))))
       
       (error
-       (process-send-string  efar-search-server (concat (prin1-to-string (cons :error (error-message-string err))) "\n"))))))
+       (process-send-string  efar-search-server (concat (prin1-to-string (cons :common-error (error-message-string err))) "\n"))))))
 
 (defun efar-next-search-process()
   "Get next search process from the pool."
@@ -2810,43 +2824,56 @@ Waits for commands in standard input."
   "Show search results in panel SIDE.
 When SORTED is t the file leist is sorted by name.
 When PRESERVE-POSITION? is t keep cursor on the file when list is refreshing."
-  (let ((side (or side (efar-get :current-panel))))
-    (efar-set
-     (if sorted
-   	 (let ((temp (cl-copy-list efar-search-results)))
-	   (sort temp 'efar-sort-files-by-name))
-       efar-search-results)
-     :panels side :files)
+  (let ((side (or side (efar-get :current-panel)))
+	(errors (cdr (assoc :errors efar-last-search-params)))
+	(result-string nil)
+	(status-string nil))
     
-    (efar-set (concat "Search results"
-		      (when efar-last-search-params
-			(if (cdr (assoc :end-time efar-last-search-params))
-			    (concat " - " (int-to-string (length (efar-get :panels side :files))) " [finished]")
-			  " [in progress]" )))
-	      :panels side :dir)
+    (if (stringp errors)
+	(progn
+	  (setf result-string "Search results [failed]")
+	  (setf status-string (concat "Search failed with erorr: " errors)))
+      
+      (efar-set
+       (if sorted
+	   (let ((temp (cl-copy-list efar-search-results)))
+	     (sort temp 'efar-sort-files-by-name))
+	 efar-search-results)
+       :panels side :files)
+
+      (setf result-string (concat "Search results"
+				  (when efar-last-search-params
+				    (if (cdr (assoc :end-time efar-last-search-params))
+					(concat " - " (int-to-string (length (efar-get :panels side :files))) " [finished]"
+						(when (cdr (assoc :errors efar-last-search-params))
+						  (concat " (" (int-to-string (length (cdr (assoc :errors efar-last-search-params)))) " skipped)")))
+				      " [in progress]" ))))
+      
+      (setf status-string (concat (cond (efar-search-running?
+					 "Search running for files ")
+					((cdr (assoc :end-time efar-last-search-params))
+					 (concat "Search finished in " (int-to-string (round (- (cdr (assoc :end-time efar-last-search-params)) (cdr (assoc :start-time efar-last-search-params))))) " second(s) for files "))
+					(t
+					 "No search has been executed yet"))
+
+				  (when (cdr (assoc :start-time efar-last-search-params))
+				    (setq status-string (concat status-string
+								"in " (cdr (assoc :dir efar-last-search-params))
+								" matching mask '" (cdr (assoc :wildcard efar-last-search-params)) "'"
+								(when (cdr (assoc :text efar-last-search-params))
+								  (concat " and containing text '" (cdr (assoc :text efar-last-search-params)) "'"
+									  " (" (if (cdr (assoc :ignore-case? efar-last-search-params)) "CI" "CS") ")"))))))))
+    
+    (efar-set result-string :panels side :dir)
     
     (efar-remove-notifier side)
     (unless preserve-position?
       (efar-set 0 :panels side :current-pos))
-    (efar-set :search :panels side :mode))
-  
-  (efar-calculate-widths)
-  (efar-write-enable (efar-redraw))
-
-  (let ((status-string (cond (efar-search-running?
-			      "Search running for files ")
-			     ((cdr (assoc :end-time efar-last-search-params))
-			      (concat "Search finished in " (int-to-string (round (- (cdr (assoc :end-time efar-last-search-params)) (cdr (assoc :start-time efar-last-search-params))))) " second(s) for files "))
-			     (t
-			      "No search has been executed yet"))))
+    (efar-set :search :panels side :mode)
     
-    (when (cdr (assoc :start-time efar-last-search-params))
-      (setq status-string (concat status-string
-				  "in " (cdr (assoc :dir efar-last-search-params))
-				  " matching mask '" (cdr (assoc :wildcard efar-last-search-params)) "'"
-				  (when (cdr (assoc :text efar-last-search-params))
-				    (concat " and containing text '" (cdr (assoc :text efar-last-search-params)) "'"
-					    " (" (if (cdr (assoc :ignore-case? efar-last-search-params)) "CI" "CS") ")")))))
+    (efar-calculate-widths)
+    (efar-write-enable (efar-redraw))
+    
     (efar-set-status :ready status-string nil t)))
 
 
@@ -2865,7 +2892,8 @@ When PRESERVE-POSITION? is t keep cursor on the file when list is refreshing."
 	  (wildcard (cdr (assoc :wildcard efar-last-search-params)))
 	  (text (cdr (assoc :text efar-last-search-params)))
 	  (ignore-case? (cdr (assoc :ignore-case? efar-last-search-params)))
-	  (regexp? (cdr (assoc :regexp? efar-last-search-params))))
+	  (regexp? (cdr (assoc :regexp? efar-last-search-params)))
+	  (errors (cdr (assoc :errors efar-last-search-params))))
       
       (with-current-buffer buffer
 	(read-only-mode 0)
@@ -2873,8 +2901,17 @@ When PRESERVE-POSITION? is t keep cursor on the file when list is refreshing."
 	
 	;; insert header with description of search parameters
 	(insert (concat "Found " (int-to-string (length (efar-get :panels (efar-get :current-panel) :files)))
-			" files in " (int-to-string (round (- (cdr (assoc :end-time efar-last-search-params)) (cdr (assoc :start-time efar-last-search-params))))) " second(s).\n"
-			"Directory: " dir "\n"
+			" files in " (int-to-string (round (- (cdr (assoc :end-time efar-last-search-params)) (cdr (assoc :start-time efar-last-search-params))))) " second(s).\n"))
+	
+	(when errors
+	  (let ((p (point)))
+	    (insert (concat (int-to-string (length errors)) " file(s) inaccessible. See list at the bottom."))
+	    (add-text-properties p (point)
+				 '(face efar-non-existing-current-file-face))
+	    (insert "\n")))
+;;	    (put-text-property p (point) 'font-lock-face '(:background "red"))))
+
+	(insert (concat "Directory: " dir "\n"
 			"File name mask: " wildcard "\n"
 			(when text
 			  (concat "Text '" text "' found in "
@@ -2908,14 +2945,22 @@ When PRESERVE-POSITION? is t keep cursor on the file when list is refreshing."
 					   :regexp? regexp?))
 			  (insert "\n"))
 		 (insert "\n"))
-
+	
+	
+	;; output skipped files
+	(when errors
+	  (insert "\nFollowing files/directries are inaccessible and therefore were skipped:\n")
+	  (cl-loop for file in errors do
+		   (insert file)
+		   (insert "\n")))
+	
 	;; highlight searched text
 	(goto-char (point-min))
 	(when text
 	  (if (cdr (assoc :regexp? efar-last-search-params))
 	      (highlight-regexp text 'hi-yellow)
 	    (highlight-phrase text 'hi-yellow)))
-	
+	  
 	(read-only-mode 1))
       
       (switch-to-buffer-other-window buffer)
