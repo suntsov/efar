@@ -97,7 +97,7 @@
   :type 'string)
 
 (defcustom efar-default-startup-dirs (cons user-emacs-directory user-emacs-directory)
-  "Default direcotries shown at startup."
+  "Default directories shown at startup."
   :group 'efar-parameters
   :type 'cons)
 
@@ -141,7 +141,7 @@
   :group 'efar-parameters
   :type 'integer)
 
-(defcustom efar-max-search-processes 8
+(defcustom efar-max-search-processes 4
   "Number of subprocesses to use for file search."
   :group 'efar-search-parameters
   :type 'integer)
@@ -206,7 +206,7 @@
 (defface efar-dir-current-face
   '((t :foreground "white"
        :background "cadet blue"
-0       :underline nil))
+       :underline nil))
   "Current directory item style"
   :group 'efar-faces)
 
@@ -293,14 +293,12 @@
      (read-only-mode 1)))
 
 (defmacro efar-retry-when-error (&rest body)
-  "Retry BODY until success or user answer 'No'."
+  "Retry BODY until success or user answers 'No'."
   `(while
        (string=
 	"error"
-	(condition-case err
-	    
+	(condition-case err	    
 	    ,@body
-	  
 	  (error (when
 		     (string= "Yes"
 			      (ido-completing-read
@@ -420,14 +418,6 @@ IGNORE-IN-MODES is a list of modes which should ignore this key binding."
 (efar-register-key (kbd "C-c c h") 'efar-show-directory-history  nil 'efar-show-directory-history-key
 		   "show last visited directories" :space-after)
 
-;; fast-search keys
-(efar-register-key (kbd "DEL") 'efar-fast-search  :back nil
-		   "Backspace for fast search")
-(efar-register-key (kbd "C-s")  'efar-fast-search  :next nil
-		   "start fast search/go to next fast search match" t)
-(efar-register-key (kbd "C-r")  'efar-fast-search  :prev nil
-		   "start fast search/go to previous fast search match" :space-after)
-
 (efar-register-key (kbd "<M-f7>") 'efar-start-search nil 'efar-start-search-key
 		   "run file search" t)
 (efar-register-key (kbd "<S-f7>") 'efar-show-search-results t 'efar-show-search-results-key
@@ -439,6 +429,14 @@ IGNORE-IN-MODES is a list of modes which should ignore this key binding."
 		   "abort current operation" t)
 
 (efar-register-key (kbd "C-n") 'efar-suggest-hint nil nil nil nil)
+
+;; fast-search keys
+(efar-register-key (kbd "DEL") 'efar-fast-search  :back nil
+		   "Backspace for fast search")
+(efar-register-key (kbd "C-s")  'efar-fast-search  :next nil
+		   "start fast search/go to next fast search match" t)
+(efar-register-key (kbd "C-r")  'efar-fast-search  :prev nil
+		   "start fast search/go to previous fast search match" :space-after)
 
 (cl-loop for char in (list ?a ?b ?c ?d ?e ?f ?g ?h ?i ?j ?k ?l ?m ?n ?o ?p ?q ?r ?s ?t ?u ?v ?w ?x ?y ?z
 			   ?A ?B ?C ?D ?E ?F ?G ?H ?I ?J ?K ?L ?M ?N ?O ?P ?Q ?R ?S ?T ?U ?V ?W ?X ?Y ?Z
@@ -468,9 +466,9 @@ IGNORE-IN-MODES is a list of modes which should ignore this key binding."
 Argument ARG: when t open default directory of current buffer."
   (interactive "P")
   
-  (let(
-       ;; if eFar buffer doesn't exist, we need to do initialisation
-       (need-init? (not (get-buffer efar-buffer-name)))
+  (let
+      ;; if eFar buffer doesn't exist, we need to do initialisation
+      ((need-init? (not (get-buffer efar-buffer-name)))
        ;; get existing or create new eFar buffer
        (efar-buffer (get-buffer-create efar-buffer-name))
        ;; if eFar is called with prefix argument, then go to default-directory of current buffer
@@ -478,8 +476,6 @@ Argument ARG: when t open default directory of current buffer."
 		    default-directory)))
     
     (with-current-buffer efar-buffer
-      ;; make eFar buffer fullscreen
-      ;;(delete-other-windows)
       
       ;; do initialisation if necessary and redraw the content of the buffer
       (when need-init?
@@ -511,12 +507,10 @@ This function is executed only once when eFAR buffer is created.
 
 REINIT? is a boolean indicating that configuration should be generated enew."
   
-  ;; forbid resizing of eFAR window
-  ;;  (setq window-size-fixed t)
   ;; disable cursor
   (setq cursor-type nil)
   
-  ;; if saving/restoring of state is allowed, read state from file
+  ;; if saving/restoring of state is allowed then read state from file
   (when (and
 	 efar-save-state?
 	 (file-exists-p efar-state-file-name))
@@ -629,6 +623,32 @@ REINIT? is a boolean indicating that configuration should be generated enew."
   
   (efar-set 0 :next-hint-number))
 
+(defun efar-get(&rest keys)
+  "Get value stored by KEYS."
+  (let ((value nil))
+    (mapc
+     (lambda(key)
+       (if value
+	   (setf value (gethash key value))
+	 (setf value (gethash key efar-state))))
+     keys)
+    value))
+
+(defun efar-set(value &rest keys)
+  "Store VALUE by KEYS."
+  (let ((place nil))
+    (mapc
+     
+     (lambda(key)
+       (if place
+	   (setf place (puthash key (gethash key place (make-hash-table :test `equal)) place))
+	 (setf place (puthash key (gethash key efar-state (make-hash-table :test `equal)) efar-state))))
+     
+     (cl-subseq keys 0 -1))
+    
+    (puthash (car (cl-subseq keys -1)) value (or place efar-state))))
+
+
 ;;--------------------------------------------------------------------------------
 ;; file sort functions
 ;;--------------------------------------------------------------------------------
@@ -726,12 +746,6 @@ Case is ignored."
     (efar-refresh-panel side nil (efar-get-short-file-name (efar-current-file)))))
 
 ;;--------------------------------------------------------------------------------
-;; end of file sort functions
-;;--------------------------------------------------------------------------------
-
-
-
-;;--------------------------------------------------------------------------------
 ;; file notification functions
 ;;--------------------------------------------------------------------------------
 
@@ -811,7 +825,7 @@ Notifications in the queue will be processed only if there are no new notificati
 	    (efar-refresh-panel :right))))))
 
 ;;--------------------------------------------------------------------------------
-;; end of file notification functions
+;; save/resore state functions
 ;;--------------------------------------------------------------------------------
 
 (defun efar-remove-file-state()
@@ -961,13 +975,13 @@ User also can select an option to overwrite all remaining files to not be asked 
 	(efar-with-notification-disabled
 	 (let* ((side (efar-get :current-panel))
 		(selected-files (efar-selected-files side nil)))
-	   
+	   ;; ask user for confirmation
 	   (when (and selected-files (string= "Yes" (ido-completing-read "Delete selected files? " (list "Yes" "No"))))
+	     ;; do the deletion of selected files
 	     (mapc(lambda (f)
 		    (if (equal (cadr f) t)
 			(efar-retry-when-error (delete-directory (car f) t))
-		      (efar-retry-when-error (delete-file (car f)))))
-		  
+		      (efar-retry-when-error (delete-file (car f)))))		  
 		  selected-files)
 	     
 	     (efar-refresh-panel side)
@@ -977,30 +991,9 @@ User also can select an option to overwrite all remaining files to not be asked 
     
     (efar-set-status :ready "Ready"))
 
-(defun efar-get(&rest keys)
-  "Get value stored by KEYS."
-  (let ((value nil))
-    (mapc
-     (lambda(key)
-       (if value
-	   (setf value (gethash key value))
-	 (setf value (gethash key efar-state))))
-     keys)
-    value))
-
-(defun efar-set(value &rest keys)
-  "Store VALUE by KEYS."
-  (let ((place nil))
-    (mapc
-     
-     (lambda(key)
-       (if place
-	   (setf place (puthash key (gethash key place (make-hash-table :test `equal)) place))
-	 (setf place (puthash key (gethash key efar-state (make-hash-table :test `equal)) efar-state))))
-     
-     (cl-subseq keys 0 -1))
-    
-    (puthash (car (cl-subseq keys -1)) value (or place efar-state))))
+;;------------------------------------------------------------------
+;; efar displaying status
+;;------------------------------------------------------------------
 
 (defun efar-reset-status()
   "Reset eFar status to default one."
@@ -1060,7 +1053,6 @@ on any next cursor movement."
 This handler calls function FUNC with argument ARG only in case when current
 mode is not in the list IGNORE-IN-MODES."
   (let ((mode (efar-get :panels (efar-get :current-panel) :mode)))
-    
     (when (consp func)
       (setq func (symbol-function (cdr (assoc mode func)))))
     
@@ -1134,14 +1126,11 @@ Increase by 1 when INCREASE is t, decrease by 1 otherwise."
 If a double mode is active then actual panel becomes fullscreen."
   (let ((current-mode (efar-get :mode))
 	(side (efar-get :current-panel)))
-    
     (efar-set (cond
 	       ((equal current-mode :both) side)
 	       (t :both))
 	      :mode)
-    
     (efar-calculate-widths)
-    
     (efar-write-enable (efar-redraw))))
 
 (defun efar-open-dir-other-panel()
@@ -1189,18 +1178,13 @@ If a double mode is active then actual panel becomes fullscreen."
 			      (start-process "" nil "xdg-open" $fpath))) $file-list)))))))
 
 
-
-
 (defun efar-filter-files()
   "Set up file filtering in current panel.
 Ask user for file mask and show files in current panel matching this mask only."
   (let ((side (efar-get :current-panel)))
     
-    (efar-set
-     (read-string "String to filter file names: " (efar-get :panels side :file-filter))
-     :panels
-     side
-     :file-filter)
+    (efar-set (read-string "String to filter file names: " (efar-get :panels side :file-filter))
+	      :panels side :file-filter)
     
     (efar-get-file-list side)
     (efar-set 0 :panels side :start-file-number)
@@ -1217,20 +1201,26 @@ Ask user for file mask and show files in current panel matching this mask only."
 	(comint-send-input nil t))
       (display-buffer "*efar-shell*"))))
 
-
 (defun efar-fast-search(k)
   "Activate and/or perform incremental search.
 K is a character typed by the user."
   (let ((str (efar-get :fast-search-string)))
-    
+
+    ;; if a printable character was pressed
+    ;; add it to the end of search string
     (unless (member k '(:next :prev :back :clear))
       (setf str (concat str (format "%c" k))))
-    
+
+    ;; if user entered at least one character
+    ;; we can navigate to file(s) with matching name
     (when (> (length str) 0)
-      
+
+      ;; if user pressed DEL
+      ;; then remove last character of the search string
       (when (equal k :back)
 	(setf str (substring str 0 (- (length str) 1))))
-      
+
+      ;; get the list of files in current directory with names matching the search string
       (let* ((side (efar-get :current-panel))
 	     (filtered-list (mapcan (lambda (e)
 				      (when (string-match str (if (equal (efar-get :panels side :mode) :files)
@@ -1238,7 +1228,9 @@ K is a character typed by the user."
 								(car e)))
 					(list (car e))))
 				    (efar-get :panels side :files))))
-	
+
+	;; if user pressed key binding to go to next or previous occurence
+	;; shift selector accordingly
 	(cond ((equal k :next)
 	       (if (= (+ (efar-get :fast-search-occur) 1) (length filtered-list))
 		   (efar-set 0 :fast-search-occur)
@@ -1248,12 +1240,14 @@ K is a character typed by the user."
 	       (if (= (efar-get :fast-search-occur) 0)
 		   (efar-set (- (length filtered-list) 1) :fast-search-occur)
 		 (efar-set (- (efar-get :fast-search-occur) 1) :fast-search-occur))))
-	
+
+	;; navigate to matched file
 	(let ((file-name (nth (efar-get :fast-search-occur) filtered-list)))
 	  (when file-name
 	    (efar-go-to-file file-name nil 0)
 	    (efar-write-enable (efar-redraw))))))
-    
+
+    ;; store search string
     (efar-set str :fast-search-string))
   
   (efar-output-status (concat "Fast search: " (efar-get :fast-search-string))))
@@ -1330,14 +1324,18 @@ When SIDE is given show directory in this panel, otherwise in current one."
     (efar-set "" :fast-search-string)
     
     (efar-get-file-list side)
-    
+
+    ;; if we go to the directory which is a parent of current one
+    ;; then we move cursor to the current directory in the list
     (if go-to-parent?
 	(progn
 	  (efar-go-to-file current-dir side 0))
+      ;; otherwise go to the first item
       (progn
 	(efar-set 0 :panels side :start-file-number)
 	(efar-set 0 :panels side :current-pos)))
-    
+
+    ;; add directory in the list of last visited directories
     (let* ((current-hist (efar-get :directory-history))
 	   (new-hist (cl-subseq (cl-remove-if (lambda(e) (equal dir (car e))) current-hist)
 				0 (when (> (length current-hist) efar-max-items-in-directory-history)
@@ -1345,8 +1343,8 @@ When SIDE is given show directory in this panel, otherwise in current one."
       (push (cons (if (equal dir "/") dir (string-trim-right dir "[/]")) side) new-hist)
       
       (efar-set new-hist :directory-history))
-    
-    ;;(efar-set dir :last-visited-dirs (efar-get-root-directory dir))
+
+    ;; set up file change notification for the directory
     (efar-setup-notifier dir side)
     
     (efar-set :files :panels side :mode)))
@@ -1357,7 +1355,7 @@ When SIDE is given show directory in this panel, otherwise in current one."
   (string-trim-right (file-name-directory (directory-file-name dir)) "[/]"))
 
 (defun efar-go-to-file(file &optional side prev-file-number)
-  "Move cursor to given FILE or to PREV-FILE-NUMBER if file cannot be found.
+  "Move cursor to the given FILE or to PREV-FILE-NUMBER if file cannot be found.
 Do this in current panel, unless SIDE is given."
   (let* ((side (or side (efar-get :current-panel)))
 	 (file (if (equal (efar-get :panels side :mode) :files)
@@ -1831,21 +1829,19 @@ otherwise redraw all."
 	       (col-number (length widths))
 	       
 	       
-	       (files
-		(append
-		 (cl-subseq  (efar-get :panels side :files)
-			     (efar-get :panels side :start-file-number)
-			     (+ (efar-get :panels side :start-file-number)
-				(if (> (- (length (efar-get :panels side :files)) (efar-get :panels side :start-file-number)) (* max-files-in-column col-number))
-				    (* max-files-in-column col-number)
-				  (- (length (efar-get :panels side :files)) (efar-get :panels side :start-file-number)))))
-		 
-		 ;; append empty items if number of files to display is less then max files in panel
-		 ;; in order to overwrite old entries
-		 (make-list (let ((rest (- (length (efar-get :panels side :files)) (efar-get :panels side :start-file-number))))
-			      (if (> rest (* max-files-in-column col-number))
-				  0 (- (* max-files-in-column col-number) rest)))
-			    (list "")))))
+	       (files (append (cl-subseq  (efar-get :panels side :files)
+					  (efar-get :panels side :start-file-number)
+					  (+ (efar-get :panels side :start-file-number)
+					     (if (> (- (length (efar-get :panels side :files)) (efar-get :panels side :start-file-number)) (* max-files-in-column col-number))
+						 (* max-files-in-column col-number)
+					       (- (length (efar-get :panels side :files)) (efar-get :panels side :start-file-number)))))
+			      
+			      ;; append empty items if number of files to display is less then max files in panel
+			      ;; in order to overwrite old entries
+			      (make-list (let ((rest (- (length (efar-get :panels side :files)) (efar-get :panels side :start-file-number))))
+					   (if (> rest (* max-files-in-column col-number))
+					       0 (- (* max-files-in-column col-number) rest)))
+					 (list "")))))
 	  
 	  (cl-loop for col from 0 upto (- col-number 1) do
 		   
@@ -1994,7 +1990,6 @@ otherwise from end."
   (let ((panel-height (efar-get :panel-height)))
     
     ;; insert first line
-    
     (efar-draw-border-line
      #x2554 ;; ╔
      #x2566 ;; ╦
@@ -2208,18 +2203,17 @@ When SKIP-NON-EXISTING? is t then non-existing files removed from the list."
   (let* ((marked-files (efar-get :panels side :selected))
 	 (start-file-number (efar-get :panels side :start-file-number))
 	 (current-file-number (+ start-file-number (efar-get :panels side :current-pos)))
-	 (files (efar-get :panels side :files))
+	 (files (efar-get :panels side :files)))
 	 
-	 (selected-files (when (> (length files) 0)
-			   (cl-remove-if (lambda(f) (and skip-non-existing? (not (file-exists-p (car f)))))
-					 (remove (unless up-included? (list ".." t))
-						 (mapcar
-						  (lambda (fn)
-						    (nth fn files))
-						  (if (or current? (not marked-files))
-						      (list current-file-number)
-						    marked-files)))))))
-    selected-files))
+    (when (> (length files) 0)
+      (cl-remove-if (lambda(f) (and skip-non-existing? (not (file-exists-p (car f)))))
+		    (remove (unless up-included? (list ".." t))
+			    (mapcar
+			     (lambda (fn)
+			       (nth fn files))
+			     (if (or current? (not marked-files))
+				 (list current-file-number)
+			       marked-files)))))))
 
 
 (defun efar-abort()
