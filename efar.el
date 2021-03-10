@@ -1766,36 +1766,37 @@ When FOR-READ? is t switch back to eFar buffer."
 (defun efar-output-file-details(side)
   "Output detailes of the file under cursor in panel SIDE."
   (let ((mode (efar-get :mode))
-	(file (car (efar-selected-files side t nil t)))
+	(file (car (efar-selected-files side t t t)))
 	(width (efar-panel-width side))
 	(status-string "Non-existing or not-accessible file!"))
 
-    (when (and file
-	       (not (null (efar-get :panels side :files)))
-	       (or (equal mode :both) (equal mode side)))
-      
-      (let ((file-short-name (efar-get-short-file-name file)))
-
-	(setf status-string (concat  (if (nth 1 file) "Directory: " "File: ")
-				  file-short-name
-				  "  Modified: "
-				  (format-time-string "%D %T" (nth 6 file))
-				  (if (and (not (nth 1 file)) (numberp (nth 8 file)))
-				      (concat "  Size: " (int-to-string (nth 8 file))))))))
-
-    (let ((col-number (cond
-		       ((or (equal side :left) (equal mode :right)) 1)
-		       (t (+ (efar-panel-width (efar-other-side side)) 2)))))
-      (goto-char 0)
-
-      (forward-line (+ 2 (efar-get :panel-height)))
-      
-      (move-to-column col-number)
-      
-      (let ((p (point)))
-	(replace-rectangle p (+ p width) (efar-prepare-file-name status-string width))
+    (when (or (equal mode :both) (equal mode side))
+      (when (and file
+		 (not (null (efar-get :panels side :files)))
+		 (or (equal mode :both) (equal mode side)))
 	
-	(put-text-property p (+ p width) 'face 'efar-border-line-face)))))
+	(let ((file-short-name (efar-get-short-file-name file)))
+	  
+	  (setf status-string (concat  (if (nth 1 file) "Directory: " "File: ")
+				       file-short-name
+				       "  Modified: "
+				       (format-time-string "%D %T" (nth 6 file))
+				       (if (and (not (nth 1 file)) (numberp (nth 8 file)))
+					   (concat "  Size: " (int-to-string (nth 8 file))))))))
+      
+      (let ((col-number (cond
+			 ((or (equal side :left) (equal mode :right)) 1)
+			 (t (+ (efar-panel-width (efar-other-side side)) 2)))))
+	(goto-char 0)
+	
+	(forward-line (+ 2 (efar-get :panel-height)))
+	
+	(move-to-column col-number)
+	
+	(let ((p (point)))
+	  (replace-rectangle p (+ p width) (efar-prepare-file-name status-string width))
+	  
+	  (put-text-property p (+ p width) 'face 'efar-border-line-face))))))
 
 (defun efar-panel-width(side)
   "Calculate and return the width of panel SIDE."
@@ -2702,10 +2703,10 @@ Case is ignored when IGNORE-CASE? is t."
 						      (car entry))
 						    dir)))
 	     
-	     ;; we process directory only if it is readable
+	     ;; we process directory only if it is accessible
 	     ;; otherwise we skip it and report an error
 	     (if (and dir?
-		      (not (file-readable-p real-file-name)))
+		      (not (file-accessible-directory-p real-file-name)))
 		 (process-send-string  efar-search-server (concat (prin1-to-string (cons :file-error real-file-name)) "\n"))
 	       
 	       ;; when entry is a directory or a symlink pointing to the directory call function recursivelly for it
@@ -2747,27 +2748,32 @@ Case is ignored when IGNORE-CASE? is t."
 	(regexp? (or (cdr (assoc :regexp? args)) nil))
 	(ignore-case? (or (cdr (assoc :ignore-case? args)) nil)))
     (when (and file text)
-      (let ((hits (let ((hits '())
-			(case-fold-search ignore-case?) ;; case insensitive search when ignore-case? is t
-			(search-func (if regexp? 're-search-forward 'search-forward))) ;; use regular expression for search when regexp? is t
-		    ;; open file in temp buffer
-		    (with-temp-buffer
-		      (insert-file-contents file)
-		      (goto-char 0)
-		      ;; do search the text
-		      (while (funcall search-func text nil t)
-			;; store line number and whole line where searched text occurs
-			(push
-			 (cons
-			  (line-number-at-pos)
-			  (replace-regexp-in-string "\n" "" (thing-at-point 'line t)))
-			 hits)
-			(forward-line)))
-		    
-		    (reverse hits))))
-	;; if text is found in the file send information to main process
-	(when hits
-	  (process-send-string  efar-search-server (concat (prin1-to-string (cons :found-file (list (cons :name file) (cons :lines hits)))) "\n")))))))
+
+      (condition-case error	  
+	  (let ((hits (let ((hits '())
+			    (case-fold-search ignore-case?) ;; case insensitive search when ignore-case? is t
+			    (search-func (if regexp? 're-search-forward 'search-forward))) ;; use regular expression for search when regexp? is t
+			;; open file in temp buffer
+			(with-temp-buffer
+			  (insert-file-contents file)
+			  (goto-char 0)
+			  ;; do search the text
+			  (while (funcall search-func text nil t)
+			    ;; store line number and whole line where searched text occurs
+			    (push
+			     (cons
+			      (line-number-at-pos)
+			      (replace-regexp-in-string "\n" "" (thing-at-point 'line t)))
+			     hits)
+			    (forward-line)))
+			
+			(reverse hits))))
+	    ;; if text is found in the file send information to main process
+	    (when hits
+	      (process-send-string  efar-search-server (concat (prin1-to-string (cons :found-file (list (cons :name file) (cons :lines hits)))) "\n"))))
+	;; if any error occur skip file and report an error
+	(error
+	 (process-send-string efar-search-server (concat (prin1-to-string (cons :file-error file)) "\n")))))))
 
 
 (defun efar-process-search-request()
