@@ -2701,7 +2701,7 @@ Case is ignored when IGNORE-CASE? is t."
 	     ;; otherwise we skip it and report an error
 	     (if (and dir?
 		      (not (file-accessible-directory-p real-file-name)))
-		 (process-send-string  efar-search-server (concat (prin1-to-string (cons :file-error real-file-name)) "\n"))
+		 (process-send-string  efar-search-server (concat (prin1-to-string (cons :file-error (cons real-file-name "directory is inaccessible"))) "\n"))
 	       
 	       ;; when entry is a directory or a symlink pointing to the directory call function recursivelly for it
 	       (when (and dir?
@@ -2729,7 +2729,7 @@ Case is ignored when IGNORE-CASE? is t."
 							     request)
 							    "\n")))))
 			 ;; otherwise skip it and report a file error
-			 (process-send-string  efar-search-server (concat (prin1-to-string (cons :file-error real-file-name)) "\n")))
+			 (process-send-string  efar-search-server (concat (prin1-to-string (cons :file-error (cons real-file-name "file is not readable"))) "\n")))
 		     
 		     ;; otherwise report about found file
 		     (process-send-string  efar-search-server (concat (prin1-to-string (cons :found-file (list (cons :name real-file-name) (cons :lines '())))) "\n")))))))))
@@ -2767,7 +2767,7 @@ Case is ignored when IGNORE-CASE? is t."
 	      (process-send-string  efar-search-server (concat (prin1-to-string (cons :found-file (list (cons :name file) (cons :lines hits)))) "\n"))))
 	;; if any error occur skip file and report an error
 	(error
-	 (process-send-string efar-search-server (concat (prin1-to-string (cons :file-error file)) "\n")))))))
+	 (process-send-string efar-search-server (concat (prin1-to-string (cons :file-error (cons file (error-message-string error)))) "\n")))))))
 
 
 (defun efar-process-search-request()
@@ -2856,11 +2856,14 @@ When SORTED is t the file leist is sorted by name."
 
       (setf result-string (concat "Search results"
 				  (when efar-last-search-params
-				    (if (cdr (assoc :end-time efar-last-search-params))
-					(concat " - " (int-to-string (length (efar-get :panels side :files))) " [finished]"
-						(when (cdr (assoc :errors efar-last-search-params))
-						  (concat " (" (int-to-string (length (cdr (assoc :errors efar-last-search-params)))) " skipped)")))
-				      " [in progress]" ))))
+				    (concat " - " (int-to-string (length (efar-get :panels side :files))) 
+					    (if (cdr (assoc :end-time efar-last-search-params))
+						" [finished]" " [in progress]" )
+
+					    (when errors
+					      (concat " (" (int-to-string (length errors)) " skipped)"))))))
+
+      
       
       (setf status-string (concat (cond (efar-search-running?
 					 "Search running for files ")
@@ -2918,7 +2921,7 @@ When SORTED is t the file leist is sorted by name."
 	;; in case if some file were skipped uring search we add corresponding hint to the header
 	(when errors
 	  (let ((p (point)))
-	    (insert (concat (int-to-string (length errors)) " file(s) inaccessible. See list at the bottom."))
+	    (insert (concat (int-to-string (length errors)) " file(s) skipped. See list at the bottom."))
 	    (add-text-properties p (point)
 				 '(face efar-non-existing-current-file-face))
 	    (insert "\n")))
@@ -2964,7 +2967,7 @@ When SORTED is t the file leist is sorted by name."
 	(when errors
 	  (insert "\nFollowing files/directries are inaccessible and therefore were skipped:\n")
 	  (cl-loop for file in errors do
-		   (insert file)
+		   (insert (car file) " (" (cdr file) ")")
 		   (insert "\n")))
 	
 	;; highlight searched text
