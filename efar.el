@@ -41,6 +41,9 @@
 (require 'filenotify)
 (require 'dired)
 
+(defconst efar-version 1.0
+  "Current eFar version number.")
+
 (defvar efar-state nil)
 ;;variables for file search
 (defvar efar-search-processes '())
@@ -297,7 +300,7 @@
   `(while
        (string=
 	"error"
-	(condition-case err	    
+	(condition-case err
 	    ,@body
 	  (error (when
 		     (string= "Yes"
@@ -514,8 +517,7 @@ REINIT? is a boolean indicating that configuration should be generated enew."
   (when (and
 	 efar-save-state?
 	 (file-exists-p efar-state-file-name))
-    (setf efar-state (efar-read-state))
-    (efar-set-status :ready (concat "eFar state loaded from file " efar-state-file-name) nil t))
+    (setf efar-state (efar-read-state)))
   
   ;; if eFAR state cannot be restored from file (missing or broken file) or saving/restoring of state is disabled
   ;; then initialize state storage with default values
@@ -845,17 +847,56 @@ Notifications in the queue will be processed only if there are no new notificati
       (puthash :files () (gethash :left (gethash :panels copy)))
       (puthash :files () (gethash :right (gethash :panels copy)))
       (puthash :last-auto-read-buffer nil copy)
+
+      ;; add eFar version tag
+      (puthash :version efar-version copy)
       
       (print copy (current-buffer)))))
-
 
 (defun efar-read-state()
   "Read eFar state from the file."
   (interactive)
-  (with-temp-buffer
-    (insert-file-contents efar-state-file-name)
-    (cl-assert (eq (point) (point-min)))
-    (read (current-buffer))))
+  (efar-check-state-file-version
+   (with-temp-buffer
+     (insert-file-contents efar-state-file-name)
+     (cl-assert (eq (point) (point-min)))
+     (read (current-buffer)))))
+
+(defun efar-check-state-file-version(state)
+  "Check version of STATE file and upgrade it if necessary."
+  (let ((state-version (or (gethash :version state) 0.0)))
+    (cond
+     ;; if current eFar version matches version stored in state file
+     ;; then we have nothing to do - we use loaded state
+     ((equal efar-version state-version)
+      (message (concat "eFar state loaded from file " efar-state-file-name))
+      state)
+     
+     ;; else if curent version of eFar is lower then version stored in state file
+     ;; we have to skip loading state
+     ((< efar-version state-version)
+      (message "Version of state file is greater then eFar version. State file loading skipped...")
+      nil)
+     
+     ;; else if current eFar version is greater then version stored in state file
+     ;; we do "upgrade" of state file
+     (t
+      (efar-upgrade-state-file state state-version)))))
+
+(defun efar-upgrade-state-file(state from-version)
+  "Upgrade state file.
+Do necessary changes in STATE in order to switch
+from version FROM-VERSION to actual version."
+  (let ((copy (copy-hash-table state)))
+    (condition-case err
+	(progn
+	  ;;placeholder for upgrade actions
+	  )
+      (error
+       (message (format "Error occured during upgrading state file: %s. State file skipped." (error-message-string err)))
+       (setf copy nil)))
+      
+      copy))
 
 ;;------------------------------------------------------------------
 ;; efar file operations
@@ -981,7 +1022,7 @@ User also can select an option to overwrite all remaining files to not be asked 
 	     (mapc(lambda (f)
 		    (if (equal (cadr f) t)
 			(efar-retry-when-error (delete-directory (car f) t))
-		      (efar-retry-when-error (delete-file (car f)))))		  
+		      (efar-retry-when-error (delete-file (car f)))))
 		  selected-files)
 	     
 	     (efar-refresh-panel side)
@@ -2743,7 +2784,7 @@ Case is ignored when IGNORE-CASE? is t."
 	(ignore-case? (or (cdr (assoc :ignore-case? args)) nil)))
     (when (and file text)
 
-      (condition-case error	  
+      (condition-case error
 	  (let ((hits (let ((hits '())
 			    (case-fold-search ignore-case?) ;; case insensitive search when ignore-case? is t
 			    (search-func (if regexp? 're-search-forward 'search-forward))) ;; use regular expression for search when regexp? is t
@@ -2856,7 +2897,7 @@ When SORTED is t the file leist is sorted by name."
 
       (setf result-string (concat "Search results"
 				  (when efar-last-search-params
-				    (concat " - " (int-to-string (length (efar-get :panels side :files))) 
+				    (concat " - " (int-to-string (length (efar-get :panels side :files)))
 					    (if (cdr (assoc :end-time efar-last-search-params))
 						" [finished]" " [in progress]" )
 
