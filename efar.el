@@ -924,17 +924,20 @@ from version FROM-VERSION to actual version."
 (defun efar-copy-or-move-files(operation)
   "Copy or move selected files depending on OPERATION."
   (unwind-protect
-      (progn
-	(efar-set-status :busy (if (equal operation :copy)
-				   "Copying files..."
-				 "Moving files..."))
-	
+      (progn	
 	(efar-with-notification-disabled
 	 (let* ((side (efar-get :current-panel))
-		(todir  (efar-get :panels (efar-other-side) :dir) )
+		(todir  (let ((todir (efar-get :panels (efar-other-side) :dir)))
+			  (if (file-exists-p todir)
+			      todir
+			    (efar-get :panels side :dir))))
 		(files (efar-selected-files side nil)))
 	   
 	   (when files
+	     (efar-set-status :busy (if (equal operation :copy)
+					"Copying files..."
+				      "Moving files..."))
+	     
 	     (efar-copy-or-move-files-int operation files (read-directory-name (if (equal operation :copy) "Copy selected files to " "Move selected files to ") todir todir)))
 	   
 	   (efar-refresh-panel :left)
@@ -1010,27 +1013,26 @@ User also can select an option to overwrite all remaining files to not be asked 
 
 (defun efar-delete-selected()
   "Delete selected file(s)."
-  (efar-set-status :busy "Deleting files...")
-    
-    (unwind-protect
-	(efar-with-notification-disabled
-	 (let* ((side (efar-get :current-panel))
-		(selected-files (efar-selected-files side nil)))
-	   ;; ask user for confirmation
-	   (when (and selected-files (string= "Yes" (ido-completing-read "Delete selected files? " (list "Yes" "No"))))
-	     ;; do the deletion of selected files
-	     (mapc(lambda (f)
-		    (if (equal (cadr f) t)
-			(efar-retry-when-error (delete-directory (car f) t))
-		      (efar-retry-when-error (delete-file (car f)))))
-		  selected-files)
-	     
-	     (efar-refresh-panel side)
-	     
-	     (when (string= (efar-get :panels side :dir) (efar-get :panels (efar-other-side) :dir))
-	       (efar-refresh-panel (efar-other-side)))))))
-    
-    (efar-set-status :ready "Ready"))
+  (unwind-protect
+      (efar-with-notification-disabled
+       (let* ((side (efar-get :current-panel))
+	      (selected-files (efar-selected-files side nil)))
+	 ;; ask user for confirmation
+	 (when (and selected-files (string= "Yes" (ido-completing-read "Delete selected files? " (list "Yes" "No"))))
+	   ;; do the deletion of selected files
+	   (efar-set-status :busy "Deleting files...")
+	   (mapc(lambda (f)
+		  (if (equal (cadr f) t)
+		      (efar-retry-when-error (delete-directory (car f) t))
+		    (efar-retry-when-error (delete-file (car f)))))
+		selected-files)
+	   
+	   (efar-refresh-panel side)
+	   
+	   (when (string= (efar-get :panels side :dir) (efar-get :panels (efar-other-side) :dir))
+	     (efar-refresh-panel (efar-other-side)))))))
+  
+  (efar-set-status :ready "Ready"))
 
 ;;------------------------------------------------------------------
 ;; efar displaying status
@@ -1326,24 +1328,25 @@ If there are no accessible directories, return `user-emacs-directory'."
   "Refresh given panel (or a current one when SIDE is not given).
 When MOVE-TO-FIRST? is t move cursot to the first file.
 When MOVE-TO-FILE-NAME is given then move cursor to the file with that name."
-  (let* ((side (or side (efar-get :current-panel)))
-	 (dir (efar-get-accessible-directory-in-path (efar-get :panels side :dir))))
-    (efar-set dir :panels side :dir)
-    (efar-set () :panels side :selected)
-    (efar-set "" :panels side :fast-search-string)
-    
-    (let ((current-file-name (cond
-			      (move-to-first? "")
-			      (move-to-file-name move-to-file-name)
-			      (t (efar-current-file-name side))))
-	  (current-file-number (if move-to-first? 0 (efar-current-file-number side))))
-      
-      (efar-get-file-list side)
-      
-      (when (> (length (efar-get :panels side :files)) 0)
-	(efar-go-to-file current-file-name side current-file-number)))
-    
-    (efar-write-enable (efar-redraw))))
+  (let ((side (or side (efar-get :current-panel))))
+    (when (equal (efar-get :panels side :mode) :files)
+      (let ((dir (efar-get-accessible-directory-in-path (efar-get :panels side :dir))))
+	(efar-set dir :panels side :dir)
+	(efar-set () :panels side :selected)
+	(efar-set "" :panels side :fast-search-string)
+	
+	(let ((current-file-name (cond
+				  (move-to-first? "")
+				  (move-to-file-name move-to-file-name)
+				  (t (efar-current-file-name side))))
+	      (current-file-number (if move-to-first? 0 (efar-current-file-number side))))
+	  
+	  (efar-get-file-list side)
+	  
+	  (when (> (length (efar-get :panels side :files)) 0)
+	    (efar-go-to-file current-file-name side current-file-number)))
+	
+	(efar-write-enable (efar-redraw))))))
 
 
 (defun efar-go-to-dir(dir &optional side)
