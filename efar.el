@@ -619,7 +619,6 @@ REINIT? is a boolean indicating that configuration should be generated enew."
   
   (efar-set nil :last-auto-read-buffer)
   
-  ;;(efar-set (make-hash-table :test `equal) :last-visited-dirs)
   (efar-set '() :directory-history)
   (efar-set '() :bookmarks)
   
@@ -843,6 +842,7 @@ Notifications in the queue will be processed only if there are no new notificati
       ;; clear up data not not relevant for saving
       (puthash :file-notifier nil (gethash :left (gethash :panels copy)))
       (puthash :file-notifier nil (gethash :right (gethash :panels copy)))
+      (puthash :notification-timer nil copy)
       (puthash :pending-notifications () copy)
       (puthash :files () (gethash :left (gethash :panels copy)))
       (puthash :files () (gethash :right (gethash :panels copy)))
@@ -890,8 +890,14 @@ from version FROM-VERSION to actual version."
   (let ((copy (copy-hash-table state)))
     (condition-case err
 	(progn
-	  ;;placeholder for upgrade actions
-	  )
+	  ;; 0.9 -> 1.0
+	  (when (< from-version 1.0)
+	    ;; transform :directory-history to keep date
+	    (let ((dir-history (mapcar (lambda(e) (cons (car e) (list (cons :side (cdr e)) (cons :time (current-time)))))				     
+				     (gethash :directory-history copy))))
+	      (puthash :directory-history dir-history copy))
+	      
+	    (message "State file upgraded to version 1.0")))
       (error
        (message (format "Error occured during upgrading state file: %s. State file skipped." (error-message-string err)))
        (setf copy nil)))
@@ -1070,7 +1076,7 @@ on any next cursor movement."
   (efar-write-enable
    
    (let* ((w (- (efar-get :window-width) 2))
-	  (status-string (efar-prepare-file-name (or status (efar-get :status-string)) w)))
+	  (status-string (efar-prepare-string (or status (efar-get :status-string)) w)))
      
      (goto-char 0)
      (forward-line (+ 4 (efar-get :panel-height)))
@@ -1384,7 +1390,7 @@ When SIDE is given show directory in this panel, otherwise in current one."
 	   (new-hist (cl-subseq (cl-remove-if (lambda(e) (equal dir (car e))) current-hist)
 				0 (when (> (length current-hist) efar-max-items-in-directory-history)
 				    (- efar-max-items-in-directory-history 1)))))
-      (push (cons (if (equal dir "/") dir (string-trim-right dir "[/]")) side) new-hist)
+      (push (cons (if (equal dir "/") dir (string-trim-right dir "[/]")) (list (cons :side side)  (cons :time (current-time)))) new-hist)
       
       (efar-set new-hist :directory-history))
 
@@ -1836,7 +1842,7 @@ When FOR-READ? is t switch back to eFar buffer."
 	(move-to-column col-number)
 	
 	(let ((p (point)))
-	  (replace-rectangle p (+ p width) (efar-prepare-file-name status-string width))
+	  (replace-rectangle p (+ p width) (efar-prepare-string status-string width))
 	  
 	  (put-text-property p (+ p width) 'face 'efar-border-line-face))))))
 
@@ -1854,107 +1860,137 @@ When FOR-READ? is t switch back to eFar buffer."
   "Output the list of files in panel SIDE.
 Redraw files with numbers in AFFECTED-ITEM-NUMBERS if given,
 otherwise redraw all."
-  (unless (= 0 (length (efar-get :panels side :files)))
-    (let ((mode (efar-get :mode))
-	  (widths (if (equal side :left)
-		      (car (efar-get :column-widths))
-		    (cdr (efar-get :column-widths)))))
-      
-      (when (or (equal mode :both) (equal mode side))
+  (let ((mode (efar-get :mode)))
+    (when (and
+	   ;; when there are files to output
+	   (not (zerop (length (efar-get :panels side :files))))
+	   ;; and panel is displayed
+	   (or (equal mode :both) (equal mode side)))
+
+      (let ;; get column widths for given panel
+	  ((widths (if (equal side :left)
+		       (car (efar-get :column-widths))
+		     (cdr (efar-get :column-widths))))
+	   ;; get display mode for current panel
+	   (disp-mode (car (efar-get :panels side :view (efar-get :panels side :mode) :file-disp-mode)))
+	   (panel-mode (efar-get :panels side :mode)))
 	
 	(goto-char 0)
 	(forward-line)
 	
-	(let* ((start-pos (cond ((equal side :left) 1)
-				((and (equal side :right) (equal mode :right)) 1)
-				(t (+ (efar-panel-width :left) 2))))
-	       (max-files-in-column (- (efar-get :panel-height) 1))
-	       (cnt 0)
-	       (col-number (length widths))
-	       
-	       
-	       (files (append (cl-subseq  (efar-get :panels side :files)
-					  (efar-get :panels side :start-file-number)
-					  (+ (efar-get :panels side :start-file-number)
-					     (if (> (- (length (efar-get :panels side :files)) (efar-get :panels side :start-file-number)) (* max-files-in-column col-number))
-						 (* max-files-in-column col-number)
-					       (- (length (efar-get :panels side :files)) (efar-get :panels side :start-file-number)))))
-			      
-			      ;; append empty items if number of files to display is less then max files in panel
-			      ;; in order to overwrite old entries
-			      (make-list (let ((rest (- (length (efar-get :panels side :files)) (efar-get :panels side :start-file-number))))
-					   (if (> rest (* max-files-in-column col-number))
-					       0 (- (* max-files-in-column col-number) rest)))
-					 (list "")))))
+	(let*
+	    ;; calculate start column for printing file names
+	    ((start-column (cond ((equal side :left) 1) ;; left panel always starts at 1
+				 ((and (equal side :right) (equal mode :right)) 1) ;; right panel when it's alone also starts at 1
+				 (t (+ (efar-panel-width :left) 2)))) ;; otherwise start at position where left panel ends
+	     ;; maximum number in one column
+	     (max-files-in-column (- (efar-get :panel-height) 1))
+	     ;; file counter
+	     (cnt 0)
+	     ;; number of columns in the panel
+	     (col-number (length widths))
+	     ;; get subset of file which that should be displayed and will fit to the panel
+	     (files (append (cl-subseq  (efar-get :panels side :files)
+					(efar-get :panels side :start-file-number)
+					(+ (efar-get :panels side :start-file-number)
+					   (if (> (- (length (efar-get :panels side :files)) (efar-get :panels side :start-file-number)) (* max-files-in-column col-number))
+					       (* max-files-in-column col-number)
+					     (- (length (efar-get :panels side :files)) (efar-get :panels side :start-file-number)))))
+			    
+			    ;; append empty items if number of files to display is less then max files in panel
+			    ;; in order to overwrite old entries
+			    (make-list (let ((rest (- (length (efar-get :panels side :files)) (efar-get :panels side :start-file-number))))
+					 (if (> rest (* max-files-in-column col-number))
+					     0 (- (* max-files-in-column col-number) rest)))
+				       (list "")))))
 	  
+	  ;; loop over column numbers
 	  (cl-loop for col from 0 upto (- col-number 1) do
-		   
-		   (let ((files-in-column (cl-subseq files (* col max-files-in-column) (* (+ col 1) max-files-in-column))))
+		   	       
+		   (let ;; get subset of files which fit in column
+		       ((files-in-column (cl-subseq files
+						    (* col max-files-in-column)
+						    (* (+ col 1) max-files-in-column)))
+			;; width of current column
+			(column-width (nth col widths)))
 		     
+		     ;; loop over this subset
 		     (cl-loop repeat (length files-in-column)  do
-			      
+			      ;; move one line down
 			      (forward-line)
-			      
+
+			      ;; we skip output if file number is not in the list of file numbers to be redrawed
 			      (when (or (null affected-item-numbers) (member cnt affected-item-numbers))
-				(let ((shift (+ start-pos
-						(apply '+ (cl-subseq widths 0 col))
-						col)))
+				
+				;; calculate start output position for column and move to it
+				(move-to-column (+ start-column
+						   (apply '+ (cl-subseq widths 0 col))
+						   col))
+				
+				(let*
+				    ;; current file to output
+				    ((file (nth cnt files))
+				     ;; remember current position
+				     (p (point))				     
+				     ;; is current file marked?
+				     (marked? (member (+ (efar-get :panels side :start-file-number) cnt) (efar-get :panels side :selected)))
+				     ;; is it existing file?
+				     (exists? (file-exists-p (car file)))
+				     ;; get real file (for symlinks)
+				     (real-file (if (not (stringp (cadr file)))
+						    (cdr file)
+						  (file-attributes (cadr file))))
+				     ;; is it a directory?
+				     (dir? (car real-file))
+				     ;; is it a normal file?
+				     (file? (not (car real-file)))
+				     ;; is it a file under cursor?
+				     (current? (and
+						(= cnt (efar-get :panels side :current-pos))
+						(equal side (efar-get :current-panel))))
+				     
+				     ;; prepare string representing the file
+				     (str (efar-prepare-string (concat (pcase disp-mode
+									 ;; in short mode we just output short file name with optional ending "/"
+									 (:short (concat (file-name-nondirectory (car file)) (when (and efar-add-slash-to-directories (car real-file) (not (equal (car file) "/"))) "/")))
+									 ;; in long mode we output full file path + some additional info depending on current mode
+									 (:long (let ((file-name (concat (car file)
+													 (when (and efar-add-slash-to-directories (car real-file) (not (equal (car file) "/"))) "/"))))																  (cond ((equal panel-mode :search)
+											 (concat file-name
+												 (when (nth 13 file) (format " (%s)" (length (nth 13 file))))))
+											
+											((equal panel-mode :dir-hist)
+											 (concat (when (nth 13 file) (format-time-string "%Y-%m-%d   " (nth 13 file))) file-name))
+											
+											(t file-name))))
+									 ;; in deteiled mode we output detailed info about file
+									 (:detailed (efar-prepare-detailed-file-info file column-width))))
+							       
+							       column-width
+							       ;; cut string from beginn or from end?
+							       (and (eq :long disp-mode) (not (eq panel-mode :dir-hist))))))
+				  ;; output string
+				  (replace-rectangle p (+ p (length str)) str)
 				  
-				  (move-to-column shift)
-				  
-				  (let* ((f (nth cnt files))
-					 (p (point))
-					 (w (nth col widths))
-					 
-					 (marked? (member (+ (efar-get :panels side :start-file-number) cnt) (efar-get :panels side :selected)))
-					 
-					 (disp-mode (car (efar-get :panels side :view (efar-get :panels side :mode) :file-disp-mode)))
-					 
-					 (exists? (file-exists-p (car f)))
-					 (real-file (if (not (stringp (cadr f)))
-							(cdr f)
-						      (file-attributes (cadr f))))
-					 
-					 (dir? (car real-file))
-					 (file? (not (car real-file)))
-					 
-					 (current? (and
-						    (= cnt (efar-get :panels side :current-pos))
-						    (equal side (efar-get :current-panel))))
-					 
-					 
-					 (str (efar-prepare-file-name (concat (and marked? "*")
-									      (pcase disp-mode
-										(:short (concat (file-name-nondirectory (car f)) (when (and efar-add-slash-to-directories (car real-file) (not (equal (car f) "/"))) "/")))
-										(:long (concat (car f)
-											       (when (and efar-add-slash-to-directories (car real-file) (not (equal (car f) "/"))) "/")
-											       (when (nth 13 f) (concat " (" (int-to-string (length (nth 13 f))) ")"))))
-										(:detailed (efar-prepare-detailed-file-info f w))))
-								      w
-								      (eq :long disp-mode))))
-				    
-				    (replace-rectangle p (+ p (length str)) str)
-				    
-				    
-				    (let ((current-face
-					   (cond
-					    ((and (not exists?) current?) 'efar-non-existing-current-file-face)
-					    ((not exists?) 'efar-non-existing-file-face)
-					    
-					    ((and dir? current?) 'efar-dir-current-face)
-					    ((and file? current?) 'efar-file-current-face)
-					    (marked? 'efar-marked-face)
-					    
-					    ((and dir? (not current?)) 'efar-dir-face)
-					    ((and file? (not current?)) 'efar-file-face) )))
-				      (put-text-property p (+ p w) 'face current-face)))))
+				  ;; get corresponding face and apply it
+				  (let ((current-face
+					 (cond
+					  ((and (not exists?) current?) 'efar-non-existing-current-file-face)
+					  ((not exists?) 'efar-non-existing-file-face)
+					  
+					  ((and dir? current?) 'efar-dir-current-face)
+					  ((and file? current?) 'efar-file-current-face)
+					  (marked? 'efar-marked-face)
+					  
+					  ((and dir? (not current?)) 'efar-dir-face)
+					  ((and file? (not current?)) 'efar-file-face) )))
+				    (put-text-property p (+ p column-width) 'face current-face))))
 			      
-			      
+			      ;; go to next file
 			      (cl-incf cnt)))
 		   
 		   (goto-char 0)
 		   (forward-line)))))))
-
 
 (defun efar-output-header(side)
   "Output eFar header in panel SIDE."
@@ -1983,23 +2019,23 @@ otherwise redraw all."
 	  (put-text-property p (+ p (length str)) 'face 'efar-header-face))))))
 
 
-(defun efar-prepare-file-name(fname len &optional cut-from-beginn?)
-  "Prepare file name FNAME.
-File name is truncated to be not more than LEN characters long.
-When CUT-FROM-BEGINN? is t then name is truncated from the beginn,
-otherwise from end."
+(defun efar-prepare-string(str len &optional cut-from-beginn?)
+  "Prepare file name STR.
+String is truncated to be not more than LEN characters long.
+When CUT-FROM-BEGINN? is t then string is truncated from the beginn,
+otherwise from the end."
   (let ((cut-from-beginn? (or cut-from-beginn?)))
     
-    (cond ((> (length fname) len)
+    (cond ((> (length str) len)
 	   (if cut-from-beginn?
-	       (concat "<" (cl-subseq fname (+ (- (length fname) len) 1)))
-	     (concat (cl-subseq fname 0 (- len 1)) ">")))
+	       (concat "<" (cl-subseq str (+ (- (length str) len) 1)))
+	     (concat (cl-subseq str 0 (- len 1)) ">")))
 	  
-	  ((< (length fname) len)
-	   (concat fname (make-string (- len (length fname)) ?\s)))
+	  ((< (length str) len)
+	   (concat str (make-string (- len (length str)) ?\s)))
 	  
-	  ((= (length fname) len)
-	   fname))))
+	  ((= (length str) len)
+	   str))))
 
 (defun efar-output-dir-names(side)
   "Output current directory name for panel SIDE."
@@ -2272,10 +2308,11 @@ When SKIP-NON-EXISTING? is t then non-existing files removed from the list."
 (defun efar-last-visited-dir(&optional side)
   "Return last visited directory for the panel SIDE."
   (let ((side (or side (efar-get :current-panel))))
-    (catch 'dir
-      (cl-loop for d in (efar-get :directory-history) do
-	       (when (equal (cdr d) side)
-		 (throw 'dir (car d)))))))
+    (or (catch 'dir
+	  (cl-loop for d in (efar-get :directory-history) do
+		   (when (equal (cdr (assoc :side d)) side)
+		     (throw 'dir (car d)))))
+	(user-emacs-directory))))
 
 (defun efar-change-file-disp-mode()
   "Change file display mode.
@@ -2385,9 +2422,9 @@ Truncate string to WIDTH characters."
 (defun efar-show-directory-history(&optional side)
   "Show list of last visited directories in panel SIDE."
   (let ((side (or side (efar-get :current-panel))))
-    (efar-set (mapcar (lambda(d) (let ((attrs (file-attributes (car d))))
-				   (push (car d) attrs)))
-		      (efar-get :directory-history))
+    (efar-set (mapcar (lambda(d) (let ((attrs (file-attributes (car d))))		
+				   (append (push (car d) attrs) (list (cdr (assoc :time (cdr d)))))))
+		      (efar-get :directory-history)) 
 	      :panels side :files)
     
     (efar-set "Directory history" :panels side :dir)
