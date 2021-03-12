@@ -349,7 +349,7 @@ IGNORE-IN-MODES is a list of modes which should ignore this key binding."
 		   "move cursot to the end of the list" t)
 (efar-register-key (kbd "C-<right>")  'efar-move-cursor  :end 'efar-move-end-alt-key
 		   "move cursot to the end of the list (alternative)" t)
-(efar-register-key (kbd "RET") '((:files . efar-enter-directory) (:dir-hist . efar-navigate-to-file) (:bookmark . efar-navigate-to-file) (:disks . efar-navigate-to-file) (:search . efar-navigate-to-file))  nil  'efar-enter-directory-key
+(efar-register-key (kbd "RET") '((:files . efar-enter-directory) (:dir-hist . efar-navigate-to-file) (:file-hist . efar-navigate-to-file) (:bookmark . efar-navigate-to-file) (:disks . efar-navigate-to-file) (:search . efar-navigate-to-file))  nil  'efar-enter-directory-key
 		   "go into or to the item under cursor" :space-after)
 
 (efar-register-key (kbd "C-<down>") 'efar-scroll-other-window :down 'efar-scroll-other-down-key
@@ -358,9 +358,9 @@ IGNORE-IN-MODES is a list of modes which should ignore this key binding."
 		   "scroll other window up" t)
 
 (efar-register-key (kbd "<insert>") 'efar-mark-file   nil 'efar-mark-file-key
-		    "mark item under cursor" t (list :dir-hist :bookmark :disks :search))
+		    "mark item under cursor" t (list :file-hist :dir-hist :bookmark :disks :search))
 (efar-register-key (kbd "<C-insert>") 'efar-deselect-all  nil 'efar-deselect-all-kay
-		   "unmark all items in the list" :space-after (list :dir-hist :bookmark :disks :search))
+		   "unmark all items in the list" :space-after (list :file-hist :dir-hist :bookmark :disks :search))
 
 (efar-register-key (kbd "TAB")   'efar-switch-to-other-panel nil 'efar-switch-to-other-panel-key
 		   "switch to other panel" t)
@@ -375,21 +375,21 @@ IGNORE-IN-MODES is a list of modes which should ignore this key binding."
 		   "show content of the file in other window" :space-after)
 
 (efar-register-key (kbd "<f5>")   'efar-copy-or-move-files :copy 'efar-copy-file-key
-		   "copy marked file(s)" t (list :dir-hist :bookmark :disks :search))
+		   "copy marked file(s)" t (list :file-hist :dir-hist :bookmark :disks :search))
 (efar-register-key (kbd "<f6>")  'efar-copy-or-move-files :move 'efar-move-file-key
-		   "move/rename marked file(s)" t (list :dir-hist :bookmark :disks :search))
+		   "move/rename marked file(s)" t (list :file-hist :dir-hist :bookmark :disks :search))
 (efar-register-key (kbd "<f7>")  'efar-create-new-directory nil 'efar-create-direcotry-key
-		   "create new directory" t (list :dir-hist :bookmark :disks :search))
+		   "create new directory" t (list :file-hist :dir-hist :bookmark :disks :search))
 (efar-register-key (kbd "<f8>")  '((:files . efar-delete-selected) (:bookmark . efar-delete-bookmark))   nil 'efar-delete-file-key
-		   "delete selected file(s) or bookmark" :space-after '(:dir-hist :disks :search))
+		   "delete selected file(s) or bookmark" :space-after '(:file-hist :dir-hist :disks :search))
 
 
 (efar-register-key (kbd "C-c f d") 'efar-show-disk-selector  nil 'efar-show-disk-selector-key
 		   "show list of available disks (Windows) or mount points (Unix)" t)
 (efar-register-key (kbd "C-c f s") 'efar-change-sort-function  nil 'efar-change-sort-key
-		   "change sort function and/or order for current panel" t (list :dir-hist :bookmark :disks :search))
+		   "change sort function and/or order for current panel" t (list :file-hist :dir-hist :bookmark :disks :search))
 (efar-register-key (kbd "C-c f f") 'efar-filter-files  nil 'efar-filter-files-key
-		   "set/remove filtering for current panel" :space-after (list :dir-hist :bookmark :disks :search))
+		   "set/remove filtering for current panel" :space-after (list :file-hist :dir-hist :bookmark :disks :search))
 
 (efar-register-key (kbd "C-c v M") 'efar-change-mode  nil 'efar-change-mode-key
 		   "toggle mode: double panel <-> single panel" t)
@@ -405,7 +405,7 @@ IGNORE-IN-MODES is a list of modes which should ignore this key binding."
 (efar-register-key (kbd "C-c c d") 'efar-cd   nil 'efar-cd-key
 		   "go to specific directory" t)
 (efar-register-key (kbd "C-c c e") 'efar-ediff-files  nil 'efar-ediff-files-key
-		   "run ediff for selected files" t (list :dir-hist :bookmark :disks :search))
+		   "run ediff for selected files" t (list :file-hist :dir-hist :bookmark :disks :search))
 (efar-register-key (kbd "C-c c s") 'efar-current-file-stat  nil 'efar-current-file-stat-key
 		   "show directory stats (size and files number)" t)
 (efar-register-key (kbd "C-c c o") 'efar-display-console  nil 'efar-display-console-key
@@ -419,14 +419,18 @@ IGNORE-IN-MODES is a list of modes which should ignore this key binding."
 (efar-register-key (kbd "C-c c B") 'efar-add-bookmark  nil 'efar-add-boormark-key
 		   "add item under cursor to the bookmarks" t)
 (efar-register-key (kbd "C-c c h") 'efar-show-directory-history  nil 'efar-show-directory-history-key
-		   "show last visited directories" :space-after)
+		   "show last visited directories" t)
+(efar-register-key (kbd "C-c c f") 'efar-show-file-history  nil 'efar-show-file-history-key
+		   "show last edited files" t)
+(efar-register-key (kbd "C-c c m") 'efar-show-mode-selector  nil 'efar-show-mode-selector-key
+		   "show panel mode selector" :space-after)
 
 (efar-register-key (kbd "<M-f7>") 'efar-start-search nil 'efar-start-search-key
 		   "run file search" t)
 (efar-register-key (kbd "<S-f7>") 'efar-show-search-results t 'efar-show-search-results-key
 		   "show file search results" t)
 (efar-register-key (kbd "<C-M-f7>") 'efar-show-search-results-in-buffer nil 'efar-show-search-results-in-buffer-key
-		   "display search results in a separate buffer" :space-after (list :dir-hist :bookmark :disks :files))
+		   "display search results in a separate buffer" :space-after (list :file-hist :dir-hist :bookmark :disks :files))
 
 (efar-register-key (kbd "C-g") 'efar-abort  nil nil
 		   "abort current operation" t)
@@ -517,7 +521,7 @@ REINIT? is a boolean indicating that configuration should be generated enew."
   (when (and
 	 efar-save-state?
 	 (file-exists-p efar-state-file-name))
-    (setf efar-state (efar-read-state)))
+    (efar-read-state))
   
   ;; if eFAR state cannot be restored from file (missing or broken file) or saving/restoring of state is disabled
   ;; then initialize state storage with default values
@@ -528,21 +532,12 @@ REINIT? is a boolean indicating that configuration should be generated enew."
   
   (efar-set-key-bindings)
   (efar-set-mouse-bindings)
-  
-  (efar-init-panel :left)
-  (efar-init-panel :right)
+
+  (efar-go-to-dir (efar-get :panels :left :dir) :left)
+  (efar-go-to-dir (efar-get :panels :right :dir) :right)
   
   (when reinit?
     (efar-write-enable (efar-redraw))))
-
-(defun efar-init-panel(side)
-  "Initialize configuration for panel SIDE."
-  (pcase (efar-get :panels side :mode)
-    (:files (efar-go-to-dir (efar-get :panels side :dir) side))
-    (:dir-hist (efar-show-directory-history side))
-    (:bookmark (efar-show-bookmarks side))
-    (:disks (efar-show-disk-selector))
-    (:search (efar-go-to-dir (efar-last-visited-dir side)))))
 
 (defun efar-init-state()
   "Initialize state with default values."
@@ -599,6 +594,8 @@ REINIT? is a boolean indicating that configuration should be generated enew."
   (efar-set '(:short :detailed :long) :panels :left :view :files :file-disp-mode)
   (efar-set 1 :panels :left :view :dir-hist :column-number)
   (efar-set '(:long) :panels :left :view :dir-hist :file-disp-mode)
+  (efar-set 1 :panels :left :view :file-hist :column-number)
+  (efar-set '(:long) :panels :left :view :file-hist :file-disp-mode)
   (efar-set 1 :panels :left :view :bookmark :column-number)
   (efar-set '(:long) :panels :left :view :bookmark :file-disp-mode)
   (efar-set 1 :panels :left :view :disks :column-number)
@@ -610,6 +607,8 @@ REINIT? is a boolean indicating that configuration should be generated enew."
   (efar-set '(:short :detailed :long) :panels :right :view :files :file-disp-mode)
   (efar-set 1 :panels :right :view :dir-hist :column-number)
   (efar-set '(:long) :panels :right :view :dir-hist :file-disp-mode)
+  (efar-set 1 :panels :right :view :file-hist :column-number)
+  (efar-set '(:long) :panels :right :view :file-hist :file-disp-mode)
   (efar-set 1 :panels :right :view :bookmark :column-number)
   (efar-set '(:long) :panels :right :view :bookmark :file-disp-mode)
   (efar-set 1 :panels :right :view :disks :column-number)
@@ -621,6 +620,7 @@ REINIT? is a boolean indicating that configuration should be generated enew."
   
   (efar-set '() :directory-history)
   (efar-set '() :bookmarks)
+  (efar-set '() :file-history)
   
   (efar-set 0 :next-hint-number))
 
@@ -856,11 +856,12 @@ Notifications in the queue will be processed only if there are no new notificati
 (defun efar-read-state()
   "Read eFar state from the file."
   (interactive)
-  (efar-check-state-file-version
-   (with-temp-buffer
-     (insert-file-contents efar-state-file-name)
-     (cl-assert (eq (point) (point-min)))
-     (read (current-buffer)))))
+  (setf efar-state
+	(efar-check-state-file-version
+	 (with-temp-buffer
+	   (insert-file-contents efar-state-file-name)
+	   (cl-assert (eq (point) (point-min)))
+	   (read (current-buffer))))))
 
 (defun efar-check-state-file-version(state)
   "Check version of STATE file and upgrade it if necessary."
@@ -888,21 +889,30 @@ Notifications in the queue will be processed only if there are no new notificati
 Do necessary changes in STATE in order to switch
 from version FROM-VERSION to actual version."
   (let ((copy (copy-hash-table state)))
+    (setq efar-state copy)
     (condition-case err
 	(progn
 	  ;; 0.9 -> 1.0
 	  (when (< from-version 1.0)
 	    ;; transform :directory-history to keep date
-	    (let ((dir-history (mapcar (lambda(e) (cons (car e) (list (cons :side (cdr e)) (cons :time (current-time)))))				     
-				     (gethash :directory-history copy))))
-	      (puthash :directory-history dir-history copy))
-	      
+	    (let ((dir-history (mapcar (lambda(e) (cons (car e) (list (cons :side (cdr e)) (cons :time nil))))
+				     (gethash :directory-history efar-state))))
+	      (puthash :directory-history dir-history efar-state))
+
+	    ;; add file-history
+	    (puthash :file-history '() efar-state)
+	    (efar-set 1 :panels :left :view :file-hist :column-number)
+	    (efar-set '(:long) :panels :left :view :file-hist :file-disp-mode)
+	    (efar-set 1 :panels :right :view :file-hist :column-number)
+	    (efar-set '(:long) :panels :right :view :file-hist :file-disp-mode)
+
+	    
 	    (message "State file upgraded to version 1.0")))
       (error
        (message (format "Error occured during upgrading state file: %s. State file skipped." (error-message-string err)))
-       (setf copy nil)))
+       (setf efar-state nil)))
       
-      copy))
+      efar-state))
 
 ;;------------------------------------------------------------------
 ;; efar file operations
@@ -930,7 +940,7 @@ from version FROM-VERSION to actual version."
 (defun efar-copy-or-move-files(operation)
   "Copy or move selected files depending on OPERATION."
   (unwind-protect
-      (progn	
+      (progn
 	(efar-with-notification-disabled
 	 (let* ((side (efar-get :current-panel))
 		(todir  (let ((todir (efar-get :panels (efar-other-side) :dir)))
@@ -1521,6 +1531,17 @@ When FOR-READ? is t switch back to eFar buffer."
 	;; if file opened for reading only then goto back to eFar
 	(when for-read?
 	  (select-window (get-buffer-window (get-buffer efar-buffer-name))))
+
+	;; add file to the list of last opned files
+	(when (not for-read?)
+	  (let* ((current-hist (efar-get :file-history))
+		 (new-hist (cl-subseq (cl-remove-if (lambda(e) (equal file (car e))) current-hist)
+				      0 (when (> (length current-hist) efar-max-items-in-directory-history)
+					  (- efar-max-items-in-directory-history 1)))))
+	    (push (cons file (list (cons :side side)  (cons :time (current-time)))) new-hist)
+	    
+	    (efar-set new-hist :file-history)))
+
 	
 	buffer))))
 
@@ -1816,7 +1837,7 @@ When FOR-READ? is t switch back to eFar buffer."
   (let ((mode (efar-get :mode))
 	(file (car (efar-selected-files side t t t)))
 	(width (efar-panel-width side))
-	(status-string "Non-existing or not-accessible file!"))
+	(status-string (if (efar-get :panels side :files) "Non-existing or not-accessible file!" "")))
 
     (when (or (equal mode :both) (equal mode side))
       (when (and file
@@ -1931,7 +1952,7 @@ otherwise redraw all."
 				    ;; current file to output
 				    ((file (nth cnt files))
 				     ;; remember current position
-				     (p (point))				     
+				     (p (point))
 				     ;; is current file marked?
 				     (marked? (member (+ (efar-get :panels side :start-file-number) cnt) (efar-get :panels side :selected)))
 				     ;; is it existing file?
@@ -1959,7 +1980,7 @@ otherwise redraw all."
 											 (concat file-name
 												 (when (nth 13 file) (format " (%s)" (length (nth 13 file))))))
 											
-											((equal panel-mode :dir-hist)
+											((or (equal panel-mode :dir-hist) (equal panel-mode :file-hist))
 											 (concat (when (nth 13 file) (format-time-string "%Y-%m-%d   " (nth 13 file))) file-name))
 											
 											(t file-name))))
@@ -1968,7 +1989,9 @@ otherwise redraw all."
 							       
 							       column-width
 							       ;; cut string from beginn or from end?
-							       (and (eq :long disp-mode) (not (eq panel-mode :dir-hist))))))
+							       (and (eq :long disp-mode)
+								    (not (cl-member panel-mode '(:dir-hist :file-hist)))))))
+							       
 				  ;; output string
 				  (replace-rectangle p (+ p (length str)) str)
 				  
@@ -2300,7 +2323,7 @@ When SKIP-NON-EXISTING? is t then non-existing files removed from the list."
   "Abort current operation."
   (when (string-empty-p (efar-get :fast-search-string))
     (let ((side (efar-get :current-panel)))
-      (when (cl-member (efar-get :panels side :mode) '(:search :bookmark :dir-hist :disks))
+      (when (cl-member (efar-get :panels side :mode) '(:search :bookmark :dir-hist :file-hist :disks))
 	(efar-go-to-dir (efar-last-visited-dir side) side)
 	(efar-write-enable (efar-redraw)))))
   (efar-quit-fast-search))
@@ -2312,7 +2335,7 @@ When SKIP-NON-EXISTING? is t then non-existing files removed from the list."
 	  (cl-loop for d in (efar-get :directory-history) do
 		   (when (equal (cdr (assoc :side d)) side)
 		     (throw 'dir (car d)))))
-	(user-emacs-directory))))
+	user-emacs-directory)))
 
 (defun efar-change-file-disp-mode()
   "Change file display mode.
@@ -2422,9 +2445,9 @@ Truncate string to WIDTH characters."
 (defun efar-show-directory-history(&optional side)
   "Show list of last visited directories in panel SIDE."
   (let ((side (or side (efar-get :current-panel))))
-    (efar-set (mapcar (lambda(d) (let ((attrs (file-attributes (car d))))		
+    (efar-set (mapcar (lambda(d) (let ((attrs (file-attributes (car d))))
 				   (append (push (car d) attrs) (list (cdr (assoc :time (cdr d)))))))
-		      (efar-get :directory-history)) 
+		      (efar-get :directory-history))
 	      :panels side :files)
     
     (efar-set "Directory history" :panels side :dir)
@@ -2435,6 +2458,51 @@ Truncate string to WIDTH characters."
   (efar-calculate-widths)
   (efar-write-enable (efar-redraw)))
 
+(defun efar-show-file-history(&optional side)
+  "Show list of last edited files in panel SIDE."
+  (let ((side (or side (efar-get :current-panel))))
+    (efar-set (mapcar (lambda(d) (let ((attrs (file-attributes (car d))))
+				   (append (push (car d) attrs) (list (cdr (assoc :time (cdr d)))))))
+		      (efar-get :file-history))
+	      :panels side :files)
+    
+    (efar-set "File history" :panels side :dir)
+    (efar-remove-notifier side)
+    (efar-set 0 :panels side :current-pos)
+    (efar-set :file-hist :panels side :mode))
+  
+  (efar-calculate-widths)
+  (efar-write-enable (efar-redraw)))
+
+(defconst efar-panel-modes '((:files . "Files")
+			     (:bookmark . "Bookmarks")
+			     (:dir-hist . "Directory history")
+			     (:file-hist . "File history")
+			     (:disks . "Disks/mount points")
+			     (:search . "Search results")))
+
+(defun efar-show-mode-selector()
+  "Show selector of panel modes.
+Current panel switched to selected mode."
+  (let* ((side (efar-get :current-panel))
+	 (current-mode (efar-get :panels side :mode))
+	 (new-mode (car (rassoc (ido-completing-read "Switch to mode: "
+					(mapcar (lambda(m) (cdr m))
+						(append (list (cons current-mode (cdr (assoc current-mode efar-panel-modes))))
+							(cl-remove-if (lambda(m) (equal current-mode (car m))) efar-panel-modes))))
+				efar-panel-modes))))
+
+    (pcase new-mode
+      (:files (efar-go-to-dir (efar-last-visited-dir side) side))
+      (:dir-hist (efar-show-directory-history side))
+      (:file-hist (efar-show-file-history side))
+      (:bookmark (efar-show-bookmarks side))
+      (:disks (efar-show-disk-selector))
+      (:search (efar-show-search-results t side)))
+
+    (efar-write-enable (efar-redraw))
+    (efar-quit-fast-search)))
+    
 (defun efar-add-bookmark()
   "Add file under cursor to bookmark list."
   (let ((current-file-entry (caar (efar-selected-files (efar-get :current-panel) t)))
