@@ -21,6 +21,7 @@ When Efar is called with universal argument, default-directory of actual buffer 
 * go to first/last file in current directory - **\<home\>/\<end\> or \<C-left\>/\<C-right\>**
 * enter directory under cursor - **RET**
 * switch to other panel - **TAB**
+* open current directory in other panel - **C-c TAB**
 * fast navigation to the file with specific name in current directory - **just start typing any part of file name**
 * you also can include \'*\' into the search string, then search string is used as a wildcard
 * **C-s/C-r** to go to next/previous occurrence, **C-g** to quit fast search mode
