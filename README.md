@@ -25,6 +25,7 @@ When Efar is called with universal argument, default-directory of actual buffer 
 * you also can include \'*\' into the search string, then search string is used as a wildcard
 * **C-s/C-r** to go to next/previous occurrence, **C-g** to quit fast search mode
 * go to the given directory - **C-c c d**
+* go to the parent directory - **\<C-up\>**
 
 ### Appearance
 * change mode double-panel <-> single-panel - **C-c v M**
@@ -69,6 +70,11 @@ When Efar is called with universal argument, default-directory of actual buffer 
 ### Last visited directories
 * display list of last visited directories - **C-c c h**
 * go to the directory from the list of last visited directories - **RET**
+* when panel is in file mode you can loop over last visited directories by **\<C-M-up\>** and **\<C-M-down\>**
+
+### Panel mode selector
+* Selector of available panel modes can be displayed by **C-c c m**
+* Current panel is switched to selected mode
 
 ### Bookmarks
 * add file/directory under cursor to bookmark list - **C-c c B**
