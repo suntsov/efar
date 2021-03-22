@@ -90,7 +90,7 @@ When Efar is called with universal argument, default-directory of actual buffer 
 * eFar buffer is automatically refreshed when content of displayed directories changes in outside world
 
 ### Help
-* display list of all available key bindigs - **C-?**
+* display list of all available key bindigs - **C-c ?**
 
 ### Customization
 * numerous customizable parameters including key bindings and faces available via **M-x customize**
