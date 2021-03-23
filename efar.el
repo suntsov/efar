@@ -40,9 +40,9 @@
 (require 'subr-x)
 (require 'filenotify)
 (require 'dired)
+(require 'comint)
 
-(defconst efar-version 1.0
-  "Current eFar version number.")
+(defconst efar-version 1.0 "Current eFar version number.")
 
 (defvar efar-state nil)
 ;;variables for file search
@@ -874,7 +874,7 @@ Notifications in the queue will be processed only if there are no new notificati
 	(efar-check-state-file-version
 	 (with-temp-buffer
 	   (insert-file-contents efar-state-file-name)
-	   (cl-assert (eq (point) (point-min)))
+	   (cl-assert (bobp))
 	   (read (current-buffer))))))
 
 (defun efar-check-state-file-version(state)
@@ -1236,7 +1236,7 @@ If a double mode is active then actual panel becomes fullscreen."
 	   ($file-list
 	    (if @fname
 		(progn (list @fname))
-	      (if (string-equal major-mode "dired-mode")
+	      (if (eq major-mode 'dired-mode)
 		  (dired-get-marked-files)
 		(list (buffer-file-name)))))
 	   ($do-it-p (if (<= (length $file-list) 5)
@@ -1247,7 +1247,8 @@ If a double mode is active then actual panel becomes fullscreen."
 	 ((string-equal system-type "windows-nt")
 	  (mapc
 	   (lambda ($fpath)
-	     (w32-shell-execute nil $fpath)) $file-list))
+	     (let ((f 'w32-shell-execute))
+	       (funcall f nil $fpath))) $file-list))
 	 ((string-equal system-type "darwin")
 	  (mapc
 	   (lambda ($fpath)
@@ -1294,7 +1295,7 @@ K is a character typed by the user."
     
     ;; if user entered at least one character
     ;; we can navigate to file(s) with matching name
-    (when (and (not (null str))
+    (when (and str
 	       (not (string-empty-p  str)))
       
       ;; if user pressed DEL
@@ -1337,7 +1338,7 @@ K is a character typed by the user."
 (defun efar-quit-fast-search(&optional no-refresh?)
   "Quite fast search mode.
 When NO-REFRESH? is t the no eFar redraw occurs."
-  (unless (null efar-state)
+  (when efar-state
     (efar-set nil :fast-search-string)
     ;;    (efar-reset-status)
     (efar-set 0 :fast-search-occur)
@@ -1555,7 +1556,7 @@ When FOR-READ? is t switch back to eFar buffer."
 	    (if case-fold-search
 		(setq string (downcase string)))
 	    (isearch-process-search-string string
-					   (mapconcat 'isearch-text-char-description string ""))))
+					   (mapconcat #'isearch-text-char-description string ""))))
 	
 	;; if file opened for editing unmark its buffer to prevent auto kill of the buffer
 	(when (and (equal buffer (efar-get :last-auto-read-buffer))
@@ -1615,7 +1616,7 @@ When FOR-READ? is t switch back to eFar buffer."
 					 (> (length filter) 0 )
 					 (not (string-match (wildcard-to-regexp filter) (car f))))
 				    (and efar-fast-search-filter-enabled?
-					 (not (null fast-search-string))
+					 fast-search-string
 					 (not (string-match (if (cl-position ?* fast-search-string) (wildcard-to-regexp fast-search-string) fast-search-string)
 							    (if (equal (car (efar-get :panels side :view (efar-get :panels side :mode) :file-disp-mode)) :long)
 								(car f)
@@ -1936,7 +1937,7 @@ When FOR-READ? is t switch back to eFar buffer."
     
     (when (or (equal mode :both) (equal mode side))
       (when (and file
-		 (not (null (efar-get :panels side :files)))
+		 (efar-get :panels side :files)
 		 (or (equal mode :both) (equal mode side)))
 	
 	(let ((file-short-name (efar-get-short-file-name file)))
@@ -1968,7 +1969,7 @@ When FOR-READ? is t switch back to eFar buffer."
 		    (car (efar-get :column-widths))
 		  (cdr (efar-get :column-widths)))))
     
-    (+ (apply '+ widths)
+    (+ (apply #'+ widths)
        (- (length widths) 1))))
 
 
@@ -2040,7 +2041,7 @@ otherwise redraw all."
 				
 				;; calculate start output position for column and move to it
 				(move-to-column (+ start-column
-						   (apply '+ (cl-subseq widths 0 col))
+						   (apply #'+ (cl-subseq widths 0 col))
 						   col))
 				
 				(let*
@@ -2384,9 +2385,9 @@ Saves eFar state and kills all subprocesses."
       (efar-save-state))))
 
 ;; hooks
-(add-hook 'window-size-change-functions 'efar-frame-size-changed)
-(add-hook 'kill-buffer-hook 'efar-buffer-killed)
-(add-hook 'kill-emacs-hook 'efar-emacs-killed)
+(add-hook 'window-size-change-functions #'efar-frame-size-changed)
+(add-hook 'kill-buffer-hook #'efar-buffer-killed)
+(add-hook 'kill-emacs-hook #'efar-emacs-killed)
 
 (defun efar-get-root-directory(path)
   "Return a root directory for given PATH."
@@ -3207,6 +3208,6 @@ BUTTON is a button clicked."
       (if ignore-case?
 	  (setq text (downcase text)))
       (isearch-process-search-string text
-				     (mapconcat 'isearch-text-char-description text "")))))
+				     (mapconcat #'isearch-text-char-description text "")))))
 
 ;;; efar.el ends here
