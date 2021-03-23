@@ -21,8 +21,12 @@ When Efar is called with universal argument, default-directory of actual buffer 
 * go to first/last file in current directory - **\<home\>/\<end\> or \<C-left\>/\<C-right\>**
 * enter directory under cursor - **RET**
 * switch to other panel - **TAB**
-* fast navigation to the file with specific name in current directory - **just start typing any part of file name (C-s/C-r to go to next/previous occurrence, C-g quit fast search mode)**
+* open current directory in other panel - **C-c TAB**
+* fast navigation to the file with specific name in current directory - **just start typing any part of file name**
+* you also can include \'*\' into the search string, then search string is used as a wildcard
+* **C-s/C-r** to go to next/previous occurrence, **C-g** to quit fast search mode
 * go to the given directory - **C-c c d**
+* go to the parent directory - **\<C-up\>**
 
 ### Appearance
 * change mode double-panel <-> single-panel - **C-c v M**
@@ -67,6 +71,11 @@ When Efar is called with universal argument, default-directory of actual buffer 
 ### Last visited directories
 * display list of last visited directories - **C-c c h**
 * go to the directory from the list of last visited directories - **RET**
+* when panel is in file mode you can loop over last visited directories by **\<C-M-up\>** and **\<C-M-down\>**
+
+### Panel mode selector
+* Selector of available panel modes can be displayed by **C-c c m**
+* Current panel is switched to selected mode
 
 ### Bookmarks
 * add file/directory under cursor to bookmark list - **C-c c B**
@@ -81,7 +90,7 @@ When Efar is called with universal argument, default-directory of actual buffer 
 * eFar buffer is automatically refreshed when content of displayed directories changes in outside world
 
 ### Help
-* display list of all available key bindings - **C-?**
+* display list of all available key bindigs - **C-c ?**
 
 ### Customization
 * numerous customizable parameters including key bindings and faces available via **M-x customize**
