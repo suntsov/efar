@@ -972,8 +972,8 @@ from version FROM-VERSION to actual version."
 						     (when (equal (length files) 1) (efar-get-short-file-name (car files))))))
 	       
 	       (efar-set-status (if (equal operation :copy)
-					  "Copying files..."
-					"Moving files..."))
+				    "Copying files..."
+				  "Moving files..."))
 	       
 	       (efar-copy-or-move-files-int (pcase operation
 					      (:copy :copy)
@@ -2095,10 +2095,10 @@ otherwise redraw all."
 					 (cond
 					  ((and (not exists?) current?) 'efar-non-existing-current-file-face)
 					  ((not exists?) 'efar-non-existing-file-face)
-
+					  
 					  ((and current? marked?) 'efar-marked-current-face)
 					  ((and (not current?) marked?) 'efar-marked-face)
-
+					  
 					  ((and dir? current?) 'efar-dir-current-face)
 					  ((and file? current?) 'efar-file-current-face)
 					  ((and dir? (not current?)) 'efar-dir-face)
@@ -2178,7 +2178,7 @@ otherwise from the end."
 	     (col-number (cond
 			  ((not (equal mode :both))  (- (floor (window-width) 2) (floor (length dir) 2)))
 			  (t (- (* (floor (window-width) 4) (if (equal side :left) 1 3)) (floor (length dir) 2))))))
-	
+	(when (< col-number 0) (setf col-number 0))
 	(move-to-column col-number)
 	
 	(let ((p (point)))
@@ -3084,6 +3084,9 @@ We do text search parallel sending files one by one to all subprocesses by turns
     (efar-set result-string :panels side :dir)
     
     (efar-remove-notifier side)
+    
+    (when (not (equal :search (efar-get :panels side :mode)))
+      (efar-set 0 :panels side :current-pos))
     
     (efar-set :search :panels side :mode)
     
