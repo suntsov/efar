@@ -125,7 +125,7 @@
   :type 'boolean)
 
 (defcustom efar-auto-read-files t
-  "Automatically show contentof the file under cursor in other buffer."
+  "Automatically show content of the file under cursor in other buffer."
   :group 'efar-parameters
   :type 'boolean)
 
@@ -377,18 +377,18 @@ IGNORE-IN-MODES is a list of modes which should ignore this key binding."
 
 (efar-register-key (kbd "<insert>") 'efar-mark-file   nil 'efar-mark-file-key
 		   "mark item under cursor" t (list :file-hist :dir-hist :bookmark :disks :search))
-(efar-register-key (kbd "<C-insert>") 'efar-deselect-all  nil 'efar-deselect-all-kay
+(efar-register-key (kbd "<C-insert>") 'efar-deselect-all  nil 'efar-deselect-all-key
 		   "unmark all items in the list" :space-after (list :file-hist :dir-hist :bookmark :disks :search))
 
 (efar-register-key (kbd "TAB")   'efar-switch-to-other-panel nil 'efar-switch-to-other-panel-key
 		   "switch to other panel" t)
-(efar-register-key (kbd "C-c TAB")  'efar-open-dir-other-panel nil 'efar-open-dir-othet-panel-key
+(efar-register-key (kbd "C-c TAB")  'efar-open-dir-other-panel nil 'efar-open-dir-other-panel-key
 		   "open current directory in other panel" :space-after)
 
 (efar-register-key (kbd "<f4>")   'efar-edit-file   nil 'efar-open-file-key
 		   "edit file under cursor" t)
 (efar-register-key (kbd "<M-f4>")  'efar-open-file-in-ext-app nil 'efar-open-file-in-ext-app-key
-		   "open file under cursor in externall application" t)
+		   "open file under cursor in external application" t)
 (efar-register-key (kbd "<f3>")  'efar-edit-file   t 'efar-read-file-key
 		   "show content of the file in other window" :space-after)
 
@@ -434,7 +434,7 @@ IGNORE-IN-MODES is a list of modes which should ignore this key binding."
 		   "show frame with all key bindings" t)
 (efar-register-key (kbd "C-c c b") 'efar-change-panel-mode  :bookmark 'efar-show-bookmarks-key
 		   "show bookmarks" t)
-(efar-register-key (kbd "C-c c B") 'efar-add-bookmark  nil 'efar-add-boormark-key
+(efar-register-key (kbd "C-c c B") 'efar-add-bookmark  nil 'efar-add-bookmark-key
 		   "add item under cursor to the bookmarks" t)
 (efar-register-key (kbd "C-c c h") 'efar-change-panel-mode  :dir-hist 'efar-show-directory-history-key
 		   "show last visited directories" t)
@@ -487,7 +487,7 @@ IGNORE-IN-MODES is a list of modes which should ignore this key binding."
 ;;--------------------------------------------------------------------------------
 ;;;###autoload
 (defun efar(arg)
-  "Main funtion to run eFar commander.
+  "Main function to run eFar commander.
 Argument ARG: when t open default directory of current buffer."
   (interactive "P")
   (let
@@ -844,7 +844,7 @@ Notifications in the queue will be processed only if there are no new notificati
 ;;--------------------------------------------------------------------------------
 
 (defun efar-remove-file-state()
-  "Remove eFar state file.  Could be helpfull in case of errors during startup."
+  "Remove eFar state file.  Could be helpful in case of errors during startup."
   (interactive)
   (delete-file efar-state-file-name))
 
@@ -1181,7 +1181,7 @@ mode is not in the list IGNORE-IN-MODES."
 		   (efar-write-enable (efar-redraw)))))
 
 (defun efar-cd()
-  "Open directory selector (read-diretory-name) and go to selected directory."
+  "Open directory selector (read-directory-name) and go to selected directory."
   (efar-go-to-dir (read-directory-name "Go to directory: " default-directory))
   (efar-write-enable (efar-redraw)))
 
@@ -1507,7 +1507,7 @@ Do that for current panel or for panel SIDE if it's given."
     (nth (efar-current-file-number side) (efar-get :panels side :files))))
 
 (defun efar-other-side(&optional side)
-  "Return opposite panel to curent panel or to panel SIDE if one is given.
+  "Return opposite panel to current panel or to panel SIDE if one is given.
 :left <-> :right"
   (let ((side (if side side (efar-get :current-panel))))
     (if (equal side :left) :right :left)))
@@ -1929,7 +1929,7 @@ When FOR-READ? is t switch back to eFar buffer."
     (file-name-nondirectory (nth 0 file))))
 
 (defun efar-output-file-details(side)
-  "Output detailes of the file under cursor in panel SIDE."
+  "Output details of the file under cursor in panel SIDE."
   (let ((mode (efar-get :mode))
 	(file (car (efar-selected-files side t t t)))
 	(width (efar-panel-width side))
@@ -2533,7 +2533,7 @@ Truncate string to WIDTH characters."
 	    (int-file-size current-file-entry))
 	  
 	  ;; output stat in the status line
-	  (efar-set-status (format (concat "%d bytes (%s) in %d directries and %d files."
+	  (efar-set-status (format (concat "%d bytes (%s) in %d directories and %d files."
 					   (unless (zerop skipped) " %d directories skipped (no access)." ))
 				   size (efar-file-size-as-string size) dirs files skipped)
 			   nil t)
@@ -2870,7 +2870,7 @@ Message consists of MESSAGE-TYPE and DATA."
 		   (efar-search-kill-all-processes)
 		   (make-thread 'efar-run-search-processes)
 		   (efar-search-finished)
-		   (efar-set-status (concat "Error occured during search: " data)))))
+		   (efar-set-status (concat "Error occurred during search: " data)))))
 
 (defun efar-search-int-start-search(args)
   "Start file search with parameters defined in ARGS in the subprocess.
@@ -2893,7 +2893,7 @@ Executed in search manager process."
 Does the search for files in directory DIR.
 Files should match file mask WILDCARD.
 When TEXT is not nil given string is searched in the files.
-When REGEXP? is t text is tritted as regular expression.
+When REGEXP? is t text is treated as regular expression.
 Case is ignored when IGNORE-CASE? is t."
   ;; loop over all entries in the DIR
   (cl-loop for entry in (cl-remove-if (lambda(e) (or (string= (car e) ".") (string= (car e) ".."))) (directory-files-and-attributes dir nil nil t)) do
