@@ -1833,6 +1833,7 @@ When FOR-READ? is t switch back to eFar buffer."
 	 (mode (efar-get :panels side :mode))
 	 (root? (or (not (equal mode :files))
 		    (efar-is-root-directory (efar-get :panels side :dir)))))
+
     (efar-set
      ;; if we are not in the root directory, we add entry to go up
      (append (unless root? (list (list ".." t)))
@@ -1907,6 +1908,7 @@ When FOR-READ? is t switch back to eFar buffer."
 	      
 	      side))
      :panels side :files)
+    
     (efar-set '() :panels side :selected)))
 
 (defun efar-move-cursor(direction &optional no-auto-read?)
@@ -2070,11 +2072,13 @@ When NO-AUTO-READ? is t then no auto file read happens."
   "Enter directory under cursor or parent directory when GO-TO-PARENT? is t."
   (let* ((side (efar-get :current-panel))
 	 (current-dir-path (efar-get :panels side :dir))
-	 (file (if go-to-parent?
+	 (selected-file (car (efar-selected-files side t t)))
+	 (file (if (or go-to-parent?
+		       (equal (car selected-file) ".."))
 		   ;; get parent directory
-		   (list (efar-get-parent-dir current-dir-path) t)
+		   (list (efar-get-accessible-directory-in-path (efar-get-parent-dir current-dir-path)) t)
 		 ;; get directory under cursor
-		 (car (efar-selected-files side t t)))))
+		 selected-file)))
     (efar-quit-fast-search 'no-refresh)
     (when (or
 	   ;; file is a normal directory
@@ -2119,6 +2123,7 @@ When NO-AUTO-READ? is t then no auto file read happens."
   (efar-quit-fast-search)
   (when (equal (efar-get :mode) :both)
     (let ((side (efar-get :current-panel)))
+
       (if (equal side  :left)
 	  (progn
 	    (efar-set :right :current-panel)
