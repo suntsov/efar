@@ -404,11 +404,11 @@ IGNORE-IN-MODES is a list of modes which should ignore this key binding."
 
 
 (efar-register-key (kbd "S-C-<left>")  'efar-move-splitter  :left 'efar-move-splitter-left-key
-		   "ToDo" t)
+		   "move splitter between panels to the left" t)
 (efar-register-key (kbd "S-C-<right>")  'efar-move-splitter  :right 'efar-move-splitter-right-key
-		   "ToDo" t)
+		   "move splitter between panels to the right" t)
 (efar-register-key (kbd "S-C-<down>")  'efar-move-splitter  :center 'efar-move-splitter-center-key
-		   "ToDo" t)
+		   "Center the splitter between panels" t)
 (efar-register-key (kbd "C-c f d") 'efar-change-panel-mode  :disks 'efar-show-disk-selector-key
 		   "show list of available disks (Windows) or mount points (Unix)" t)
 (efar-register-key (kbd "C-c f s") 'efar-change-sort-function  nil 'efar-change-sort-key
