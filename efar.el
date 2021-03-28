@@ -1,6 +1,6 @@
 ;;; efar.el --- FAR-like file manager -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2021 Free Software Foundation, Inc.
+;; Copyright (C) 2021 Vladimir Suntsov
 
 ;; Author: "Vladimir Suntsov" <vladimir@suntsov.online>
 ;; Maintainer: vladimir@suntsov.online
@@ -45,6 +45,7 @@
 (defconst efar-version 1.1 "Current eFar version number.")
 
 (defvar efar-state nil)
+(defvar efar-mouse-down? nil)
 ;;variables for file search
 (defvar efar-search-processes '())
 (defvar efar-search-process-manager nil)
@@ -367,7 +368,7 @@ IGNORE-IN-MODES is a list of modes which should ignore this key binding."
 		   "loop over directories in directory history forward" t)
 (efar-register-key (kbd "C-M-<up>") 'efar-go-directory-history-cicle :backward 'efar-prev-directory-in-history-key
 		   "loop over directories in directory history backward" t)
-(efar-register-key (kbd "RET") '((:files . efar-enter-directory) (:dir-hist . efar-navigate-to-file) (:file-hist . efar-navigate-to-file) (:bookmark . efar-navigate-to-file) (:disks . efar-change-disk) (:search . efar-navigate-to-file))  nil  'efar-enter-directory-key
+(efar-register-key (kbd "RET") '((:files . efar-enter-directory) (:dir-hist . efar-navigate-to-file) (:file-hist . efar-navigate-to-file) (:bookmark . efar-navigate-to-file) (:disks . efar-switch-to-disk) (:search . efar-navigate-to-file))  nil  'efar-enter-directory-key
 		   "go into or to the item under cursor" :space-after)
 
 (efar-register-key (kbd "M-<down>") 'efar-scroll-other-window :down 'efar-scroll-other-down-key
@@ -1233,6 +1234,8 @@ The point where mouse click occurred determined out of EVENT parameters."
 	 (props (plist-get (text-properties-at pos) :control))
 	 (side (cdr (assoc :side props)))
 	 (control (cdr (assoc :control props))))
+
+    (setf efar-mouse-down? t)
     
     ;; when clicked on file entry select it
     (when (equal control :file-pos)
@@ -1254,6 +1257,8 @@ The start and end points of drag&drop action determined out of EVENT parameters.
 	 (operation (if (equal "C-drag-mouse-1" (symbol-name click-type))
 			:copy :move)))
 
+    (setf efar-mouse-down? nil)
+    
     (let ((destination (nth 0 (nth 2 event))))
       
       (pcase (type-of destination)
@@ -2152,7 +2157,9 @@ When NO-AUTO-READ? is t then no auto file read happens."
     ;; output details about files under cursor
     (efar-output-file-details :left)
     (efar-output-file-details :right)
-    
+    ;; during drag we show hand pointer
+    (when efar-mouse-down?
+      (put-text-property (point-min) (point-max) 'pointer 'hand))
     (efar-set-status "Ready")))
 
 (defun efar-reinit()
@@ -2745,14 +2752,16 @@ When SKIP-NON-EXISTING? is t then non-existing files removed from the list."
   (efar-quit-fast-search))
 
 (defun efar-last-visited-dir(&optional thing)
-  "Return last visited directory for the panel SIDE."
+  "Return last visited directory for the THING.
+THING could be :left or :right.  In this case it indicates corresponding panel.
+Or it could be a string representing Windows drive letter."
   (let ((thing (or thing (efar-get :current-panel))))
     (or (catch 'dir
 	  (cl-loop for d in (efar-get :directory-history) do
 		   (when (or (and (symbolp thing)
 				  (equal (cdr (assoc :side d)) thing))
 			     (and (stringp thing)
-				  (equal (efar-get-root-directory (car d)) (file-name-as-directory thing)))) 
+				  (equal (efar-get-root-directory (car d)) (file-name-as-directory thing))))
 		     (throw 'dir (car d)))))
 	(if (symbolp thing)
 	    user-emacs-directory
@@ -2968,8 +2977,8 @@ Current panel switched to selected mode."
       (efar-calculate-widths)
       (efar-write-enable (efar-redraw)))))
 
-(defun efar-change-disk()
-  ""
+(defun efar-switch-to-disk()
+  "Change to the selected Windows drive or Unix mount point."
   (let ((entry (caar (efar-selected-files (efar-get :current-panel) t nil t))))
     (efar-quit-fast-search)
     (when entry
