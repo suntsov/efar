@@ -45,7 +45,6 @@
 (defconst efar-version 1.1 "Current eFar version number.")
 
 (defvar efar-state nil)
-(defvar efar-pointer 'arrow)
 ;;variables for file search
 (defvar efar-search-processes '())
 (defvar efar-search-process-manager nil)
@@ -368,7 +367,7 @@ IGNORE-IN-MODES is a list of modes which should ignore this key binding."
 		   "loop over directories in directory history forward" t)
 (efar-register-key (kbd "C-M-<up>") 'efar-go-directory-history-cicle :backward 'efar-prev-directory-in-history-key
 		   "loop over directories in directory history backward" t)
-(efar-register-key (kbd "RET") '((:files . efar-enter-directory) (:dir-hist . efar-navigate-to-file) (:file-hist . efar-navigate-to-file) (:bookmark . efar-navigate-to-file) (:disks . efar-navigate-to-file) (:search . efar-navigate-to-file))  nil  'efar-enter-directory-key
+(efar-register-key (kbd "RET") '((:files . efar-enter-directory) (:dir-hist . efar-navigate-to-file) (:file-hist . efar-navigate-to-file) (:bookmark . efar-navigate-to-file) (:disks . efar-change-disk) (:search . efar-navigate-to-file))  nil  'efar-enter-directory-key
 		   "go into or to the item under cursor" :space-after)
 
 (efar-register-key (kbd "M-<down>") 'efar-scroll-other-window :down 'efar-scroll-other-down-key
@@ -1234,8 +1233,6 @@ The point where mouse click occurred determined out of EVENT parameters."
 	 (props (plist-get (text-properties-at pos) :control))
 	 (side (cdr (assoc :side props)))
 	 (control (cdr (assoc :control props))))
-  
-    (setf efar-pointer (if (equal control :splitter) 'hdrag 'hand))
     
     ;; when clicked on file entry select it
     (when (equal control :file-pos)
@@ -1323,9 +1320,7 @@ The start and end points of drag&drop action determined out of EVENT parameters.
 	
 	
 	;; DRAG&DROP OUTSIDE EMACS (not suported)
-	('frame (message-box "Drag&drop to outside world is not supported.")))
-      
-      (setf efar-pointer 'arrow))))
+	('frame (message-box "Drag&drop to outside world is not supported."))))))
 
 
 (defun efar-process-mouse-click(event)
@@ -1338,8 +1333,6 @@ The point where mouse click occurred determined out of EVENT parameters."
 	 (side (cdr (assoc :side props)))
 	 (control (cdr (assoc :control props))))
     
-     (setf efar-pointer 'arrow)
-
      ;; when single click on a file entry - auto read file
      (when (and (equal control :file-pos)
 		(equal click-type 'mouse-1))
@@ -2159,8 +2152,6 @@ When NO-AUTO-READ? is t then no auto file read happens."
     ;; output details about files under cursor
     (efar-output-file-details :left)
     (efar-output-file-details :right)
-    ;; apply property with mouse-pointer
-    (put-text-property (point-min) (point-max) 'pointer efar-pointer)
     
     (efar-set-status "Ready")))
 
@@ -2369,11 +2360,13 @@ otherwise redraw all."
 	  
 	  (setf str (substring (efar-get :panels side :sort-function-name) 0 1))
 	  (efar-place-item col 1 str 'efar-header-face nil nil nil nil nil
-			   (list (cons :side side) (cons :control :sort-func)))
+			   (list (cons :side side) (cons :control :sort-func))
+			   'hand)
 
 	  (setf str (if (efar-get :panels side :sort-order) (char-to-string 9660) (char-to-string 9650)))
 	  (efar-place-item (+ col 1) 1 str 'efar-header-face nil nil nil nil nil
-			   (list (cons :side side) (cons :control :sort-order))))
+			   (list (cons :side side) (cons :control :sort-order))
+			   'hand))
 	
 	;; output filter string
 	(unless (and (string-empty-p filter)
@@ -2387,7 +2380,8 @@ otherwise redraw all."
 	;; output control for changing column number and panel mode
 	(setf str (concat "- " (int-to-string column-number) " +"))
 	(efar-place-item nil 1 str 'efar-header-face nil nil side :center nil
-			 (list (cons :side side) (cons :control :col-number)))
+			 (list (cons :side side) (cons :control :col-number))
+			 'hand)
 
 	;; output panel mode switcher
 	(when (equal (efar-get :panels side :mode) :files)
@@ -2396,14 +2390,16 @@ otherwise redraw all."
 	 	      (:long "L")
 	 	      (:detailed "D")))
 	  (efar-place-item (+ col (- (efar-panel-width side) 3)) 1 str 'efar-header-face nil nil nil nil nil
-			   (list (cons :side side) (cons :control :file-disp-mode))))
+			   (list (cons :side side) (cons :control :file-disp-mode))
+			   'hand))
 	
 	;; output maximize/minimize control
 	(setf str (if (equal (efar-get :mode) :both)
 	 	      (char-to-string 9633)
 	 	    (char-to-string 8213)))
 	(efar-place-item (+ col (- (efar-panel-width side) 1)) 1 str 'efar-header-face nil nil nil nil nil
-			   (list (cons :side side) (cons :control :maximize)))))))
+			 (list (cons :side side) (cons :control :maximize))
+			 'hand)))))
 
 (defun efar-prepare-string(str len &optional cut-from-beginn? dont-fill?)
   "Prepare file name STR.
@@ -2426,7 +2422,7 @@ Unless DONT-FILL? fill string with spaces if it shorter than LEN."
 	  (t
 	   str))))
 
-(defun efar-place-item(column line text face &optional max-length cut-from-beginn? side start-pos fill? control-params)
+(defun efar-place-item(column line text face &optional max-length cut-from-beginn? side start-pos fill? control-params pointer)
   "Outputs an UI item.
 Start output from COLUMN in LINE.
 TEXT is a string representing item.
@@ -2465,12 +2461,14 @@ CONTROL-PARAMS - item is considered as control with given parameters"
 		
 		   (if (equal side :right)
 		       (+ (if (equal mode :both) 1 0) (efar-panel-width :left) (- (ceiling (efar-panel-width :right) 2) (floor length 2)))
-		     (- (ceiling (efar-panel-width :left) 2) (floor length 2))))))))
+		     (- (ceiling (efar-panel-width :left) 2) (floor length 2)))))))
+	 (pointer (or pointer 'arrow)))
     
     (move-to-column col)
     (let ((p (point)))
       (replace-rectangle p (+ p length) text)
       (put-text-property p (+ p length) 'face face)
+      (put-text-property p (+ p length) 'pointer pointer)
       (when control-params
 	(put-text-property p (+ p length) :control control-params)))))
 
@@ -2486,7 +2484,8 @@ CONTROL-PARAMS - item is considered as control with given parameters"
 		     'efar-dir-name-face)))
 	
 	(efar-place-item nil 0 dir face (efar-panel-width side) t side :center nil
-			 (list (cons :side side) (cons :switch-to-panel t) (cons :control :directory-name)))))))
+			 (list (cons :side side) (cons :switch-to-panel t) (cons :control :directory-name))
+			 'hand)))))
 
 (defun efar-draw-border()
   "Draw eFar border using pseudo graphic characters."
@@ -2589,7 +2588,8 @@ NEWLINE - if t the insert newline character."
 	       
 	       (when (and (equal mode :both) (equal s :left))
 		   (insert-char center 1)
-		   (put-text-property (- (point) 1) (point) :control (list (cons :control :splitter))))))
+		   (put-text-property (- (point) 1) (point) :control (list (cons :control :splitter)))
+		   (put-text-property (- (point) 1) (point) 'pointer 'hdrag))))
     (when newline
       (newline)
       (forward-line))))
@@ -2744,14 +2744,19 @@ When SKIP-NON-EXISTING? is t then non-existing files removed from the list."
 	(efar-write-enable (efar-redraw)))))
   (efar-quit-fast-search))
 
-(defun efar-last-visited-dir(&optional side)
+(defun efar-last-visited-dir(&optional thing)
   "Return last visited directory for the panel SIDE."
-  (let ((side (or side (efar-get :current-panel))))
+  (let ((thing (or thing (efar-get :current-panel))))
     (or (catch 'dir
 	  (cl-loop for d in (efar-get :directory-history) do
-		   (when (equal (cdr (assoc :side d)) side)
+		   (when (or (and (symbolp thing)
+				  (equal (cdr (assoc :side d)) thing))
+			     (and (stringp thing)
+				  (equal (efar-get-root-directory (car d)) (file-name-as-directory thing)))) 
 		     (throw 'dir (car d)))))
-	user-emacs-directory)))
+	(if (symbolp thing)
+	    user-emacs-directory
+	  thing))))
 
 (defun efar-change-file-disp-mode(&optional side)
   "Change file display mode in panel SIDE.
@@ -2963,7 +2968,14 @@ Current panel switched to selected mode."
       (efar-calculate-widths)
       (efar-write-enable (efar-redraw)))))
 
-
+(defun efar-change-disk()
+  ""
+  (let ((entry (caar (efar-selected-files (efar-get :current-panel) t nil t))))
+    (efar-quit-fast-search)
+    (when entry
+      (efar-go-to-dir (efar-last-visited-dir entry))
+      (efar-calculate-widths)
+      (efar-write-enable (efar-redraw)))))
 
 (defun efar-suggest-hint()
   "Display in the statusbar the next tip for key bindings."
