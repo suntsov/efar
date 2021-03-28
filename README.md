@@ -14,6 +14,9 @@ When Efar is called with universal argument, default-directory of actual buffer 
 ## Requirements
 * Emacs 26.1 or newer.
 
+## What's new in version 1.1
+* mouse interaction 
+
 ## Features
 
 ### Navigation
