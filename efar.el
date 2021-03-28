@@ -2141,7 +2141,7 @@ When NO-AUTO-READ? is t then no auto file read happens."
   (efar-calculate-window-size)
   (erase-buffer)
 
-  (if (< (efar-get :window-width) 40)
+  (if (< (efar-get :window-width) 30)
       (insert "eFar buffer is too narrow")
     ;; draw all border lines
     (efar-draw-border )
