@@ -14,6 +14,9 @@ When Efar is called with universal argument, default-directory of actual buffer 
 ## Requirements
 * Emacs 26.1 or newer.
 
+## What's new in version 1.1
+* mouse interaction 
+
 ## Features
 
 ### Navigation
@@ -88,6 +91,16 @@ When Efar is called with universal argument, default-directory of actual buffer 
 
 ### Auto refresh when files change
 * eFar buffer is automatically refreshed when content of displayed directories changes in outside world
+
+### Mouse interaction 
+Many operations within eFar buffer can be performed using mouse
+* Drag&Drop file items within eFar buffer to move them from one place to another
+* use **C-** modifier when dragging to copy files instead of moving
+* double click to enter directory
+* use **C-** and **S-** modifiers to mark files
+* click on the directory name at top to show disk/mout mount selector
+* use controls in the panel header to change sort order, file display mode, column number, etc.
+* drag or double click the splitter between panels to change the widths of panels
 
 ### Help
 * display list of all available key bindigs - **C-c ?**
