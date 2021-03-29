@@ -1331,8 +1331,10 @@ The start and end points of drag&drop action determined out of EVENT parameters.
 (defun efar-process-mouse-click(event)
   "Do actions when mouse button released.
 The point where mouse click occurred determined out of EVENT parameters."
- 
-   (let* ((click-type (car event))
+
+  (setf efar-mouse-down? nil)
+  
+  (let* ((click-type (car event))
 	 (pos (nth 1 (nth 1 event)))
 	 (props (plist-get (text-properties-at pos) :control))
 	 (side (cdr (assoc :side props)))
@@ -2582,21 +2584,24 @@ NEWLINE - if t the insert newline character."
 	     upto (if (or (equal mode :right) (equal mode :both)) 2 1)
 	     initially do (insert-char left 1)
 	     finally do (insert-char right 1)
-	     do
+	     do	     
 	     (let* ((s (if (= side 1) :left :right))
 		    (panel-mode (efar-get :panels s :mode))
 		    (column-number (efar-get :panels s :view panel-mode :column-number)))
-	       
-	       (cl-loop for col from 0 upto (- column-number 1)	do
-			
-			(let ((col-number column-number))
+
+	       (let ((p (point)))
+		 (cl-loop for col from 0 upto (- column-number 1)	do
 			  
-			  (insert-char filler (nth col (if (= side 1)
-							   (car (efar-get :column-widths))
-							 (cdr (efar-get :column-widths)))))
-			  
-			  (if (not (= (+ col 1) col-number))
-			      (insert-char (or splitter filler) 1))))
+			  (let ((col-number column-number))
+			    
+			    (insert-char filler (nth col (if (= side 1)
+							     (car (efar-get :column-widths))
+							   (cdr (efar-get :column-widths)))))
+			    
+			    (if (not (= (+ col 1) col-number))
+				(insert-char (or splitter filler) 1)))
+
+			  (put-text-property p (point) 'pointer 'arrow)))
 	       
 	       (when (and (equal mode :both) (equal s :left))
 		   (insert-char center 1)
@@ -2608,8 +2613,9 @@ NEWLINE - if t the insert newline character."
 
 (defun efar-calculate-widths()
   "Calculate widths of all columns in the panels."
-  (let* ((shift (cond ((equal (efar-get :splitter-shift) 0) 0)
-		      (t (floor (* (floor (efar-get :window-width) 2) (/ (efar-get :splitter-shift) 100.0))))))
+  (let* ((splitter-shift (or (efar-get :splitter-shift) 0))
+	 (shift (cond ((equal splitter-shift 0) 0)
+		      (t (floor (* (floor (efar-get :window-width) 2) (/ splitter-shift 100.0))))))
 	 (widths ())
 	 (left-widths ())
 	 (right-widths ())
