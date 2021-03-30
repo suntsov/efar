@@ -895,7 +895,7 @@ Notifications in the queue will be processed only if there are no new notificati
      ;; if current eFar version matches version stored in state file
      ;; then we have nothing to do - we use loaded state
      ((equal efar-version state-version)
-      (message "eFar state loaded from file " efar-state-file-name)
+      (message "eFar state loaded from file %s" efar-state-file-name)
       state)
      
      ;; else if curent version of eFar is lower then version stored in state file
@@ -1060,8 +1060,8 @@ User also can select an option to overwrite all remaining files to not be asked 
 				(do-operation operation (directory-files-and-attributes (car f) nil nil t) newfile (expand-file-name (efar-get-short-file-name f) default-directory) )
 				(when (equal operation :move)
 				  (delete-directory (car f))))))))
-			
-			files)))) 
+
+			files))))
     ;; call local function first time
     (do-operation operation files todir fromdir)) )
 
@@ -2561,7 +2561,7 @@ NEWLINE - if t the insert newline character."
 	     upto (if (or (equal mode :right) (equal mode :both)) 2 1)
 	     initially do (insert-char left 1)
 	     finally do (insert-char right 1)
-	     do	     
+	     do
 	     (let* ((s (if (= side 1) :left :right))
 		    (panel-mode (efar-get :panels s :mode))
 		    (column-number (efar-get :panels s :view panel-mode :column-number)))
@@ -3568,17 +3568,17 @@ BUTTON is a button clicked."
 
 (defun efar-mode-set-keys()
   "Set key bindings for the eFar mode."
-  ;; set keyboard 
+  ;; set keyboard
   (cl-loop for key in efar-keys do
-	   (let ((key-seq (if (null (nth 3 key))			    
-			    (kbd (nth 0 key))
+	   (let ((key-seq (if (null (nth 3 key))
+			      (kbd (nth 0 key))
 			    (symbol-value (nth 3 key)))))
 	     (define-key efar-mode-map
 	       key-seq
 	       `(lambda()
 		  (interactive)
 		  (efar-key-press-handle (nth 1 ',key) (nth 2 ',key) (nth 6 ',key))))))
-
+  
   (cl-loop for k in '("<double-mouse-1>"
 		      "<mouse-1>"
 		      "<wheel-down>"
