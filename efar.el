@@ -20,7 +20,7 @@
 ;; GNU General Public License for more details.
 
 ;; You should have received a copy of the GNU General Public License
-;; along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.
+;; along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
 
 ;;; Commentary:
 
@@ -895,7 +895,7 @@ Notifications in the queue will be processed only if there are no new notificati
      ;; if current eFar version matches version stored in state file
      ;; then we have nothing to do - we use loaded state
      ((equal efar-version state-version)
-      (message (concat "eFar state loaded from file " efar-state-file-name))
+      (message "eFar state loaded from file " efar-state-file-name)
       state)
      
      ;; else if curent version of eFar is lower then version stored in state file
@@ -934,7 +934,7 @@ from version FROM-VERSION to actual version."
 	    
 	    (message "State file upgraded to version 1.0")))
       (error
-       (message (format "Error occured during upgrading state file: %s. State file skipped." (error-message-string err)))
+       (message "Error occured during upgrading state file: %s. State file skipped." (error-message-string err))
        (setf efar-state nil)))
     
     efar-state))
@@ -1657,7 +1657,10 @@ When NO-HIST? is t then DIR is not saved in the history list."
 
 (defun efar-get-parent-dir(dir)
   "Return parent directory of given DIR."
-  (string-trim-right (file-name-directory (directory-file-name dir)) "[/]"))
+  (let ((parent (file-name-directory (directory-file-name dir))))
+    (if (equal parent "/")
+        parent
+      (string-trim-right parent "[/]"))))
 
 (defun efar-go-to-file(file &optional side prev-file-number)
   "Move cursor to the given FILE or to PREV-FILE-NUMBER if file cannot be found.
@@ -1779,7 +1782,7 @@ When FOR-READ? is t switch back to eFar buffer."
 	  (select-window (get-buffer-window (get-buffer efar-buffer-name))))
 	
 	;; add file to the list of last opned files
-	(when (not for-read?)
+	(unless for-read?
 	  (let* ((current-hist (efar-get :file-history))
 		 (new-hist (cl-subseq (cl-remove-if (lambda(e) (equal file (car e))) current-hist)
 				      0 (when (> (length current-hist) efar-max-items-in-directory-history)
@@ -2723,7 +2726,7 @@ When SKIP-NON-EXISTING? is t then non-existing files removed from the list."
 
 (defun efar-abort()
   "Abort current operation."
-  (when (null (efar-get :fast-search-string))
+  (unless (efar-get :fast-search-string)
     (let ((side (efar-get :current-panel)))
       (when (cl-member (efar-get :panels side :mode) '(:search :bookmark :dir-hist :file-hist :disks))
 	(efar-go-to-dir (efar-last-visited-dir side) side)
@@ -3416,7 +3419,7 @@ We do text search parallel sending files one by one to all subprocesses by turns
     
     (efar-remove-notifier side)
     
-    (when (not (equal :search (efar-get :panels side :mode)))
+    (unless (equal :search (efar-get :panels side :mode))
       (efar-set 0 :panels side :current-pos))
     
     (efar-set :search :panels side :mode)
@@ -3545,24 +3548,26 @@ BUTTON is a button clicked."
 ;;--------------------------------------------------------------------------------
 
 (defvar efar-mode-map (make-keymap)
-  "Keymap for eFar buffer")
+  "Keymap for eFar buffer.")
 
 (defun efar-mode()
-  ""
+  "Major mode for the eFar buffer."
   (interactive)
-  (kill-all-local-variables)
-  (use-local-map efar-mode-map)
-  (efar-mode-set-keys)
-  (setq major-mode 'efar-mode
-	mode-name "eFar")
-
-  ;; hooks
-  (add-hook 'window-configuration-change-hook #'efar-window-conf-changed)
-  (add-hook 'kill-buffer-hook #'efar-buffer-killed nil 'local)
-  (add-hook 'kill-emacs-hook #'efar-emacs-killed))
+  (if (not (equal (buffer-name (current-buffer)) efar-buffer-name))
+      (warn "Mode must be used for eFar buffer only")
+    (kill-all-local-variables)
+    (use-local-map efar-mode-map)
+    (efar-mode-set-keys)
+    (setq major-mode 'efar-mode
+	  mode-name "eFar")
+    
+    ;; hooks
+    (add-hook 'window-configuration-change-hook #'efar-window-conf-changed)
+    (add-hook 'kill-buffer-hook #'efar-buffer-killed nil 'local)
+    (add-hook 'kill-emacs-hook #'efar-emacs-killed)))
 
 (defun efar-mode-set-keys()
-  ""
+  "Set key bindings for the eFar mode."
   ;; set keyboard 
   (cl-loop for key in efar-keys do
 	   (let ((key-seq (if (null (nth 3 key))			    
