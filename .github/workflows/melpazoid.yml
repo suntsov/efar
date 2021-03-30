@@ -23,7 +23,7 @@ jobs:
     - name: Run
       env:
         # RECIPE is your recipe as written for MELPA:
-        RECIPE: (sh x :repo "suntsov/efar" :fetcher github)
+        RECIPE: (efar :fetcher github :repo "suntsov/efar")
         # set this to false (or remove it) if the package isn't on MELPA:
         EXIST_OK: false
       run: echo $GITHUB_REF && make -C ~/melpazoid
