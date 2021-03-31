@@ -4,7 +4,7 @@
 
 ;; Author: "Vladimir Suntsov" <vladimir@suntsov.online>
 ;; Maintainer: vladimir@suntsov.online
-;; Version: 1.1
+;; Version: 1.11
 ;; Package-Requires: ((emacs "26.1"))
 ;; Keywords: files
 ;; URL: https://github.com/suntsov/efar
@@ -20,7 +20,7 @@
 ;; GNU General Public License for more details.
 
 ;; You should have received a copy of the GNU General Public License
-;; along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.
+;; along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
 
 ;;; Commentary:
 
@@ -42,7 +42,7 @@
 (require 'dired)
 (require 'comint)
 
-(defconst efar-version 1.1 "Current eFar version number.")
+(defconst efar-version 1.11 "Current eFar version number.")
 
 (defvar efar-state nil)
 (defvar efar-mouse-down? nil)
@@ -344,146 +344,147 @@ IGNORE-IN-MODES is a list of modes which should ignore this key binding."
   (push (list key func arg custom-key-name description show-in-help? ignore-in-modes) efar-keys))
 
 ;;   key-sequence function to call  arg variable name to save custom Key description
-(efar-register-key (kbd "<down>")  'efar-move-cursor  :down 'efar-move-down-key
+(efar-register-key "<down>"  'efar-move-cursor  :down 'efar-move-down-key
 		   "move cursor one line down" t)
-(efar-register-key (kbd "<up>")   'efar-move-cursor  :up 'efar-move-up-key
+(efar-register-key "<up>"   'efar-move-cursor  :up 'efar-move-up-key
 		   "move cursor one line up" t)
-(efar-register-key (kbd "<right>")  'efar-move-cursor  :right  'efar-move-right-key
+(efar-register-key "<right>"  'efar-move-cursor  :right  'efar-move-right-key
 		   "move cursor to the column on the right" t)
-(efar-register-key (kbd "<left>")  'efar-move-cursor  :left  'efar-move-left-key
+(efar-register-key "<left>"  'efar-move-cursor  :left  'efar-move-left-key
 		   "move cursor to the column on the left" t)
-(efar-register-key (kbd "<prior>")  'efar-move-cursor  :left  nil "" nil)
-(efar-register-key (kbd "<next>")  'efar-move-cursor  :right  nil "" nil)
-(efar-register-key (kbd "<home>")  'efar-move-cursor  :home 'efar-move-home-key
-		   "move cursor to the beginning of the list" t)
-(efar-register-key (kbd "C-<left>")  'efar-move-cursor  :home  'efar-move-home-alt-key
-		   "move cursor to the beginning of the list (alternative)" t)
-(efar-register-key (kbd "<end>")  'efar-move-cursor  :end 'efar-move-end-key
-		   "move cursot to the end of the list" t)
-(efar-register-key (kbd "C-<right>")  'efar-move-cursor  :end 'efar-move-end-alt-key
-		   "move cursot to the end of the list (alternative)" t)
-(efar-register-key (kbd "C-<up>") 'efar-enter-directory t 'efar-go-to-parent-dir-key
-		   "go to parent directory" t (list :file-hist :dir-hist :bookmark :disks :search))
-(efar-register-key (kbd "C-M-<down>") 'efar-go-directory-history-cicle :forward 'efar-next-directory-in-history-key
-		   "loop over directories in directory history forward" t)
-(efar-register-key (kbd "C-M-<up>") 'efar-go-directory-history-cicle :backward 'efar-prev-directory-in-history-key
-		   "loop over directories in directory history backward" t)
-(efar-register-key (kbd "RET") '((:files . efar-enter-directory) (:dir-hist . efar-navigate-to-file) (:file-hist . efar-navigate-to-file) (:bookmark . efar-navigate-to-file) (:disks . efar-switch-to-disk) (:search . efar-navigate-to-file))  nil  'efar-enter-directory-key
-		   "go into or to the item under cursor" :space-after)
+(efar-register-key "<prior>"  'efar-move-cursor  :left  nil "" nil)
+(efar-register-key "<next>"  'efar-move-cursor  :right  nil "" nil)
+(efar-register-key "<home>"  'efar-move-cursor  :home 'efar-move-home-key
+ 		   "move cursor to the beginning of the list" t)
+(efar-register-key "C-<left>"  'efar-move-cursor  :home  'efar-move-home-alt-key
+ 		   "move cursor to the beginning of the list (alternative)" t)
+(efar-register-key "<end>"  'efar-move-cursor  :end 'efar-move-end-key
+ 		   "move cursot to the end of the list" t)
+(efar-register-key "C-<right>"  'efar-move-cursor  :end 'efar-move-end-alt-key
+ 		   "move cursot to the end of the list (alternative)" t)
+(efar-register-key "C-<up>" 'efar-enter-directory t 'efar-go-to-parent-dir-key
+ 		   "go to parent directory" t (list :file-hist :dir-hist :bookmark :disks :search))
+(efar-register-key "C-M-<down>" 'efar-go-directory-history-cicle :forward 'efar-next-directory-in-history-key
+ 		   "loop over directories in directory history forward" t)
+(efar-register-key "C-M-<up>" 'efar-go-directory-history-cicle :backward 'efar-prev-directory-in-history-key
+ 		   "loop over directories in directory history backward" t)
+(efar-register-key "RET" '((:files . efar-enter-directory) (:dir-hist . efar-navigate-to-file) (:file-hist . efar-navigate-to-file) (:bookmark . efar-navigate-to-file) (:disks . efar-switch-to-disk) (:search . efar-navigate-to-file))  nil  'efar-enter-directory-key
+ 		   "go into or to the item under cursor" :space-after)
 
-(efar-register-key (kbd "M-<down>") 'efar-scroll-other-window :down 'efar-scroll-other-down-key
-		   "scroll other window down" t)
-(efar-register-key (kbd "M-<up>") 'efar-scroll-other-window :up 'efar-scroll-other-up-key
-		   "scroll other window up" t)
+(efar-register-key "M-<down>" 'efar-scroll-other-window :down 'efar-scroll-other-down-key
+ 		   "scroll other window down" t)
+(efar-register-key "M-<up>" 'efar-scroll-other-window :up 'efar-scroll-other-up-key
+ 		   "scroll other window up" t)
 
-(efar-register-key (kbd "<insert>") 'efar-mark-file   nil 'efar-mark-file-key
-		   "mark item under cursor" t (list :file-hist :dir-hist :bookmark :disks :search))
-(efar-register-key (kbd "<C-insert>") 'efar-deselect-all  nil 'efar-deselect-all-key
-		   "unmark all items in the list" :space-after (list :file-hist :dir-hist :bookmark :disks :search))
+(efar-register-key "<insert>" 'efar-mark-file   nil 'efar-mark-file-key
+ 		   "mark item under cursor" t (list :file-hist :dir-hist :bookmark :disks :search))
+(efar-register-key "<C-insert>" 'efar-deselect-all  nil 'efar-deselect-all-key
+ 		   "unmark all items in the list" :space-after (list :file-hist :dir-hist :bookmark :disks :search))
 
-(efar-register-key (kbd "TAB")   'efar-switch-to-other-panel nil 'efar-switch-to-other-panel-key
-		   "switch to other panel" t)
-(efar-register-key (kbd "C-c TAB")  'efar-open-dir-other-panel nil 'efar-open-dir-other-panel-key
-		   "open current directory in other panel" :space-after)
+(efar-register-key "TAB"   'efar-switch-to-other-panel nil 'efar-switch-to-other-panel-key
+ 		   "switch to other panel" t)
+(efar-register-key "C-c TAB"  'efar-open-dir-other-panel nil 'efar-open-dir-other-panel-key
+ 		   "open current directory in other panel" :space-after)
 
-(efar-register-key (kbd "<f4>")   'efar-edit-file   nil 'efar-open-file-key
-		   "edit file under cursor" t)
-(efar-register-key (kbd "<M-f4>")  'efar-open-file-in-ext-app nil 'efar-open-file-in-ext-app-key
-		   "open file under cursor in external application" t)
-(efar-register-key (kbd "<f3>")  'efar-edit-file   t 'efar-read-file-key
-		   "show content of the file in other window" :space-after)
+(efar-register-key "<f4>"   'efar-edit-file   nil 'efar-open-file-key
+ 		   "edit file under cursor" t)
+(efar-register-key "<M-f4>"  'efar-open-file-in-ext-app nil 'efar-open-file-in-ext-app-key
+ 		   "open file under cursor in external application" t)
+(efar-register-key "<f3>"  'efar-edit-file   t 'efar-read-file-key
+ 		   "show content of the file in other window" :space-after)
 
-(efar-register-key (kbd "<f5>")   'efar-copy-or-move-files :copy 'efar-copy-file-key
-		   "copy selected file(s)" t (list :file-hist :dir-hist :bookmark :disks :search))
-(efar-register-key (kbd "<f6>")  'efar-copy-or-move-files :move 'efar-move-file-key
-		   "move selected file(s)" t (list :file-hist :dir-hist :bookmark :disks :search))
-(efar-register-key (kbd "<f7>")  'efar-create-new-directory nil 'efar-create-direcotry-key
-		   "create new directory" t (list :file-hist :dir-hist :bookmark :disks :search))
-(efar-register-key (kbd "<f8>")  '((:files . efar-delete-selected) (:bookmark . efar-delete-bookmark))   nil 'efar-delete-file-key
-		   "delete selected file(s) or bookmark" :space-after '(:file-hist :dir-hist :disks :search))
+(efar-register-key "<f5>"   'efar-copy-or-move-files :copy 'efar-copy-file-key
+  		   "copy selected file(s)" t (list :file-hist :dir-hist :bookmark :disks :search))
+(efar-register-key "<f6>"  'efar-copy-or-move-files :move 'efar-move-file-key
+ 		   "move selected file(s)" t (list :file-hist :dir-hist :bookmark :disks :search))
+(efar-register-key "<f7>"  'efar-create-new-directory nil 'efar-create-direcotry-key
+ 		   "create new directory" t (list :file-hist :dir-hist :bookmark :disks :search))
+(efar-register-key "<f8>"  '((:files . efar-delete-selected) (:bookmark . efar-delete-bookmark))   nil 'efar-delete-file-key
+ 		   "delete selected file(s) or bookmark" :space-after '(:file-hist :dir-hist :disks :search))
 
 
-(efar-register-key (kbd "S-C-<left>")  'efar-move-splitter  :left 'efar-move-splitter-left-key
+(efar-register-key "S-C-<left>"  'efar-move-splitter  :left 'efar-move-splitter-left-key
 		   "move splitter between panels to the left" t)
-(efar-register-key (kbd "S-C-<right>")  'efar-move-splitter  :right 'efar-move-splitter-right-key
+(efar-register-key "S-C-<right>"  'efar-move-splitter  :right 'efar-move-splitter-right-key
 		   "move splitter between panels to the right" t)
-(efar-register-key (kbd "S-C-<down>")  'efar-move-splitter  :center 'efar-move-splitter-center-key
+(efar-register-key "S-C-<down>"  'efar-move-splitter  :center 'efar-move-splitter-center-key
 		   "Center the splitter between panels" t)
-(efar-register-key (kbd "C-c f d") 'efar-change-panel-mode  :disks 'efar-show-disk-selector-key
+(efar-register-key "C-c f d" 'efar-change-panel-mode  :disks 'efar-show-disk-selector-key
 		   "show list of available disks (Windows) or mount points (Unix)" t)
-(efar-register-key (kbd "C-c f s") 'efar-change-sort-function  nil 'efar-change-sort-key
+(efar-register-key "C-c f s" 'efar-change-sort-function  nil 'efar-change-sort-key
 		   "change sort function and/or order for current panel" t (list :file-hist :dir-hist :bookmark :disks))
-(efar-register-key (kbd "C-c f f") 'efar-filter-files  nil 'efar-filter-files-key
+(efar-register-key "C-c f f" 'efar-filter-files  nil 'efar-filter-files-key
 		   "set/remove filtering for current panel" :space-after (list :file-hist :dir-hist :bookmark :disks :search))
 
-(efar-register-key (kbd "C-c v M") 'efar-change-mode  nil 'efar-change-mode-key
+(efar-register-key "C-c v M" 'efar-change-mode  nil 'efar-change-mode-key
 		   "toggle mode: double panel <-> single panel" t)
-(efar-register-key (kbd "C-c v +") 'efar-change-column-number t 'efar-inc-column-number-key
+(efar-register-key "C-c v +" 'efar-change-column-number t 'efar-inc-column-number-key
 		   "increase number of columns in current panel" t)
-(efar-register-key (kbd "C-c v -") 'efar-change-column-number nil 'efar-dec-column-number-key
+(efar-register-key "C-c v -" 'efar-change-column-number nil 'efar-dec-column-number-key
 		   "decrease number of columns in current panel" t)
-(efar-register-key (kbd "C-c v m") 'efar-change-file-disp-mode nil 'efar-change-file-disp-mode-key
+(efar-register-key "C-c v m" 'efar-change-file-disp-mode nil 'efar-change-file-disp-mode-key
 		   "change file display mode (short, long, detailed) for current panel" :space-after)
 
-(efar-register-key (kbd "C-c c p") 'efar-copy-current-path  nil 'efar-copy-current-path-key
+(efar-register-key "C-c c p" 'efar-copy-current-path  nil 'efar-copy-current-path-key
 		   "copy to the clipboard the path to the current file" t)
-(efar-register-key (kbd "C-c c d") 'efar-cd   nil 'efar-cd-key
+(efar-register-key "C-c c d" 'efar-cd   nil 'efar-cd-key
 		   "go to specific directory" t)
-(efar-register-key (kbd "C-c c e") 'efar-ediff-files  nil 'efar-ediff-files-key
+(efar-register-key "C-c c e" 'efar-ediff-files  nil 'efar-ediff-files-key
 		   "run ediff for selected files" t (list :file-hist :dir-hist :bookmark :disks :search))
-(efar-register-key (kbd "C-c c s") 'efar-current-file-stat  nil 'efar-current-file-stat-key
+(efar-register-key "C-c c s" 'efar-current-file-stat  nil 'efar-current-file-stat-key
 		   "show directory stats (size and files number)" t)
-(efar-register-key (kbd "C-c c o") 'efar-display-console  nil 'efar-display-console-key
+(efar-register-key "C-c c o" 'efar-display-console  nil 'efar-display-console-key
 		   "open console window"  t)
-(efar-register-key (kbd "<f12> <f12>")  'efar-reinit  nil 'efar-reinit-key
+(efar-register-key "<f12> <f12>"  'efar-reinit  nil 'efar-reinit-key
 		   "reinit and redraw eFar buffer" t)
-(efar-register-key (kbd "C-c ?")  'efar-show-help   nil 'efar-show-help-key
+(efar-register-key "C-c ?"  'efar-show-help   nil 'efar-show-help-key
 		   "show frame with all key bindings" t)
-(efar-register-key (kbd "C-c c b") 'efar-change-panel-mode  :bookmark 'efar-show-bookmarks-key
+(efar-register-key "C-c c b" 'efar-change-panel-mode  :bookmark 'efar-show-bookmarks-key
 		   "show bookmarks" t)
-(efar-register-key (kbd "C-c c B") 'efar-add-bookmark  nil 'efar-add-bookmark-key
+(efar-register-key "C-c c B" 'efar-add-bookmark  nil 'efar-add-bookmark-key
 		   "add item under cursor to the bookmarks" t)
-(efar-register-key (kbd "C-c c h") 'efar-change-panel-mode  :dir-hist 'efar-show-directory-history-key
+(efar-register-key "C-c c h" 'efar-change-panel-mode  :dir-hist 'efar-show-directory-history-key
 		   "show last visited directories" t)
-(efar-register-key (kbd "C-c c f") 'efar-change-panel-mode  :file-hist 'efar-show-file-history-key
+(efar-register-key "C-c c f" 'efar-change-panel-mode  :file-hist 'efar-show-file-history-key
 		   "show last edited files" t)
-(efar-register-key (kbd "C-c c m") 'efar-show-mode-selector  nil 'efar-show-mode-selector-key
+(efar-register-key "C-c c m" 'efar-show-mode-selector  nil 'efar-show-mode-selector-key
 		   "show panel mode selector" :space-after)
 
-(efar-register-key (kbd "<M-f7>") 'efar-start-search nil 'efar-start-search-key
+(efar-register-key "<M-f7>" 'efar-start-search nil 'efar-start-search-key
 		   "run file search" t)
-(efar-register-key (kbd "<S-f7>") 'efar-change-panel-mode :search 'efar-show-search-results-key
+(efar-register-key "<S-f7>" 'efar-change-panel-mode :search 'efar-show-search-results-key
 		   "show file search results" t)
-(efar-register-key (kbd "<C-M-f7>") 'efar-show-search-results-in-buffer nil 'efar-show-search-results-in-buffer-key
+(efar-register-key "<C-M-f7>" 'efar-show-search-results-in-buffer nil 'efar-show-search-results-in-buffer-key
 		   "display search results in a separate buffer" :space-after (list :file-hist :dir-hist :bookmark :disks :files))
 
-(efar-register-key (kbd "C-g") 'efar-abort  nil nil
+(efar-register-key "C-g" 'efar-abort  nil nil
 		   "abort current operation" t)
 
-(efar-register-key (kbd "C-n") 'efar-suggest-hint nil nil nil nil)
+(efar-register-key "C-n" 'efar-suggest-hint nil nil nil nil)
 
 ;; fast-search keys
-(efar-register-key (kbd "DEL") 'efar-fast-search  :back nil
+(efar-register-key "DEL" 'efar-fast-search  :back nil
 		   "Backspace for fast search")
-(efar-register-key (kbd "C-s")  'efar-fast-search  :next nil
+(efar-register-key "C-s"  'efar-fast-search  :next nil
 		   "start fast search/go to next fast search match" t)
-(efar-register-key (kbd "C-r")  'efar-fast-search  :prev nil
+(efar-register-key "C-r"  'efar-fast-search  :prev nil
 		   "start fast search/go to previous fast search match" :space-after)
 
-(cl-loop for char in (list ?a ?b ?c ?d ?e ?f ?g ?h ?i ?j ?k ?l ?m ?n ?o ?p ?q ?r ?s ?t ?u ?v ?w ?x ?y ?z
-			   ?A ?B ?C ?D ?E ?F ?G ?H ?I ?J ?K ?L ?M ?N ?O ?P ?Q ?R ?S ?T ?U ?V ?W ?X ?Y ?Z
-			   ?1 ?2 ?3 ?4 ?5 ?6 ?7 ?8 ?9 ?0
-			   ?\( ?\) ?. ?? ?*
-			   ?- ?_
-			   32) do
-			   (efar-register-key	(char-to-string char)	'efar-fast-search	char	nil	""))
+(cl-loop for char in
+	 (list ?a ?b ?c ?d ?e ?f ?g ?h ?i ?j ?k ?l ?m ?n ?o ?p ?q ?r ?s ?t ?u ?v ?w ?x ?y ?z
+	       ?A ?B ?C ?D ?E ?F ?G ?H ?I ?J ?K ?L ?M ?N ?O ?P ?Q ?R ?S ?T ?U ?V ?W ?X ?Y ?Z
+	       ?1 ?2 ?3 ?4 ?5 ?6 ?7 ?8 ?9 ?0
+	       ?\( ?\) ?. ?? ?*
+	       ?- ?_
+	       32) do
+	       (efar-register-key	(char-to-string char)	'efar-fast-search	char	nil	""))
 
 ;; create customization entries for key bindings
 (cl-loop for key in efar-keys do
 	 (when (nth 3 key)
 	   (custom-declare-variable
 	    (intern (symbol-name (nth 3 key)))
-	    (nth 0 key)
+	    (kbd (nth 0 key))
 	    (nth 4 key)
 	    :type 'key-sequence
 	    :group 'efar-keys)))
@@ -507,7 +508,9 @@ When REINIT? is t then current eFar state is discarded and it is reinitialized."
        (go-to-dir (when arg default-directory)))
     
     (with-current-buffer efar-buffer
-      
+
+      (unless (equal major-mode 'efar-mode)
+	(efar-mode))
       ;; do initialisation if necessary and redraw the content of the buffer
       (when need-init?
 	(efar-init)
@@ -554,9 +557,6 @@ REINIT? is a boolean indicating that configuration should be generated enew."
 	    (null efar-state))
     (setf efar-state nil)
     (efar-init-state))
-  
-  (efar-set-key-bindings)
-  (efar-set-mouse-bindings)
   
   (efar-go-to-dir (efar-get :panels :left :dir) :left)
   (efar-go-to-dir (efar-get :panels :right :dir) :right)
@@ -895,7 +895,7 @@ Notifications in the queue will be processed only if there are no new notificati
      ;; if current eFar version matches version stored in state file
      ;; then we have nothing to do - we use loaded state
      ((equal efar-version state-version)
-      (message (concat "eFar state loaded from file " efar-state-file-name))
+      (message "eFar state loaded from file %s" efar-state-file-name)
       state)
      
      ;; else if curent version of eFar is lower then version stored in state file
@@ -934,7 +934,7 @@ from version FROM-VERSION to actual version."
 	    
 	    (message "State file upgraded to version 1.0")))
       (error
-       (message (format "Error occured during upgrading state file: %s. State file skipped." (error-message-string err)))
+       (message "Error occured during upgrading state file: %s. State file skipped." (error-message-string err))
        (setf efar-state nil)))
     
     efar-state))
@@ -1060,7 +1060,7 @@ User also can select an option to overwrite all remaining files to not be asked 
 				(do-operation operation (directory-files-and-attributes (car f) nil nil t) newfile (expand-file-name (efar-get-short-file-name f) default-directory) )
 				(when (equal operation :move)
 				  (delete-directory (car f))))))))
-			
+
 			files))))
     ;; call local function first time
     (do-operation operation files todir fromdir)) )
@@ -1130,16 +1130,6 @@ on any next cursor movement."
 		      'efar-header-face
 		      w nil nil nil t))))
 
-(defun efar-set-key-bindings()
-  "Set up local key bindings for eFar buffer."
-  (cl-loop for key in efar-keys do
-	   (let ((key-seq (if (null (nth 3 key)) (nth 0 key) (symbol-value (nth 3 key)))))
-	     (local-set-key
-	      key-seq
-	      `(lambda()
-		 (interactive)
-		 (efar-key-press-handle (nth 1 ',key) (nth 2 ',key) (nth 6 ',key)))))))
-
 (defun efar-key-press-handle(func arg ignore-in-modes)
   "Handler for registered key-bindings.
 This handler calls function FUNC with argument ARG only in case when current
@@ -1156,6 +1146,7 @@ mode is not in the list IGNORE-IN-MODES."
 
 (defun efar-show-help()
   "Display a buffer with list of registered Efar key bindings."
+  (interactive)
   (let ((buffer (get-buffer-create "*Efar key bindings*")))
     (with-current-buffer buffer
       (read-only-mode -1)
@@ -1176,23 +1167,6 @@ mode is not in the list IGNORE-IN-MODES."
     
     (display-buffer buffer)))
 
-
-(defun efar-set-mouse-bindings()
-  "Set bindings for mouse interaction."
-  (cl-loop for k in '("<double-mouse-1>"
-		      "<mouse-1>"
-		      "<wheel-down>"
-		      "<wheel-up>"
-		      "<C-mouse-1>"
-		      "<C-down-mouse-1>"
-		      "<S-mouse-1>"
-		      "<S-down-mouse-1>"
-		      "<drag-mouse-1>"
-		      "<down-mouse-1>")
-	   do
-	   (local-set-key (kbd k) (lambda (event)
-				    (interactive "e")
-				    (efar-process-mouse-event event)))))
 
 (defun efar-process-mouse-event(event)
   "Process mouse event EVENT."
@@ -1684,7 +1658,10 @@ When NO-HIST? is t then DIR is not saved in the history list."
 
 (defun efar-get-parent-dir(dir)
   "Return parent directory of given DIR."
-  (string-trim-right (file-name-directory (directory-file-name dir)) "[/]"))
+  (let ((parent (file-name-directory (directory-file-name dir))))
+    (if (equal parent "/")
+        parent
+      (string-trim-right parent "[/]"))))
 
 (defun efar-go-to-file(file &optional side prev-file-number)
   "Move cursor to the given FILE or to PREV-FILE-NUMBER if file cannot be found.
@@ -1806,7 +1783,7 @@ When FOR-READ? is t switch back to eFar buffer."
 	  (select-window (get-buffer-window (get-buffer efar-buffer-name))))
 	
 	;; add file to the list of last opned files
-	(when (not for-read?)
+	(unless for-read?
 	  (let* ((current-hist (efar-get :file-history))
 		 (new-hist (cl-subseq (cl-remove-if (lambda(e) (equal file (car e))) current-hist)
 				      0 (when (> (length current-hist) efar-max-items-in-directory-history)
@@ -1916,6 +1893,7 @@ When FOR-READ? is t switch back to eFar buffer."
 (defun efar-move-cursor(direction &optional no-auto-read?)
   "Move cursor in direction DIRECTION.
 When NO-AUTO-READ? is t then no auto file read happens."
+  (efar-reset-status)
   (let ((side (efar-get :current-panel)))
     (unless (= 0 (length (efar-get :panels side :files)))
       
@@ -2122,6 +2100,7 @@ When NO-AUTO-READ? is t then no auto file read happens."
 
 (defun efar-switch-to-other-panel()
   "Make other panel active."
+  (interactive)
   (efar-quit-fast-search)
   (when (equal (efar-get :mode) :both)
     (let ((side (efar-get :current-panel)))
@@ -2584,7 +2563,7 @@ NEWLINE - if t the insert newline character."
 	     upto (if (or (equal mode :right) (equal mode :both)) 2 1)
 	     initially do (insert-char left 1)
 	     finally do (insert-char right 1)
-	     do	     
+	     do
 	     (let* ((s (if (= side 1) :left :right))
 		    (panel-mode (efar-get :panels s :mode))
 		    (column-number (efar-get :panels s :view panel-mode :column-number)))
@@ -2714,12 +2693,6 @@ Saves eFar state and kills all subprocesses."
     (ignore-errors
       (efar-save-state))))
 
-;; hooks
-(add-hook 'window-configuration-change-hook #'efar-window-conf-changed)
-;;(add-hook 'window-size-change-functions #'efar-frame-size-changed)
-(add-hook 'kill-buffer-hook #'efar-buffer-killed)
-(add-hook 'kill-emacs-hook #'efar-emacs-killed)
-
 (defun efar-get-root-directory(path)
   "Return a root directory for given PATH."
   ;; get parent directory
@@ -2755,7 +2728,7 @@ When SKIP-NON-EXISTING? is t then non-existing files removed from the list."
 
 (defun efar-abort()
   "Abort current operation."
-  (when (null (efar-get :fast-search-string))
+  (unless (efar-get :fast-search-string)
     (let ((side (efar-get :current-panel)))
       (when (cl-member (efar-get :panels side :mode) '(:search :bookmark :dir-hist :file-hist :disks))
 	(efar-go-to-dir (efar-last-visited-dir side) side)
@@ -2871,14 +2844,15 @@ Truncate string to WIDTH characters."
 	    (int-file-size current-file-entry))
 	  
 	  ;; output stat in the status line
-	  (efar-set-status (format (concat "%d bytes (%s) in %d directories and %d files."
-					   (unless (zerop skipped) " %d directories skipped (no access)." ))
-				   size (efar-file-size-as-string size) dirs files skipped)
-			   nil t)
+	  (let ((format-str (concat "%d bytes (%s) in %d directories and %d files."
+					   (unless (zerop skipped) " %d directories skipped (no access)." ))))
+	    (efar-set-status (format format-str
+				     size (efar-file-size-as-string size) dirs files skipped)
+			     nil t))
 	  (setf ok? t))
       
       (unless ok?
-	(efar-set :ready "Size calculation failed")))))
+	(efar-set-status "Size calculation failed" nil t)))))
 
 (defconst efar-panel-modes '((:files . "Files")
 			     (:bookmark . "Bookmarks")
@@ -3448,7 +3422,7 @@ We do text search parallel sending files one by one to all subprocesses by turns
     
     (efar-remove-notifier side)
     
-    (when (not (equal :search (efar-get :panels side :mode)))
+    (unless (equal :search (efar-get :panels side :mode))
       (efar-set 0 :panels side :current-pos))
     
     (efar-set :search :panels side :mode)
@@ -3572,4 +3546,69 @@ BUTTON is a button clicked."
       (isearch-process-search-string text
 				     (mapconcat #'isearch-text-char-description text "")))))
 
+;;--------------------------------------------------------------------------------
+;; eFar major mode
+;;--------------------------------------------------------------------------------
+
+(defvar efar-mode-map (make-keymap)
+  "Keymap for eFar buffer.")
+
+(defvar efar-menu nil
+  "Keymap for the eFar buffer menu bar.")
+
+(defun efar-customize()
+  "Open customization buffer for eFar."
+  (interactive)
+  (customize-group 'efar))
+
+(easy-menu-define efar-menu efar-mode-map
+  "Menu for eFar mode."
+  `(,"eFar"
+    [,"Describe keys" efar-show-help :active t :keys "C-c ?"]
+    [,"Customize" efar-customize t]))
+
+(defun efar-mode()
+  "Major mode for the eFar buffer."
+  (interactive)
+  (if (not (equal (buffer-name (current-buffer)) efar-buffer-name))
+      (warn "Mode must be used for eFar buffer only")
+    (kill-all-local-variables)
+    (use-local-map efar-mode-map)
+    (efar-mode-set-keys)
+    (easy-menu-add efar-menu)
+    (setq major-mode 'efar-mode
+	  mode-name "eFar")
+    (setq mode-line-format (list " " mode-line-modes))
+    ;; hooks
+    (add-hook 'window-configuration-change-hook #'efar-window-conf-changed)
+    (add-hook 'kill-buffer-hook #'efar-buffer-killed nil 'local)
+    (add-hook 'kill-emacs-hook #'efar-emacs-killed)))
+
+(defun efar-mode-set-keys()
+  "Set key bindings for the eFar mode."
+  ;; set keyboard
+  (cl-loop for key in efar-keys do
+	   (let ((key-seq (if (null (nth 3 key))
+			      (kbd (nth 0 key))
+			    (symbol-value (nth 3 key)))))
+	     (define-key efar-mode-map
+	       key-seq
+	       `(lambda()
+		  (interactive)
+		  (efar-key-press-handle (nth 1 ',key) (nth 2 ',key) (nth 6 ',key))))))
+  
+  (cl-loop for k in '("<double-mouse-1>"
+		      "<mouse-1>"
+		      "<wheel-down>"
+		      "<wheel-up>"
+		      "<C-mouse-1>"
+		      "<C-down-mouse-1>"
+		      "<S-mouse-1>"
+		      "<S-down-mouse-1>"
+		      "<drag-mouse-1>"
+		      "<down-mouse-1>")
+	   do
+	   (define-key efar-mode-map (kbd k) (lambda (event)
+					       (interactive "e")
+					       (efar-process-mouse-event event)))))
 ;;; efar.el ends here
