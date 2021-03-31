@@ -4,7 +4,7 @@
 
 ;; Author: "Vladimir Suntsov" <vladimir@suntsov.online>
 ;; Maintainer: vladimir@suntsov.online
-;; Version: 1.11
+;; Version: 1.12
 ;; Package-Requires: ((emacs "26.1"))
 ;; Keywords: files
 ;; URL: https://github.com/suntsov/efar
@@ -42,7 +42,7 @@
 (require 'dired)
 (require 'comint)
 
-(defconst efar-version 1.11 "Current eFar version number.")
+(defconst efar-version 1.12 "Current eFar version number.")
 
 (defvar efar-state nil)
 (defvar efar-mouse-down? nil)
@@ -494,10 +494,11 @@ IGNORE-IN-MODES is a list of modes which should ignore this key binding."
 ;; eFar main functions
 ;;--------------------------------------------------------------------------------
 ;;;###autoload
-(defun efar(arg &optional reinit?)
+(defun efar(arg &optional reinit? no-switch?)
   "Main function to run eFar commander.
 When ARG is t open default directory of current buffer.
-When REINIT? is t then current eFar state is discarded and it is reinitialized."
+When REINIT? is t then current eFar state is discarded and it is reinitialized.
+When NO-SWITCH? is t then don't switch to eFar buffer."
   (interactive "P")
   (let
       ;; if eFar buffer doesn't exist, we need to do initialisation
@@ -531,7 +532,8 @@ When REINIT? is t then current eFar state is discarded and it is reinitialized."
       
       (efar-suggest-hint))
     
-    (unless (equal efar-buffer (current-buffer))
+    (unless (or no-switch?
+		(equal efar-buffer (current-buffer)))
 	   (switch-to-buffer-other-window efar-buffer))
     (efar-write-enable (efar-redraw))))
 
@@ -880,7 +882,6 @@ Notifications in the queue will be processed only if there are no new notificati
 
 (defun efar-read-state()
   "Read eFar state from the file."
-  (interactive)
   (setf efar-state
 	(efar-check-state-file-version
 	 (with-temp-buffer
@@ -2100,7 +2101,6 @@ When NO-AUTO-READ? is t then no auto file read happens."
 
 (defun efar-switch-to-other-panel()
   "Make other panel active."
-  (interactive)
   (efar-quit-fast-search)
   (when (equal (efar-get :mode) :both)
     (let ((side (efar-get :current-panel)))
@@ -2890,7 +2890,7 @@ Truncate string to WIDTH characters."
     
     (cond
      ((equal mode :search)
-      (efar-show-search-results side))
+      (efar-show-search-results side t))
      
      (t
       (efar-set mode-name :panels side :dir)
@@ -3031,50 +3031,61 @@ Current panel switched to selected mode."
 
 (defun efar-start-search()
   "Start file search."
+  (interactive)
   ;; if search is already running, ask user if current search must be aborted
   (when efar-search-running?
     (when (string= "Yes" (ido-completing-read "Search is still running. Kill it? " (list "Yes" "No" )))
       ;; restart search processes
       (efar-run-search-processes)
       (setq efar-search-running? nil)))
+
+  ;; init efar if needed
+  (efar nil nil t)
   
   (unless efar-search-running?
-    (let* ((side (efar-get :current-panel))
-	   (selected-files (or (efar-selected-files side t) (list (list default-directory)))))
+    ;; gather search parameters
+    (let* ((proposed-dir (if (called-interactively-p "interactive")
+			     default-directory
+			   (let ((selected-item (caar (efar-selected-files (efar-get :current-panel) t))))
+			     (cond ((null  selected-item)
+				    default-directory)
+				   ((file-directory-p selected-item)
+				    selected-item)
+				   (t
+				    (print selected-item t)
+				    (efar-get-parent-dir selected-item))))))
+	   (dir (read-directory-name "Search in: " proposed-dir proposed-dir))
+	   (wildcard (read-string "File name mask: " efar-search-default-file-mask))
+	   (text (read-string "Text to search: " ""))
+	   (ignore-case? (and (not (string-empty-p text)) (string=  "Yes" (ido-completing-read "Ignore case? " (list "Yes" "No")))))
+	   (regexp? (and (not (string-empty-p text)) (string=  "Yes" (ido-completing-read "Use regexp? " (list "No" "Yes"))))))
+
+      (setq efar-last-search-params nil)
+      (setq efar-last-search-params (list (cons :dir dir)
+					  (cons :wildcard wildcard)
+					  (cons :text (if (string-empty-p text) nil text))
+					  (cons :ignore-case? ignore-case?)
+					  (cons :regexp? regexp?)
+					  (cons :start-time (time-to-seconds (current-time)))))
       
-      (if (not (file-directory-p (caar selected-files)))
-	  (efar-set-status "Please select a directory to search files in" nil t)
-	
-	;; gather search parameters
-	(let* ((wildcard (read-string "File name mask: " efar-search-default-file-mask))
-	       (text (read-string "Text to search: " ""))
-	       (ignore-case? (and (not (string-empty-p text)) (string=  "Yes" (ido-completing-read "Ignore case? " (list "Yes" "No")))))
-	       (regexp? (and (not (string-empty-p text)) (string=  "Yes" (ido-completing-read "Use regexp? " (list "No" "Yes"))))))
-	  
-	  (setq efar-last-search-params nil)
-	  (setq efar-last-search-params (list (cons :dir (caar selected-files))
-					      (cons :wildcard wildcard)
-					      (cons :text (if (string-empty-p text) nil text))
-					      (cons :ignore-case? ignore-case?)
-					      (cons :regexp? regexp?)
-					      (cons :start-time (time-to-seconds (current-time)))))
-	  
-	  ;; set up timer that will update search list result during search
-	  (setq efar-update-search-results-timer
-		(run-at-time nil 1
-			     (lambda()
-			       (when (equal :search (efar-get :panels :left :mode))
-				 (efar-change-panel-mode :search :left))
-			       
-			       (when (equal :search (efar-get :panels :right :mode))
-				 (efar-change-panel-mode :search :right)))))
-	  (setq efar-search-results '())
-	  (setq efar-search-running? t)
-	  (efar-change-panel-mode :search)
-	  ;; send command to the manager to start the search with given parameters
-	  (efar-search-send-command efar-search-process-manager
-				    :start-search
-				    efar-last-search-params))))))
+      ;; set up timer that will update search list result during search
+      (setq efar-update-search-results-timer
+	    (run-at-time nil 1
+			 (lambda()
+			   (when (equal :search (efar-get :panels :left :mode))
+			     (efar-change-panel-mode :search :left))
+			   
+			   (when (equal :search (efar-get :panels :right :mode))
+			     (efar-change-panel-mode :search :right)))))
+      (setq efar-search-results '())
+      (setq efar-search-running? t)
+      (efar-change-panel-mode :search)
+      ;; send command to the manager to start the search with given parameters
+      (efar-search-send-command efar-search-process-manager
+				:start-search
+				efar-last-search-params)
+
+      (when (called-interactively-p "interactive") (efar nil)))))
 
 
 (defun efar-search-kill-all-processes()
@@ -3379,8 +3390,10 @@ We do text search parallel sending files one by one to all subprocesses by turns
     (setq efar-search-processes (cons last (remove last processes)))
     (car efar-search-processes)))
 
-(defun efar-show-search-results(&optional side)
-  "Show search results in panel SIDE."
+(defun efar-show-search-results(&optional side reset-position?)
+  "Show search results in panel SIDE.
+When RESET-POSITION? is t then move cursor to the beginning."
+
   (let* ((side (or side (efar-get :current-panel)))
 	 (errors (cdr (assoc :errors efar-last-search-params)))
 	 (result-string nil)
@@ -3422,7 +3435,8 @@ We do text search parallel sending files one by one to all subprocesses by turns
     
     (efar-remove-notifier side)
     
-    (unless (equal :search (efar-get :panels side :mode))
+    (when (or (not (equal :search (efar-get :panels side :mode)))
+	      reset-position?)
       (efar-set 0 :panels side :current-pos))
     
     (efar-set :search :panels side :mode)
