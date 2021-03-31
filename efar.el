@@ -2844,10 +2844,11 @@ Truncate string to WIDTH characters."
 	    (int-file-size current-file-entry))
 	  
 	  ;; output stat in the status line
-	  (efar-set-status (format (concat "%d bytes (%s) in %d directories and %d files."
-					   (unless (zerop skipped) " %d directories skipped (no access)." ))
-				   size (efar-file-size-as-string size) dirs files skipped)
-			   nil t)
+	  (let ((format-str (concat "%d bytes (%s) in %d directories and %d files."
+					   (unless (zerop skipped) " %d directories skipped (no access)." ))))
+	    (efar-set-status (format format-str
+				     size (efar-file-size-as-string size) dirs files skipped)
+			     nil t))
 	  (setf ok? t))
       
       (unless ok?
