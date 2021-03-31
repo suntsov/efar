@@ -4,7 +4,7 @@
 
 ;; Author: "Vladimir Suntsov" <vladimir@suntsov.online>
 ;; Maintainer: vladimir@suntsov.online
-;; Version: 1.1
+;; Version: 1.11
 ;; Package-Requires: ((emacs "26.1"))
 ;; Keywords: files
 ;; URL: https://github.com/suntsov/efar
@@ -42,7 +42,7 @@
 (require 'dired)
 (require 'comint)
 
-(defconst efar-version 1.1 "Current eFar version number.")
+(defconst efar-version 1.11 "Current eFar version number.")
 
 (defvar efar-state nil)
 (defvar efar-mouse-down? nil)
@@ -1146,6 +1146,7 @@ mode is not in the list IGNORE-IN-MODES."
 
 (defun efar-show-help()
   "Display a buffer with list of registered Efar key bindings."
+  (interactive)
   (let ((buffer (get-buffer-create "*Efar key bindings*")))
     (with-current-buffer buffer
       (read-only-mode -1)
@@ -1892,6 +1893,7 @@ When FOR-READ? is t switch back to eFar buffer."
 (defun efar-move-cursor(direction &optional no-auto-read?)
   "Move cursor in direction DIRECTION.
 When NO-AUTO-READ? is t then no auto file read happens."
+  (efar-reset-status)
   (let ((side (efar-get :current-panel)))
     (unless (= 0 (length (efar-get :panels side :files)))
       
@@ -2849,7 +2851,7 @@ Truncate string to WIDTH characters."
 	  (setf ok? t))
       
       (unless ok?
-	(efar-set :ready "Size calculation failed")))))
+	(efar-set-status "Size calculation failed" nil t)))))
 
 (defconst efar-panel-modes '((:files . "Files")
 			     (:bookmark . "Bookmarks")
@@ -3550,6 +3552,20 @@ BUTTON is a button clicked."
 (defvar efar-mode-map (make-keymap)
   "Keymap for eFar buffer.")
 
+(defvar efar-menu nil
+  "Keymap for the eFar buffer menu bar.")
+
+(defun efar-customize()
+  "Open customization buffer for eFar."
+  (interactive)
+  (customize-group 'efar))
+
+(easy-menu-define efar-menu efar-mode-map
+  "Menu for eFar mode."
+  `(,"eFar"
+    [,"Describe keys" efar-show-help :active t :keys "C-c ?"]
+    [,"Customize" efar-customize t]))
+
 (defun efar-mode()
   "Major mode for the eFar buffer."
   (interactive)
@@ -3558,9 +3574,10 @@ BUTTON is a button clicked."
     (kill-all-local-variables)
     (use-local-map efar-mode-map)
     (efar-mode-set-keys)
+    (easy-menu-add efar-menu)
     (setq major-mode 'efar-mode
 	  mode-name "eFar")
-    
+    (setq mode-line-format (list " " mode-line-modes))
     ;; hooks
     (add-hook 'window-configuration-change-hook #'efar-window-conf-changed)
     (add-hook 'kill-buffer-hook #'efar-buffer-killed nil 'local)
