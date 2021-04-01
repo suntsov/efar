@@ -2492,14 +2492,14 @@ CONTROL-PARAMS - item is considered as control with given parameters"
     
     (efar-draw-border-line
      9553 ;; ║
-     9553 ;; ║     
-     9553 ;; ║     
+     9553 ;; ║
+     9553 ;; ║
      32 ;; space
      nil
      t)
     
     ;; (efar-draw-border-line
-    ;;  9567 ;; ╟ 
+    ;;  9567 ;; ╟
     ;;  9579 ;; ╫
     ;;  9570 ;; ╢
     ;;  9472 ;; ─
@@ -2528,7 +2528,7 @@ CONTROL-PARAMS - item is considered as control with given parameters"
     
     (efar-draw-border-line
      9553 ;; ║
-     9553 ;; ║  
+     9553 ;; ║
      9553 ;; ║
      32 ;; space
      nil
@@ -2536,7 +2536,7 @@ CONTROL-PARAMS - item is considered as control with given parameters"
 
     (efar-draw-border-line
      9562 ;; ╚
-     9577 ;; ╩ 
+     9577 ;; ╩
      9565 ;; ╝
      9552 ;; ═
      nil)))
