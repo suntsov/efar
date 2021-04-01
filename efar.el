@@ -682,7 +682,7 @@ REINIT? is a boolean indicating that configuration should be generated enew."
 ;; file sort functions
 ;;--------------------------------------------------------------------------------
 (defconst efar-sort-functions '(("Name" . efar-sort-files-by-name)
-				("Modification Date" . efar-sort-files-by-modification-date)
+				("Date" . efar-sort-files-by-modification-date)
 				("Extension" . efar-sort-files-by-extension)
 				("Size" . efar-sort-files-by-size)
 				("Unsorted" . nil)))
@@ -2454,7 +2454,8 @@ CONTROL-PARAMS - item is considered as control with given parameters"
     
     (move-to-column col)
     (let ((p (point)))
-      (replace-rectangle p (+ p length) text)
+      (delete-region p (+ p length))
+      (insert text)
       (put-text-property p (+ p length) 'face face)
       (put-text-property p (+ p length) 'pointer pointer)
       (when control-params
@@ -2481,69 +2482,52 @@ CONTROL-PARAMS - item is considered as control with given parameters"
   
   (let ((panel-height (efar-get :panel-height)))
     
-    ;; insert first line
-    (efar-draw-border-line
-     9556 ;; ╔
-     9574 ;; ╦
-     9559 ;; ╗
-     9552 ;; ═
-     9552 ;; ═
-     t)
+    ;; header area
+    (efar-draw-border-line 9556 ;; ╔
+			   9574 ;; ╦
+			   9559 ;; ╗
+			   9552 ;; ═
+			   9552 ;; ═
+			   'newline)
+   
+    (efar-draw-border-line 9553 ;; ║
+			   9553 ;; ║
+			   9553 ;; ║
+			   32 ;; space
+			   nil
+			   'newline)
     
-    (efar-draw-border-line
-     9553 ;; ║
-     9553 ;; ║
-     9553 ;; ║
-     32 ;; space
-     nil
-     t)
+    ;; files area
+    (cl-loop repeat panel-height do	     
+	     (efar-draw-border-line 9553 ;; ║
+				    9553 ;; ║
+				    9553 ;; ║
+				    32 ;; space
+				    9474 ;; │
+				    'newline))
+    ;; file details area
+    (efar-draw-border-line 9568 ;; ╠
+			   9580 ;; ╬
+			   9571 ;; ╣
+			   9552 ;; ═
+			   9575 ;; ╧
+			   'newline) 
     
-    ;; (efar-draw-border-line
-    ;;  9567 ;; ╟
-    ;;  9579 ;; ╫
-    ;;  9570 ;; ╢
-    ;;  9472 ;; ─
-    ;;  9516 ;; ┬
-    ;;  t) ;; 
+    (efar-draw-border-line 9553 ;; ║
+			   9553 ;; ║
+			   9553 ;; ║
+			   32 ;; space
+			   nil
+			   'newline)
     
-    ;; insert vertical lines
-    (cl-loop repeat panel-height do
-	     
-	     (efar-draw-border-line
-	      9553 ;; ║
-	      9553 ;; ║
-	      9553 ;; ║
-	      32 ;; space
-	      9474 ;; │
-	      t))
-    
-    
-    (efar-draw-border-line
-     9568 ;; ╠
-     9580 ;; ╬
-     9571 ;; ╣
-     9552 ;; ═
-     9575 ;; ╧
-     t) ;; 
-    
-    (efar-draw-border-line
-     9553 ;; ║
-     9553 ;; ║
-     9553 ;; ║
-     32 ;; space
-     nil
-     t)
-
-    (efar-draw-border-line
-     9562 ;; ╚
-     9577 ;; ╩
-     9565 ;; ╝
-     9552 ;; ═
-     nil)))
-
+    (efar-draw-border-line 9562 ;; ╚
+			   9577 ;; ╩
+			   9565 ;; ╝
+			   9552 ;; ═
+			   nil)))
 
 (defun efar-draw-border-line(left center right filler splitter &optional newline)
-  "Draw border line according to given arguments.
+  "Draw the line according to given arguments.
 LEFT is a character to be used to draw left border.
 CENTER is a character to be used to draw vertical splitter between panels.
 RIGHT is a character to be used to draw right border.
@@ -2551,7 +2535,6 @@ FILLER is a character to be used as a filler between borders
 when SPLITTER is not given, otherwise use SPLITTER.
 NEWLINE - if t the insert newline character."
   (let ((mode (efar-get :mode)))
-    
     (cl-loop for side
 	     from (if (or (equal mode :left) (equal mode :both)) 1 2)
 	     upto (if (or (equal mode :right) (equal mode :both)) 2 1)
@@ -2718,7 +2701,6 @@ When SKIP-NON-EXISTING? is t then non-existing files removed from the list."
 			     (if (or current? (not marked-files))
 				 (list current-file-number)
 			       marked-files)))))))
-
 
 (defun efar-abort()
   "Quit fast search mode when it's active.
@@ -3305,11 +3287,9 @@ Case is ignored when IGNORE-CASE? is t."
 			  ;; do search the text
 			  (while (funcall search-func text nil t)
 			    ;; store line number and whole line where searched text occurs
-			    (push
-			     (cons
-			      (line-number-at-pos)
-			      (replace-regexp-in-string "\n" "" (thing-at-point 'line t)))
-			     hits)
+			    (push (cons (line-number-at-pos)
+					(replace-regexp-in-string "\n" "" (thing-at-point 'line t)))
+				  hits)
 			    (forward-line)))
 			
 			(reverse hits))))
