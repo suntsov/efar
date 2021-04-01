@@ -381,7 +381,7 @@ IGNORE-IN-MODES is a list of modes which should ignore this key binding."
 (efar-register-key "<C-insert>" 'efar-deselect-all  nil 'efar-deselect-all-key
  		   "unmark all items in the list" :space-after (list :file-hist :dir-hist :bookmark :disks :search))
 
-(efar-register-key "TAB"   'efar-switch-to-other-panel nil 'efar-switch-to-other-panel-key
+(efar-register-key "TAB" 'efar-switch-to-other-panel nil 'efar-switch-to-other-panel-key
  		   "switch to other panel" t)
 (efar-register-key "C-c TAB"  'efar-open-dir-other-panel nil 'efar-open-dir-other-panel-key
  		   "open current directory in other panel" :space-after)
@@ -458,7 +458,7 @@ IGNORE-IN-MODES is a list of modes which should ignore this key binding."
 		   "display search results in a separate buffer" :space-after (list :file-hist :dir-hist :bookmark :disks :files))
 
 (efar-register-key "C-g" 'efar-abort  nil nil
-		   "abort current operation" t)
+		   "quit fast search mode or switch panel to files mode" t)
 
 (efar-register-key "C-n" 'efar-suggest-hint nil nil nil nil)
 
@@ -1112,24 +1112,14 @@ on any next cursor movement."
 	(status (or status "Ready")))
     
     (efar-set status :status)
-    (efar-output-status)
+    (setq mode-line-format (list " " mode-line-modes (or status (efar-get :status))))
+    (force-mode-line-update)
+    (sit-for 0.01)
     
     (when seconds
       (run-at-time seconds nil
 		   `(lambda()
 		      (efar-set-status ',prev-status))))))
-
-(defun efar-output-status(&optional status)
-  "Output STATUS."
-  (efar-write-enable
-   
-   (let* ((w (- (efar-get :window-width) 2))
-	  (status-string (efar-prepare-string (or status (efar-get :status)) w)))
-
-     (efar-place-item 1 (+ 4 (efar-get :panel-height))
-		      status-string
-		      'efar-header-face
-		      w nil nil nil t))))
 
 (defun efar-key-press-handle(func arg ignore-in-modes)
   "Handler for registered key-bindings.
@@ -1654,7 +1644,9 @@ When NO-HIST? is t then DIR is not saved in the history list."
 	(efar-set new-hist :directory-history)))
     
     ;; set up file change notification for the directory
-    (efar-setup-notifier dir side)))
+    (efar-setup-notifier dir side)
+    (efar-calculate-widths)
+    (efar-write-enable (efar-redraw))))
 
 
 (defun efar-get-parent-dir(dir)
@@ -1903,7 +1895,7 @@ When NO-AUTO-READ? is t then no auto file read happens."
       
       (efar-write-enable
        (let* ((curr-pos (efar-get :panels side :current-pos))
-	      (max-files-in-column (- (efar-get :panel-height) 1))
+	      (max-files-in-column (efar-get :panel-height))
 	      (max-file-number (length (efar-get :panels side :files)))
 	      (start-file-number (efar-get :panels side :start-file-number))
 	      (panel-mode (efar-get :panels side :mode))
@@ -2118,13 +2110,13 @@ When NO-AUTO-READ? is t then no auto file read happens."
   "Calculate and set windows sizes."
   (efar-set (- (window-width) 1) :window-width)
   (efar-set (window-height) :window-height)
-  (efar-set (- (window-height) 7) :panel-height))
+  (efar-set (- (window-height) 6) :panel-height))
 
 (defun efar-redraw()
   "The main function to output content of eFar buffer."
   (efar-calculate-window-size)
   (erase-buffer)
-
+  
   (if (< (efar-get :window-width) 30)
       (insert "eFar buffer is too narrow")
     ;; draw all border lines
@@ -2146,6 +2138,7 @@ When NO-AUTO-READ? is t then no auto file read happens."
     ;; during drag we show hand pointer
     (when efar-mouse-down?
       (put-text-property (point-min) (point-max) 'pointer 'hand))
+
     (efar-set-status "Ready")))
 
 (defun efar-reinit()
@@ -2170,14 +2163,16 @@ When NO-AUTO-READ? is t then no auto file read happens."
 		 (efar-get :panels side :files)
 		 (or (equal mode :both) (equal mode side)))
 	
-	(setf status-string (concat  (if (nth 1 file) "Directory: " "File: ")
-				     (efar-get-short-file-name file)
-				     "  Modified: "
-				     (format-time-string "%D %T" (nth 6 file))
-				     (if (and (not (nth 1 file)) (numberp (nth 8 file)))
-					 (concat "  Size: " (int-to-string (nth 8 file)))))))
+	(setf status-string (concat  (efar-get-short-file-name file)
+				     "  "
+				     (format-time-string "%x %X" (nth 6 file))
+				     "  "
+				     (if (equal (nth 1 file) t)
+					 "Directory"
+				       (when (numberp (nth 8 file))
+					 (format "%d bytes (%s)" (nth 8 file) (efar-file-size-as-string (nth 8 file))))))))
       
-      (efar-place-item nil (+ 2 (efar-get :panel-height))
+      (efar-place-item nil (+ 3 (efar-get :panel-height))
 		       status-string
 		       'efar-border-line-face
 		       width nil side :left t))))
@@ -2212,7 +2207,7 @@ otherwise redraw all."
 	   (panel-mode (efar-get :panels side :mode)))
 	
 	(goto-char 0)
-	(forward-line)
+	(forward-line 1)
 	
 	(let*
 	    ;; calculate start column for printing file names
@@ -2220,7 +2215,7 @@ otherwise redraw all."
 				 ((and (equal side :right) (equal mode :right)) 1) ;; right panel when it's alone also starts at 1
 				 (t (+ (efar-panel-width :left) 2)))) ;; otherwise start at position where left panel ends
 	     ;; maximum number in one column
-	     (max-files-in-column (- (efar-get :panel-height) 1))
+	     (max-files-in-column (efar-get :panel-height))
 	     ;; file counter
 	     (cnt 0)
 	     ;; number of columns in the panel
@@ -2327,7 +2322,7 @@ otherwise redraw all."
 				  (cl-incf cnt))
 		     
 		     (goto-char 0)
-		     (forward-line))))))))
+		     (forward-line 1))))))))
 
 (defun efar-output-header(side)
   "Output eFar header in panel SIDE."
@@ -2488,63 +2483,62 @@ CONTROL-PARAMS - item is considered as control with given parameters"
     
     ;; insert first line
     (efar-draw-border-line
-     #x2554 ;; ╔
-     #x2566 ;; ╦
-     #x2557 ;; ╗
-     #x2550 ;; ═
-     #x2564
-     t) ;; ╤
+     9556 ;; ╔
+     9574 ;; ╦
+     9559 ;; ╗
+     9552 ;; ═
+     9552 ;; ═
+     t)
+    
+    (efar-draw-border-line
+     9553 ;; ║
+     9553 ;; ║     
+     9553 ;; ║     
+     32 ;; space
+     nil
+     t)
+    
+    ;; (efar-draw-border-line
+    ;;  9567 ;; ╟ 
+    ;;  9579 ;; ╫
+    ;;  9570 ;; ╢
+    ;;  9472 ;; ─
+    ;;  9516 ;; ┬
+    ;;  t) ;; 
     
     ;; insert vertical lines
     (cl-loop repeat panel-height do
 	     
 	     (efar-draw-border-line
-	      #x2551 ;; ║
-	      #x2551 ;; ║
-	      #x2551 ;; ║
-	      #x0020 ;; space
-	      #x2502 ;; │
+	      9553 ;; ║
+	      9553 ;; ║
+	      9553 ;; ║
+	      32 ;; space
+	      9474 ;; │
 	      t))
     
     
     (efar-draw-border-line
-     9568 ;; 
-     9580
-     9571 ;; 
-     #x2550 ;; ═
-     9575
+     9568 ;; ╠
+     9580 ;; ╬
+     9571 ;; ╣
+     9552 ;; ═
+     9575 ;; ╧
      t) ;; 
     
     (efar-draw-border-line
-     #x2551 ;; ║
-     #x2551 ;; ║
-     #x2551 ;; ║
-     #x0020 ;; space
+     9553 ;; ║
+     9553 ;; ║  
+     9553 ;; ║
+     32 ;; space
      nil
      t)
-    
+
     (efar-draw-border-line
-     9568 ;;
-     #x2569 ;; ╩
-     9571 ;;
-     #x2550 ;; ═
-     nil
-     t)
-    
-    (efar-draw-border-line
-     #x2551 ;; ║
-     #x0020
-     #x2551 ;; ║
-     #x0020 ;; space
-     nil
-     t)
-    
-    (efar-draw-border-line
-     #x255A ;; ╚
-     
-     #x2550 ;; ═
-     #x255D ;; ╝
-     #x2550 ;; ═
+     9562 ;; ╚
+     9577 ;; ╩ 
+     9565 ;; ╝
+     9552 ;; ═
      nil)))
 
 
@@ -2727,12 +2721,12 @@ When SKIP-NON-EXISTING? is t then non-existing files removed from the list."
 
 
 (defun efar-abort()
-  "Abort current operation."
+  "Quit fast search mode when it's active.
+Switch current panel to :files mode otherwise."
   (unless (efar-get :fast-search-string)
     (let ((side (efar-get :current-panel)))
       (when (cl-member (efar-get :panels side :mode) '(:search :bookmark :dir-hist :file-hist :disks))
-	(efar-go-to-dir (efar-last-visited-dir side) side)
-	(efar-write-enable (efar-redraw)))))
+	(efar-go-to-dir (efar-last-visited-dir side) side))))
   (efar-quit-fast-search))
 
 (defun efar-last-visited-dir(&optional thing)
@@ -2787,7 +2781,7 @@ Truncate string to WIDTH characters."
 (defun efar-file-size-as-string(size)
   "Prepare human readable string representing file SIZE."
   (cond ((< size 1024)
-	 (concat (int-to-string size) "  B"))
+	 (concat (int-to-string size) " B"))
 	((< size 1048576)
 	 (concat (int-to-string (/ size 1024)) " KB"))
 	((< size 1073741824)
@@ -3585,7 +3579,7 @@ BUTTON is a button clicked."
   "Major mode for the eFar buffer."
   (interactive)
   (if (not (equal (buffer-name (current-buffer)) efar-buffer-name))
-      (warn "Mode must be used for eFar buffer only")
+      (warn "Mode is intended be used for eFar buffer only")
     (kill-all-local-variables)
     (use-local-map efar-mode-map)
     (efar-mode-set-keys)
