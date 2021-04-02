@@ -4,7 +4,7 @@
 
 ;; Author: "Vladimir Suntsov" <vladimir@suntsov.online>
 ;; Maintainer: vladimir@suntsov.online
-;; Version: 1.12
+;; Version: 1.13
 ;; Package-Requires: ((emacs "26.1"))
 ;; Keywords: files
 ;; URL: https://github.com/suntsov/efar
@@ -42,7 +42,7 @@
 (require 'dired)
 (require 'comint)
 
-(defconst efar-version 1.12 "Current eFar version number.")
+(defconst efar-version 1.13 "Current eFar version number.")
 
 (defvar efar-state nil)
 (defvar efar-mouse-down? nil)
@@ -522,6 +522,8 @@ When NO-SWITCH? is t then don't switch to eFar buffer."
 	
 	(efar-calculate-window-size)
 	(efar-calculate-widths)
+	(efar-go-to-dir (efar-get :panels :left :dir) :left)
+	(efar-go-to-dir (efar-get :panels :right :dir) :right)
 	(efar-write-enable
 	 (efar-redraw)))
       
@@ -558,13 +560,10 @@ REINIT? is a boolean indicating that configuration should be generated enew."
   (when (or reinit?
 	    (null efar-state))
     (setf efar-state nil)
-    (efar-init-state))
-  
-  (efar-go-to-dir (efar-get :panels :left :dir) :left)
-  (efar-go-to-dir (efar-get :panels :right :dir) :right)
-  
-  (when reinit?
-    (efar-write-enable (efar-redraw))))
+    (efar-init-state)))
+    
+;;  (when reinit?
+;;    (efar-write-enable (efar-redraw))))
 
 (defun efar-init-state()
   "Initialize state with default values."
@@ -617,7 +616,7 @@ REINIT? is a boolean indicating that configuration should be generated enew."
   (efar-set nil :reset-status?)
   
   (efar-set 1 :panels :left :view :files :column-number)
-  (efar-set '(:short :detailed :long) :panels :left :view :files :file-disp-mode)
+  (efar-set '(:short :long :detailed :full) :panels :left :view :files :file-disp-mode)
   (efar-set 1 :panels :left :view :dir-hist :column-number)
   (efar-set '(:long) :panels :left :view :dir-hist :file-disp-mode)
   (efar-set 1 :panels :left :view :file-hist :column-number)
@@ -630,7 +629,7 @@ REINIT? is a boolean indicating that configuration should be generated enew."
   (efar-set '(:long) :panels :left :view :search :file-disp-mode)
   
   (efar-set 1 :panels :right :view :files :column-number)
-  (efar-set '(:short :detailed :long) :panels :right :view :files :file-disp-mode)
+  (efar-set '(:short :long :detailed :full) :panels :right :view :files :file-disp-mode)
   (efar-set 1 :panels :right :view :dir-hist :column-number)
   (efar-set '(:long) :panels :right :view :dir-hist :file-disp-mode)
   (efar-set 1 :panels :right :view :file-hist :column-number)
@@ -933,7 +932,14 @@ from version FROM-VERSION to actual version."
 	    (efar-set '(:long) :panels :right :view :file-hist :file-disp-mode)
 	    
 	    
-	    (message "State file upgraded to version 1.0")))
+	    (message "State file upgraded to version 1.0"))
+
+	  ;; 1.12 -> 1.13
+	  (when (< from-version 1.13)
+	    (efar-set '(:short :long :detailed :full) :panels :right :view :files :file-disp-mode)
+	    (efar-set '(:short :long :detailed :full) :panels :left :view :files :file-disp-mode)
+	    (message "State file upgraded to version 1.13")))
+    
       (error
        (message "Error occured during upgrading state file: %s. State file skipped." (error-message-string err))
        (setf efar-state nil)))
@@ -1058,7 +1064,7 @@ User also can select an option to overwrite all remaining files to not be asked 
 			       ;; if file is a directory and does exist in destination folder
 			       ((and (equal (cadr f) t) (file-exists-p newfile))
 				;; we call local function recursively
-				(do-operation operation (directory-files-and-attributes (car f) nil nil t) newfile (expand-file-name (efar-get-short-file-name f) default-directory) )
+				(do-operation operation (directory-files-and-attributes (car f) nil nil t 'string) newfile (expand-file-name (efar-get-short-file-name f) default-directory) )
 				(when (equal operation :move)
 				  (delete-directory (car f))))))))
 
@@ -1836,21 +1842,21 @@ When FOR-READ? is t switch back to eFar buffer."
 			
 			;; panel is in mode :files
 			(:files
-			 (directory-files-and-attributes (efar-get :panels side :dir) t nil t))
+			 (directory-files-and-attributes (efar-get :panels side :dir) t nil t 'string))
 			
 			;; entries to be displayed in directory history
 			(:dir-hist
-			 (mapcar (lambda(d) (let ((attrs (file-attributes (car d))))
+			 (mapcar (lambda(d) (let ((attrs (file-attributes (car d) 'string)))
 					      (append (push (car d) attrs) (list (cdr (assoc :time (cdr d)))))))
 				 (efar-get :directory-history)))
 			;; entries to be displayed in file history
 			(:file-hist
-			 (mapcar (lambda(d) (let ((attrs (file-attributes (car d))))
+			 (mapcar (lambda(d) (let ((attrs (file-attributes (car d) 'string)))
 					      (append (push (car d) attrs) (list (cdr (assoc :time (cdr d)))))))
 				 (efar-get :file-history)))
 			;; entries to be displayed in bookmark mode
 			(:bookmark
-			 (mapcar (lambda(d) (let ((attrs (file-attributes d)))
+			 (mapcar (lambda(d) (let ((attrs (file-attributes d 'string)))
 					      (push d attrs)))
 				 (efar-get :bookmarks)))
 			
@@ -2238,12 +2244,20 @@ otherwise redraw all."
 	  ;; loop over column numbers
 	  (cl-loop for col from 0 upto (- col-number 1) do
 		   
-		   (let ;; get subset of files which fit in column
+		   (let* ;; get subset of files which fit in column
 		       ((files-in-column (cl-subseq files
 						    (* col max-files-in-column)
 						    (* (+ col 1) max-files-in-column)))
 			;; width of current column
-			(column-width (nth col widths)))
+			(column-width (nth col widths))
+			;; calculate max widths of uid/gid if panel is in full mode
+			(uid-gid-max-widths (when (equal disp-mode :full)
+					      (let ((uid-width 0)
+						    (gid-width 0))
+						(cl-loop for f in files-in-column do
+							 (setf uid-width (max uid-width (length (nth 3 f))))
+							 (setf gid-width (max gid-width (length (nth 4 f)))))
+						(cons uid-width gid-width)))))
 		     
 		     ;; loop over this subset
 		     (cl-loop repeat (length files-in-column)  do
@@ -2263,7 +2277,7 @@ otherwise redraw all."
 				     ;; get real file (for symlinks)
 				     (real-file (if (not (stringp (cadr file)))
 						    (cdr file)
-						  (file-attributes (cadr file))))
+						  (file-attributes (cadr file) 'string)))
 				     ;; is it a directory?
 				     (dir? (car real-file))
 				     ;; is it a normal file?
@@ -2289,7 +2303,9 @@ otherwise redraw all."
 						      (concat (when (nth 13 file) (format-time-string "%Y-%m-%d   " (nth 13 file))) file-name))
 						     (t file-name))))
 					    ;; in deteiled mode we output detailed info about file
-					    (:detailed (efar-prepare-detailed-file-info file column-width))))
+					    (:detailed (efar-prepare-detailed-file-info file column-width))
+					     ;; in full mode we output all possible info about file
+					    (:full (efar-prepare-detailed-file-info file column-width 'full uid-gid-max-widths))))
 				     ;; get corresponding face
 				     (face
 				      (cond
@@ -2376,7 +2392,8 @@ otherwise redraw all."
 	  (setf str (pcase (car (efar-get :panels side :view (efar-get :panels side :mode) :file-disp-mode))
 	 	      (:short "S")
 	 	      (:long "L")
-	 	      (:detailed "D")))
+	 	      (:detailed "D")
+		      (:full "F")))
 	  (efar-place-item (+ col (- (efar-panel-width side) 3)) 1 str 'efar-header-face nil nil nil nil nil
 			   (list (cons :side side) (cons :control :file-disp-mode))
 			   'hand))
@@ -2498,7 +2515,7 @@ CONTROL-PARAMS - item is considered as control with given parameters"
 			   'newline)
     
     ;; files area
-    (cl-loop repeat panel-height do	     
+    (cl-loop repeat panel-height do
 	     (efar-draw-border-line 9553 ;; ║
 				    9553 ;; ║
 				    9553 ;; ║
@@ -2511,7 +2528,7 @@ CONTROL-PARAMS - item is considered as control with given parameters"
 			   9571 ;; ╣
 			   9552 ;; ═
 			   9575 ;; ╧
-			   'newline) 
+			   'newline)
     
     (efar-draw-border-line 9553 ;; ║
 			   9553 ;; ║
@@ -2731,35 +2748,53 @@ Or it could be a string representing Windows drive letter."
   "Change file display mode in panel SIDE.
 Mode is changed in the loop :short -> :detail -> :long."
   (let* ((side (or side (efar-get :current-panel)))
-	 (modes (efar-get :panels side :view (efar-get :panels side :mode) :file-disp-mode)))
-    (efar-set (reverse (cons (car modes) (reverse (cdr modes))))
-	      :panels side :view (efar-get :panels side :mode) :file-disp-mode))
+	 (modes (efar-get :panels side :view (efar-get :panels side :mode) :file-disp-mode))
+	 (new-modes (reverse (cons (car modes) (reverse (cdr modes))))))
+    (efar-set new-modes
+	      :panels side :view (efar-get :panels side :mode) :file-disp-mode)
+
+    (when (member (car new-modes) '(:full :detailed))
+      (efar-set 1 :panels side :view (efar-get :panels side :mode) :column-number)))
+
+  (efar-calculate-widths)
   (efar-write-enable (efar-redraw)))
 
-(defun efar-prepare-detailed-file-info(file width)
-  "Prepare string with detailed info for FILE.
-Truncate string to WIDTH characters."
+(defun efar-prepare-detailed-file-info(file width &optional full? max-uid-gid-widths)
+  "Prepare string with detailed info for FILE (size and date).
+Truncate string to WIDTH characters.
+When FULL? t, then include also file modes, uid and gid.
+MAX-UID-GID-WIDTHS is relevant when FULL?.  It contains precalculated maximal
+widths for uid and gid columns."
   (if (or (equal (car file) "..") (string-empty-p (car file)))
       (car file)
-    (let ((size (if (cadr file)
-		    "DIR"
-		  (efar-file-size-as-string (nth 8 file))))
-	  (name (file-name-nondirectory  (car file)))
-	  (time (format-time-string "%D %T" (nth 6 file))))
-      
-      (if (< width 35)
-	  (concat (cond ((< (length name) 6)
-			 (concat name " "))
-			(t
-			 (concat (cl-subseq name 0 4) "> ")))
-		  (format "%7s" size) "   " time)
-	
-	(let ((max-name-width (- width 30)))
-	  
-	  (if (> (length name) max-name-width)
-	      (concat (cl-subseq name 0 (- max-name-width 1)) ">   " (format "%7s" size) "   " time)
-	    (concat name (make-string (- max-name-width (length name)) ?\s) "   " (format "%7s" size) "   " time)))))))
+    (let* ((size (if (cadr file)
+		     "DIR"
+		   (efar-file-size-as-string (nth 8 file))))
+	   (name (file-name-nondirectory  (car file)))
+	   (time (format-time-string "%D %T" (nth 6 file)))
+	   (file-modes (when full? (nth 9 file)))
+	   (uid (when full? (nth 3 file)))
+	   (gid (when full? (nth 4 file)))
+	   (file-details-format (concat "%s   %s"
+					(when full?
+					  (concat
+					   "   %s   "
+					   "%-" (int-to-string (car max-uid-gid-widths)) "s   "
+					   "%-" (int-to-string (cdr max-uid-gid-widths)) "s"))))
+	   (file-details (format file-details-format size time file-modes uid gid)))
 
+      (cond ((>= width (+ (length file-details)
+		       (length name)
+		       3))
+	     (concat (efar-prepare-string name (- width (length file-details) 3)) "   " file-details))
+
+	    ((>= width (+ (length file-details)
+			  5))
+	     (concat (efar-prepare-string name (- width (length file-details) 3)) "   " file-details))
+
+	    (t
+	     (concat (efar-prepare-string name 2) "   " (efar-prepare-string file-details (- width 5))))))))
+ 
 (defun efar-file-size-as-string(size)
   "Prepare human readable string representing file SIZE."
   (cond ((< size 1024)
@@ -2813,7 +2848,7 @@ Truncate string to WIDTH characters."
 				   (cl-incf dirs))
 			       
 			       ;; otherwise if item is a file
-			       (cl-incf size (nth 7 (file-attributes file)))
+			       (cl-incf size (nth 7 (file-attributes file 'string)))
 			       (cl-incf files))))
 	    
 	    ;; run calculation for the current item in current panel
@@ -3175,7 +3210,7 @@ Message consists of MESSAGE-TYPE and DATA."
     ;; message from subprocess about found files
     ;; we just push this file to the search result list
     (:found-file (let* ((file (cdr (assoc :name data)))
-			(attrs (file-attributes file)))
+			(attrs (file-attributes file 'string)))
 		   (push (append (push file attrs) (list (cdr (assoc :lines data)))) efar-search-results)))
     ;; message from the subprocess indicating that it finished his work
     ;; once all subprocesses send this message we finish search
@@ -3219,7 +3254,7 @@ When TEXT is not nil given string is searched in the files.
 When REGEXP? is t text is treated as regular expression.
 Case is ignored when IGNORE-CASE? is t."
   ;; loop over all entries in the DIR
-  (cl-loop for entry in (cl-remove-if (lambda(e) (or (string= (car e) ".") (string= (car e) ".."))) (directory-files-and-attributes dir nil nil t)) do
+  (cl-loop for entry in (cl-remove-if (lambda(e) (or (string= (car e) ".") (string= (car e) ".."))) (directory-files-and-attributes dir nil nil t 'string)) do
 	   
 	   (let* ((symlink? (stringp (cadr entry)))
 		  (dir? (or (equal (cadr entry) t)
