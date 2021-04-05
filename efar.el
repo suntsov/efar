@@ -4,7 +4,7 @@
 
 ;; Author: "Vladimir Suntsov" <vladimir@suntsov.online>
 ;; Maintainer: vladimir@suntsov.online
-;; Version: 1.13
+;; Version: 1.14
 ;; Package-Requires: ((emacs "26.1"))
 ;; Keywords: files
 ;; URL: https://github.com/suntsov/efar
@@ -42,7 +42,7 @@
 (require 'dired)
 (require 'comint)
 
-(defconst efar-version 1.13 "Current eFar version number.")
+(defconst efar-version 1.14 "Current eFar version number.")
 
 (defvar efar-state nil)
 (defvar efar-mouse-down? nil)
@@ -3573,11 +3573,36 @@ BUTTON is a button clicked."
 ;; eFar major mode
 ;;--------------------------------------------------------------------------------
 
-(defvar efar-mode-map (make-keymap)
+(defvar efar-mode-map
+  (let ((keymap (make-sparse-keymap)))
+    (cl-loop for key in efar-keys do
+	     (let ((key-seq (if (null (nth 3 key))
+				(kbd (nth 0 key))
+			      (symbol-value (nth 3 key)))))
+	       (define-key keymap
+		 key-seq
+		 `(lambda()
+		    (interactive)
+		    (efar-key-press-handle (nth 1 ',key) (nth 2 ',key) (nth 6 ',key))))))
+    
+    (cl-loop for k in '("<double-mouse-1>"
+			"<mouse-1>"
+			"<wheel-down>"
+			"<wheel-up>"
+			"<C-mouse-1>"
+			"<C-down-mouse-1>"
+			"<S-mouse-1>"
+			"<S-down-mouse-1>"
+			"<drag-mouse-1>"
+			"<down-mouse-1>")
+	     do
+	     (define-key keymap (kbd k) (lambda (event)
+					  (interactive "e")
+					  (efar-process-mouse-event event))))
+    keymap)
   "Keymap for eFar buffer.")
 
-(defvar efar-menu nil
-  "Keymap for the eFar buffer menu bar.")
+(defvar efar-menu  "Keymap for the eFar buffer menu bar.")
 
 (defun efar-customize()
   "Open customization buffer for eFar."
@@ -3590,48 +3615,18 @@ BUTTON is a button clicked."
     [,"Describe keys" efar-show-help :active t :keys "C-c ?"]
     [,"Customize" efar-customize t]))
 
-(defun efar-mode()
+(define-derived-mode
+  efar-mode fundamental-mode "eFar"
   "Major mode for the eFar buffer."
-  (interactive)
+  :group 'efar
+
   (if (not (equal (buffer-name (current-buffer)) efar-buffer-name))
       (warn "Mode is intended be used for eFar buffer only")
-    (kill-all-local-variables)
-    (use-local-map efar-mode-map)
-    (efar-mode-set-keys)
+
     (easy-menu-add efar-menu)
-    (setq major-mode 'efar-mode
-	  mode-name "eFar")
-    (setq mode-line-format (list " " mode-line-modes))
     ;; hooks
     (add-hook 'window-configuration-change-hook #'efar-window-conf-changed)
     (add-hook 'kill-buffer-hook #'efar-buffer-killed nil 'local)
     (add-hook 'kill-emacs-hook #'efar-emacs-killed)))
-
-(defun efar-mode-set-keys()
-  "Set key bindings for the eFar mode."
-  ;; set keyboard
-  (cl-loop for key in efar-keys do
-	   (let ((key-seq (if (null (nth 3 key))
-			      (kbd (nth 0 key))
-			    (symbol-value (nth 3 key)))))
-	     (define-key efar-mode-map
-	       key-seq
-	       `(lambda()
-		  (interactive)
-		  (efar-key-press-handle (nth 1 ',key) (nth 2 ',key) (nth 6 ',key))))))
   
-  (cl-loop for k in '("<double-mouse-1>"
-		      "<mouse-1>"
-		      "<wheel-down>"
-		      "<wheel-up>"
-		      "<C-mouse-1>"
-		      "<C-down-mouse-1>"
-		      "<S-mouse-1>"
-		      "<S-down-mouse-1>"
-		      "<drag-mouse-1>"
-		      "<down-mouse-1>")
-	   do
-	   (define-key efar-mode-map (kbd k) (lambda (event)
-					       (interactive "e")
-					       (efar-process-mouse-event event)))))
 ;;; efar.el ends here
