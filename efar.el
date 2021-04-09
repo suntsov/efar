@@ -2071,7 +2071,7 @@ when normal file - open it in external application.
 
 When DONT-RUN? is t executable file is not run, but it's name
 just copied to the shell."
-  (let* ((side (efar-get :current-panel))	 
+  (let* ((side (efar-get :current-panel))
 	 (file (car (efar-selected-files side t t))))
     
     (cond ((or
