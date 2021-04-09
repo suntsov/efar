@@ -40,8 +40,8 @@
 (require 'subr-x)
 (require 'filenotify)
 (require 'dired)
-(require 'comint)
-(require 'eshell)
+(require 'esh-mode)
+(require 'em-dirs)
 
 (defconst efar-version 1.15 "Current eFar version number.")
 
@@ -2070,8 +2070,7 @@ when normal file - open it in external application.
 
 When DONT-RUN? is t executable file is not run, but it's name
 just copied to the shell."
-  (let* ((side (efar-get :current-panel))
-	 (current-dir-path (efar-get :panels side :dir))
+  (let* ((side (efar-get :current-panel))	 
 	 (file (car (efar-selected-files side t t))))
     
     (cond ((or
@@ -2094,7 +2093,6 @@ just copied to the shell."
 CD to `default-directory' when GO-TO-DIR? is t."
   (save-window-excursion
     (let* ((dir default-directory)
-	   (eshell-buffer-name efar-shell-buffer-name)
 	   (shell-buffer (eshell)))
       (when go-to-dir?
 	(with-current-buffer shell-buffer
@@ -2113,19 +2111,18 @@ Execute it unless DONT-RUN? is t."
   (efar-display-shell nil)
   (sit-for 0.1)
   (select-window (get-buffer-window (get-buffer efar-buffer-name)))
-
-  (let* ((dir default-directory)
-	(subtask-running? (with-current-buffer efar-shell-buffer-name
-			    eshell-current-command ))
-	(ready? (or (null (get-buffer efar-shell-buffer-name))
-		    (null subtask-running?)
-		    (equal "Yes" (ido-completing-read (concat "Operation is in progress '"
-							      (with-current-buffer efar-shell-buffer-name
-								(concat eshell-last-command-name " "
-									(string-join eshell-last-arguments " ")))
-							      "'. Abort? ")
-						      (list "Yes" "No"))))))
-
+  
+  (let* ((subtask-running? (with-current-buffer efar-shell-buffer-name
+			     eshell-current-command ))
+	 (ready? (or (null (get-buffer efar-shell-buffer-name))
+		     (null subtask-running?)
+		     (equal "Yes" (ido-completing-read (concat "Operation is in progress '"
+							       (with-current-buffer efar-shell-buffer-name
+								 (concat eshell-last-command-name " "
+									 (string-join eshell-last-arguments " ")))
+							       "'. Abort? ")
+						       (list "Yes" "No"))))))
+    
     (when ready?
       (let* ((side (efar-get :current-panel))
 	     (file (efar-get-short-file-name (car (efar-selected-files side t t)))))
