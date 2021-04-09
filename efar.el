@@ -4,7 +4,7 @@
 
 ;; Author: "Vladimir Suntsov" <vladimir@suntsov.online>
 ;; Maintainer: vladimir@suntsov.online
-;; Version: 1.14
+;; Version: 1.15
 ;; Package-Requires: ((emacs "26.1"))
 ;; Keywords: files
 ;; URL: https://github.com/suntsov/efar
@@ -41,8 +41,9 @@
 (require 'filenotify)
 (require 'dired)
 (require 'comint)
+(require 'eshell)
 
-(defconst efar-version 1.14 "Current eFar version number.")
+(defconst efar-version 1.15 "Current eFar version number.")
 
 (defvar efar-state nil)
 (defvar efar-mouse-down? nil)
@@ -92,6 +93,12 @@
 (eval-and-compile
   (defcustom efar-buffer-name "*eFAR*"
     "Name for the Efar buffer."
+    :group 'efar-parameters
+    :type 'string))
+
+(eval-and-compile
+  (defcustom efar-shell-buffer-name "*eFAR shell*"
+    "Name for the Efar shell buffer."
     :group 'efar-parameters
     :type 'string))
 
@@ -196,6 +203,20 @@
        :background "navy"
        :underline nil))
   "File item style (executable file)"
+  :group 'efar-faces)
+
+(defface efar-file-current-executable-face
+  '((t :foreground "green"
+       :background "cadet blue"
+       :underline nil))
+  "Current file item style (executable file)"
+  :group 'efar-faces)
+
+(defface efar-marked-current-face
+  '((t :foreground "gold"
+       :background "cadet blue"
+       :underline nil))
+  "Current marked item style"
   :group 'efar-faces)
 
 (defface efar-dir-face
@@ -368,8 +389,11 @@ IGNORE-IN-MODES is a list of modes which should ignore this key binding."
  		   "loop over directories in directory history forward" t)
 (efar-register-key "C-M-<up>" 'efar-go-directory-history-cicle :backward 'efar-prev-directory-in-history-key
  		   "loop over directories in directory history backward" t)
-(efar-register-key "RET" '((:files . efar-enter-directory) (:dir-hist . efar-navigate-to-file) (:file-hist . efar-navigate-to-file) (:bookmark . efar-navigate-to-file) (:disks . efar-switch-to-disk) (:search . efar-navigate-to-file))  nil  'efar-enter-directory-key
- 		   "go into or to the item under cursor" :space-after)
+(efar-register-key "RET" '((:files . efar-handle-enter) (:dir-hist . efar-navigate-to-file) (:file-hist . efar-navigate-to-file) (:bookmark . efar-navigate-to-file) (:disks . efar-switch-to-disk) (:search . efar-navigate-to-file))  nil  'efar-enter-directory-key
+ 		   "go into/to the item under cursor or run executable file in the shell" :space-after)
+
+(efar-register-key "M-RET" 'efar-handle-enter t 'efar-copy-to-shell-key
+		   "insert file name into the shell buffer" t (list :file-hist :dir-hist :bookmark :disks :search))
 
 (efar-register-key "M-<down>" 'efar-scroll-other-window :down 'efar-scroll-other-down-key
  		   "scroll other window down" t)
@@ -433,7 +457,7 @@ IGNORE-IN-MODES is a list of modes which should ignore this key binding."
 		   "run ediff for selected files" t (list :file-hist :dir-hist :bookmark :disks :search))
 (efar-register-key "C-c c s" 'efar-current-file-stat  nil 'efar-current-file-stat-key
 		   "show directory stats (size and files number)" t)
-(efar-register-key "C-c c o" 'efar-display-console  nil 'efar-display-console-key
+(efar-register-key "C-c c o" 'efar-display-shell  t 'efar-display-shell-key
 		   "open console window"  t)
 (efar-register-key "<f12> <f12>"  'efar-reinit  nil 'efar-reinit-key
 		   "reinit and redraw eFar buffer" t)
@@ -1482,16 +1506,6 @@ Ask user for file mask and show files in current panel matching this mask only."
     (efar-set 0 :panels side :current-pos)
     (efar-write-enable (efar-redraw))))
 
-(defun efar-display-console ()
-  "Open shell in new buffer and go to directory opened in current panel."
-  (if (not (get-buffer "*efar-shell*"))
-      (shell "*efar-shell*")
-    (let ((side (efar-get :current-panel)))
-      (with-current-buffer (get-buffer "*efar-shell*")
-	(insert (concat "cd " (efar-get :panels side :dir)))
-	(comint-send-input nil t))
-      (display-buffer "*efar-shell*"))))
-
 (defun efar-fast-search(k)
   "Activate and/or perform incremental search.
 K is a character typed by the user."
@@ -2047,6 +2061,88 @@ When NO-AUTO-READ? is t then no auto file read happens."
 	  (unless last-auto-read-buffer-exists?
  	    (efar-set buffer :last-auto-read-buffer)))))))
 
+(defun efar-handle-enter(&optional dont-run?)
+  "Handle enter key pressing.
+Do action depending on the type of item under cursor:
+when directory - enter this directory
+when executable file - open shell and execute it in the shell
+when normal file - open it in external application.
+
+When DONT-RUN? is t executable file is not run, but it's name
+just copied to the shell."
+  (let* ((side (efar-get :current-panel))
+	 (current-dir-path (efar-get :panels side :dir))
+	 (file (car (efar-selected-files side t t))))
+    
+    (cond ((or
+	    ;; file is a normal directory
+	    (equal (cadr file) t)
+	    ;; file is a symlink pointing to the directory
+	    (and (stringp (cadr file))
+		 (file-directory-p (cadr file))))
+
+	   (efar-enter-directory))
+	  
+	  ((file-executable-p (car file))
+	   
+	   (efar-execute-file dont-run?))
+	  
+	  (t (efar-open-file-in-ext-app)))))
+
+(defun efar-display-shell(&optional go-to-dir?)
+  "Open eshell buffer.
+CD to `default-directory' when GO-TO-DIR? is t."
+  (save-window-excursion
+    (let* ((dir default-directory)
+	   (eshell-buffer-name efar-shell-buffer-name)
+	   (shell-buffer (eshell)))
+      (when go-to-dir?
+	(with-current-buffer shell-buffer
+	  (goto-char (point-max))
+	  (let ((old-input (eshell-get-old-input)))
+	    (eshell-kill-input)
+	    (eshell/cd dir)
+	    (eshell-send-input)
+	    (insert old-input))))))
+  (switch-to-buffer-other-window efar-shell-buffer-name)
+  (goto-char (point-max)))
+			      
+(defun efar-execute-file(&optional dont-run?)
+  "Insert file name under cursor to shell buffer.
+Execute it unless DONT-RUN? is t."
+  (efar-display-shell nil)
+  (sit-for 0.1)
+  (select-window (get-buffer-window (get-buffer efar-buffer-name)))
+
+  (let* ((dir default-directory)
+	(subtask-running? (with-current-buffer efar-shell-buffer-name
+			    eshell-current-command ))
+	(ready? (or (null (get-buffer efar-shell-buffer-name))
+		    (null subtask-running?)
+		    (equal "Yes" (ido-completing-read (concat "Operation is in progress '"
+							      (with-current-buffer efar-shell-buffer-name
+								(concat eshell-last-command-name " "
+									(string-join eshell-last-arguments " ")))
+							      "'. Abort? ")
+						      (list "Yes" "No"))))))
+
+    (when ready?
+      (let* ((side (efar-get :current-panel))
+	     (file (efar-get-short-file-name (car (efar-selected-files side t t)))))
+	
+	(when subtask-running?
+	  (with-current-buffer efar-shell-buffer-name
+	    (eshell-kill-process)))
+	(sit-for 0.1)
+	(efar-display-shell t)
+	(goto-char (point-max))
+	(eshell-kill-input)
+	(insert (if (eshell-under-windows-p)
+		    file
+		  (concat "./" file)))
+	(unless dont-run?
+	  (eshell-send-input))))))
+
 (defun efar-enter-directory(&optional go-to-parent?)
   "Enter directory under cursor or parent directory when GO-TO-PARENT? is t."
   (let* ((side (efar-get :current-panel))
@@ -2282,6 +2378,8 @@ otherwise redraw all."
 				     (dir? (car real-file))
 				     ;; is it a normal file?
 				     (file? (not (car real-file)))
+				     ;; file is executable?
+				     (executable? (and file? (file-executable-p (car file))))
 				     ;; is it a file under cursor?
 				     (current? (and
 						(= cnt (efar-get :panels side :current-pos))
@@ -2311,14 +2409,19 @@ otherwise redraw all."
 				      (cond
 				       ((and (not exists?) current?) 'efar-non-existing-current-file-face)
 				       ((not exists?) 'efar-non-existing-file-face)
-				       
+
 				       ((and current? marked?) 'efar-marked-current-face)
 				       ((and (not current?) marked?) 'efar-marked-face)
+
+				       ((and current? executable?) 'efar-file-current-executable-face)
+				       ((and (not current?) executable?) 'efar-file-executable-face)
 				       
 				       ((and dir? current?) 'efar-dir-current-face)
 				       ((and file? current?) 'efar-file-current-face)
 				       ((and dir? (not current?)) 'efar-dir-face)
 				       ((and file? (not current?)) 'efar-file-face))))
+
+
 				  
 				  (efar-place-item
 				   ;; calculate start output position for column
@@ -3628,5 +3731,5 @@ BUTTON is a button clicked."
     (add-hook 'window-configuration-change-hook #'efar-window-conf-changed)
     (add-hook 'kill-buffer-hook #'efar-buffer-killed nil 'local)
     (add-hook 'kill-emacs-hook #'efar-emacs-killed)))
-  
+
 ;;; efar.el ends here
