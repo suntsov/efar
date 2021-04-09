@@ -40,6 +40,7 @@
 (require 'subr-x)
 (require 'filenotify)
 (require 'dired)
+(require 'eshell)
 (require 'esh-mode)
 (require 'em-dirs)
 
@@ -2093,9 +2094,10 @@ just copied to the shell."
 CD to `default-directory' when GO-TO-DIR? is t."
   (save-window-excursion
     (let* ((dir default-directory)
-	   (shell-buffer (eshell)))
+	   (eshell-buffer-name efar-shell-buffer-name))
+      (eshell)
       (when go-to-dir?
-	(with-current-buffer shell-buffer
+	(with-current-buffer eshell-buffer-name
 	  (goto-char (point-max))
 	  (let ((old-input (eshell-get-old-input)))
 	    (eshell-kill-input)
@@ -2104,7 +2106,8 @@ CD to `default-directory' when GO-TO-DIR? is t."
 	    (insert old-input))))))
   (switch-to-buffer-other-window efar-shell-buffer-name)
   (goto-char (point-max)))
-			      
+
+
 (defun efar-execute-file(&optional dont-run?)
   "Insert file name under cursor to shell buffer.
 Execute it unless DONT-RUN? is t."
