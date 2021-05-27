@@ -3228,7 +3228,7 @@ Current panel switched to selected mode."
   (setq efar-search-server nil)
   (setq efar-last-search-params nil)
   (setq efar-search-results '())
-  (setq efar-search-running-p t))
+  (setq efar-search-running-p nil))
 
 (defun efar-search-start-server ()
   "Start search server which will consume messages from search subprocesses."
