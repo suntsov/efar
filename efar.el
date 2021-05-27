@@ -4,7 +4,7 @@
 
 ;; Author: "Vladimir Suntsov" <vladimir@suntsov.online>
 ;; Maintainer: vladimir@suntsov.online
-;; Version: 1.14
+;; Version: 1.15
 ;; Package-Requires: ((emacs "26.1"))
 ;; Keywords: files
 ;; URL: https://github.com/suntsov/efar
@@ -27,25 +27,28 @@
 ;; This package provides FAR-like file manager.
 
 ;; To start eFar just type M-x efar.
-;; When Efar is called with universal argument, default-directory of actual buffer is automatically opened in left panel (C-u M-x efar).
+;; When Efar is called with universal argument (C-u M-x efar),
+;; default-directory of actual buffer is automatically opened in left panel.
 
 ;; Press C-? to show buffer with all available key bindings.
 
-;; Use M-x customize to configure numerous eFar parameters including key bindings and faces.
+;; Use M-x customize to configure numerous eFar parameters
+;; including key bindings and faces.
 
 
 ;;; Code:
 
-(require 'ido)
 (require 'subr-x)
 (require 'filenotify)
 (require 'dired)
-(require 'comint)
+(require 'eshell)
+(require 'esh-mode)
+(require 'em-dirs)
 
-(defconst efar-version 1.14 "Current eFar version number.")
+(defconst efar-version 1.15 "Current eFar version number.")
 
 (defvar efar-state nil)
-(defvar efar-mouse-down? nil)
+(defvar efar-mouse-down-p nil)
 ;;variables for file search
 (defvar efar-search-processes '())
 (defvar efar-search-process-manager nil)
@@ -55,7 +58,7 @@
 (defvar efar-search-server nil)
 (defvar efar-search-server-port nil)
 (defvar efar-search-clients '())
-(defvar efar-search-running? nil)
+(defvar efar-search-running-p nil)
 (defvar efar-search-process-pending-messages '())
 
 (provide 'efar)
@@ -95,6 +98,12 @@
     :group 'efar-parameters
     :type 'string))
 
+(eval-and-compile
+  (defcustom efar-shell-buffer-name "*eFAR shell*"
+    "Name for the Efar shell buffer."
+    :group 'efar-parameters
+    :type 'string))
+
 (defcustom efar-state-file-name (concat user-emacs-directory ".efar-state")
   "Path to the eFar state save file."
   :group 'efar-parameters
@@ -105,12 +114,12 @@
   :group 'efar-parameters
   :type 'cons)
 
-(defcustom efar-save-state? t
+(defcustom efar-save-state-p t
   "Save eFar state when eFar buffer is killed to restore it at next open."
   :group 'efar-parameters
   :type 'boolean)
 
-(defcustom efar-filter-directories? nil
+(defcustom efar-filter-directories-p nil
   "Apply filter to the directories and files (t) or to files only (nil)."
   :group 'efar-parameters
   :type 'boolean)
@@ -145,7 +154,7 @@
   :group 'efar-parameters
   :type 'integer)
 
-(defcustom efar-fast-search-filter-enabled? t
+(defcustom efar-fast-search-filter-enabled-p t
   "Filter out not matching files in fast search mode."
   :group 'efar-parameters
   :type 'boolean)
@@ -170,7 +179,7 @@
   :group 'efar-search-parameters
   :type 'symbol)
 
-(defcustom efar-search-follow-symlinks? t
+(defcustom efar-search-follow-symlinks-p t
   "Follow directory symlinks when searching?"
   :group 'efar-search-parameters
   :type 'boolean)
@@ -196,6 +205,20 @@
        :background "navy"
        :underline nil))
   "File item style (executable file)"
+  :group 'efar-faces)
+
+(defface efar-file-current-executable-face
+  '((t :foreground "green"
+       :background "cadet blue"
+       :underline nil))
+  "Current file item style (executable file)"
+  :group 'efar-faces)
+
+(defface efar-marked-current-face
+  '((t :foreground "gold"
+       :background "cadet blue"
+       :underline nil))
+  "Current marked item style"
   :group 'efar-faces)
 
 (defface efar-dir-face
@@ -317,7 +340,7 @@
 	    ,@body
 	  (error (when
 		     (string= "Yes"
-			      (ido-completing-read
+			      (completing-read
 			       (concat "Error: \"" (error-message-string err) "\". Try again? ")
 			       (list "Yes" "No")))
 		   "error"))))))
@@ -330,7 +353,7 @@
 
 (setq efar-keys '())
 
-(defun efar-register-key(key func arg custom-key-name description &optional show-in-help? ignore-in-modes)
+(defun efar-register-key (key func arg custom-key-name description &optional show-in-help ignore-in-modes)
   "Registers a new KEY binding.
 This list is used to set up local key bindings,
 generate content of help buffer and prepare key binding customizaton entries.
@@ -339,9 +362,9 @@ FUNC is a function to call with argument ARG.
 CUSTOM-KEY-NAME is a name of custom variable by which a key binding is available
 in customization menu.
 DESCRIPTION is a string describing the key in customization menu.
-SHOW-IN-HELP? is optional boolean indicating whether to show key in help buffer.
+SHOW-IN-HELP is optional boolean indicating whether to show key in help buffer.
 IGNORE-IN-MODES is a list of modes which should ignore this key binding."
-  (push (list key func arg custom-key-name description show-in-help? ignore-in-modes) efar-keys))
+  (push (list key func arg custom-key-name description show-in-help ignore-in-modes) efar-keys))
 
 ;;   key-sequence function to call  arg variable name to save custom Key description
 (efar-register-key "<down>"  'efar-move-cursor  :down 'efar-move-down-key
@@ -368,8 +391,11 @@ IGNORE-IN-MODES is a list of modes which should ignore this key binding."
  		   "loop over directories in directory history forward" t)
 (efar-register-key "C-M-<up>" 'efar-go-directory-history-cicle :backward 'efar-prev-directory-in-history-key
  		   "loop over directories in directory history backward" t)
-(efar-register-key "RET" '((:files . efar-enter-directory) (:dir-hist . efar-navigate-to-file) (:file-hist . efar-navigate-to-file) (:bookmark . efar-navigate-to-file) (:disks . efar-switch-to-disk) (:search . efar-navigate-to-file))  nil  'efar-enter-directory-key
- 		   "go into or to the item under cursor" :space-after)
+(efar-register-key "RET" '((:files . efar-handle-enter) (:dir-hist . efar-navigate-to-file) (:file-hist . efar-navigate-to-file) (:bookmark . efar-navigate-to-file) (:disks . efar-switch-to-disk) (:search . efar-navigate-to-file))  nil  'efar-enter-directory-key
+ 		   "go into/to the item under cursor or run executable file in the shell" :space-after)
+
+(efar-register-key "M-RET" 'efar-handle-enter t 'efar-copy-to-shell-key
+		   "insert file name into the shell buffer" t (list :file-hist :dir-hist :bookmark :disks :search))
 
 (efar-register-key "M-<down>" 'efar-scroll-other-window :down 'efar-scroll-other-down-key
  		   "scroll other window down" t)
@@ -433,7 +459,7 @@ IGNORE-IN-MODES is a list of modes which should ignore this key binding."
 		   "run ediff for selected files" t (list :file-hist :dir-hist :bookmark :disks :search))
 (efar-register-key "C-c c s" 'efar-current-file-stat  nil 'efar-current-file-stat-key
 		   "show directory stats (size and files number)" t)
-(efar-register-key "C-c c o" 'efar-display-console  nil 'efar-display-console-key
+(efar-register-key "C-c c o" 'efar-display-shell  t 'efar-display-shell-key
 		   "open console window"  t)
 (efar-register-key "<f12> <f12>"  'efar-reinit  nil 'efar-reinit-key
 		   "reinit and redraw eFar buffer" t)
@@ -494,7 +520,7 @@ IGNORE-IN-MODES is a list of modes which should ignore this key binding."
 ;; eFar main functions
 ;;--------------------------------------------------------------------------------
 ;;;###autoload
-(defun efar(arg &optional reinit? no-switch?)
+(defun efar (arg &optional reinit? no-switch?)
   "Main function to run eFar commander.
 When ARG is t open default directory of current buffer.
 When REINIT? is t then current eFar state is discarded and it is reinitialized.
@@ -531,8 +557,8 @@ When NO-SWITCH? is t then don't switch to eFar buffer."
       (when go-to-dir
 	(efar-go-to-dir go-to-dir :left)
 	(efar-write-enable (efar-redraw)))
-      
-      (efar-suggest-hint))
+
+      (unless no-switch? (efar-suggest-hint)))
     
     (unless (or no-switch?
 		(equal efar-buffer (current-buffer)))
@@ -540,7 +566,7 @@ When NO-SWITCH? is t then don't switch to eFar buffer."
     (efar-write-enable (efar-redraw))))
 
 
-(defun efar-init(&optional reinit?)
+(defun efar-init (&optional reinit?)
   "Set up main eFAR configuration.
 This function is executed only once when eFAR buffer is created.
 
@@ -551,7 +577,7 @@ REINIT? is a boolean indicating that configuration should be generated enew."
   
   ;; if saving/restoring of state is allowed then read state from file
   (when (and
-	 efar-save-state?
+	 efar-save-state-p
 	 (file-exists-p efar-state-file-name))
     (efar-read-state))
   
@@ -562,10 +588,7 @@ REINIT? is a boolean indicating that configuration should be generated enew."
     (setf efar-state nil)
     (efar-init-state)))
     
-;;  (when reinit?
-;;    (efar-write-enable (efar-redraw))))
-
-(defun efar-init-state()
+(defun efar-init-state ()
   "Initialize state with default values."
   (setf efar-state (make-hash-table :test `equal))
   
@@ -651,7 +674,7 @@ REINIT? is a boolean indicating that configuration should be generated enew."
   
   (efar-set 0 :next-hint-number))
 
-(defun efar-get(&rest keys)
+(defun efar-get (&rest keys)
   "Get value stored by KEYS."
   (let ((value nil))
     (mapc
@@ -662,7 +685,7 @@ REINIT? is a boolean indicating that configuration should be generated enew."
      keys)
     value))
 
-(defun efar-set(value &rest keys)
+(defun efar-set (value &rest keys)
   "Store VALUE by KEYS."
   (let ((place nil))
     (mapc
@@ -686,12 +709,12 @@ REINIT? is a boolean indicating that configuration should be generated enew."
 				("Size" . efar-sort-files-by-size)
 				("Unsorted" . nil)))
 
-(defun efar-get-sort-function(name)
+(defun efar-get-sort-function (name)
   "Return sort function by NAME."
   (cdr (assoc name efar-sort-functions)))
 
 
-(defun efar-sort-function-names(side)
+(defun efar-sort-function-names (side)
   "Return a list of sort function names.
 The name of a function which is currently used for the panel SIDE (or current panel) becomes a first entry in the list."
   (let ((current-function-name (efar-get :panels side :sort-function-name)))
@@ -700,9 +723,10 @@ The name of a function which is currently used for the panel SIDE (or current pa
 		       (mapcar
 			(lambda(e)
 			  (car e))
-			efar-sort-functions)))))
+			efar-sort-functions)
+		       :test 'equal))))
 
-(defun efar-sort-files-by-name(a b)
+(defun efar-sort-files-by-name (a b)
   "Function to sort files A and B by name.
 Directories always go before normal files.
 Function string< is used for comparing file names.
@@ -718,7 +742,7 @@ Case is ignored."
        (downcase (car a))
        (downcase (car b))))))
 
-(defun efar-sort-files-by-modification-date(a b)
+(defun efar-sort-files-by-modification-date (a b)
   "Function to sort files A and B by modification date.
 Directories always go before normal files."
   (cond
@@ -732,7 +756,7 @@ Directories always go before normal files."
        (time-to-seconds (nth 6 a))
        (time-to-seconds (nth 6 b))))))
 
-(defun efar-sort-files-by-size(a b)
+(defun efar-sort-files-by-size (a b)
   "Function to sort files A and B by file size.
 Directories always go before normal files."
   (cond
@@ -746,7 +770,7 @@ Directories always go before normal files."
        (nth 8 a)
        (nth 8 b)))))
 
-(defun efar-sort-files-by-extension(a b)
+(defun efar-sort-files-by-extension (a b)
   "Function to sort files A and B by type (extension).
 Directories always go before normal files.
 Function string< is used for comparing file extensions.
@@ -762,13 +786,13 @@ Case is ignored."
        (downcase (or (file-name-extension (car a)) ""))
        (downcase (or (file-name-extension (car b)) ""))))))
 
-(defun efar-change-sort-function()
+(defun efar-change-sort-function ()
   "Ask user for sort function and order and set them for panel SIDE."
   (let ((side (efar-get :current-panel)))
-    (efar-set (ido-completing-read "Sort files by: " (efar-sort-function-names side))
+    (efar-set (efar-completing-read "Sort files by" (efar-sort-function-names side))
 	      :panels side :sort-function-name)
     
-    (efar-set (string= (char-to-string 9660) (ido-completing-read "Sort order: " (list (char-to-string 9650) (char-to-string 9660) )))
+    (efar-set (string= (char-to-string 9660) (efar-completing-read "Sort order" (list (char-to-string 9650) (char-to-string 9660) )))
 	      :panels side :sort-order)
     (efar-refresh-panel side nil (efar-get-short-file-name (efar-current-file)))))
 
@@ -776,7 +800,7 @@ Case is ignored."
 ;; file notification functions
 ;;--------------------------------------------------------------------------------
 
-(defun efar-setup-notifier(dir side)
+(defun efar-setup-notifier (dir side)
   "Set up file-notify-watch for the directory DIR and register it for panel SIDE."
   ;; first remove existing file-notify-watch
   (efar-remove-notifier side)
@@ -794,7 +818,7 @@ Case is ignored."
     (efar-set (cons dir descriptor) :panels side :file-notifier)))
 
 
-(defun efar-remove-notifier(side &optional dont-check-other)
+(defun efar-remove-notifier (side &optional dont-check-other)
   "Remove file-notify-watch registered for panel SIDE.
 If same watch is registered for other panel, then don't remove the watch, but just unregister it for panel SIDE, unless DONT-CHECK-OTHER is t"
   (let ((descriptor (cdr (efar-get :panels side :file-notifier)))
@@ -803,7 +827,7 @@ If same watch is registered for other panel, then don't remove the watch, but ju
       (file-notify-rm-watch descriptor))
     (efar-set nil :panels side :file-notifier)))
 
-(defun efar-notification(event)
+(defun efar-notification (event)
   "Callback function triggered when a file EVENT occurs.
 It stores notification in the queue and runs timer for 1 second.
 Notifications in the queue will be processed only if there are no new notifications within 1 second."
@@ -832,7 +856,7 @@ Notifications in the queue will be processed only if there are no new notificati
 		    :notification-timer))))))
 
 
-(defun efar-process-pending-notifications()
+(defun efar-process-pending-notifications ()
   
   "Process all pending file notifications."
   
@@ -855,12 +879,12 @@ Notifications in the queue will be processed only if there are no new notificati
 ;; save/resore state functions
 ;;--------------------------------------------------------------------------------
 
-(defun efar-remove-file-state()
+(defun efar-remove-file-state ()
   "Remove eFar state file.  Could be helpful in case of errors during startup."
   (interactive)
   (delete-file efar-state-file-name))
 
-(defun efar-save-state()
+(defun efar-save-state ()
   "Save eFar state to the state file.  Data from this file is used during startup to restore last state."
   (with-temp-file efar-state-file-name
     (let ((copy (copy-hash-table efar-state)))
@@ -879,7 +903,7 @@ Notifications in the queue will be processed only if there are no new notificati
       
       (print copy (current-buffer)))))
 
-(defun efar-read-state()
+(defun efar-read-state ()
   "Read eFar state from the file."
   (setf efar-state
 	(efar-check-state-file-version
@@ -888,7 +912,7 @@ Notifications in the queue will be processed only if there are no new notificati
 	   (cl-assert (bobp))
 	   (read (current-buffer))))))
 
-(defun efar-check-state-file-version(state)
+(defun efar-check-state-file-version (state)
   "Check version of STATE file and upgrade it if necessary."
   (let ((state-version (or (gethash :version state) 0.0)))
     (cond
@@ -909,7 +933,7 @@ Notifications in the queue will be processed only if there are no new notificati
      (t
       (efar-upgrade-state-file state state-version)))))
 
-(defun efar-upgrade-state-file(state from-version)
+(defun efar-upgrade-state-file (state from-version)
   "Upgrade state file.
 Do necessary changes in STATE in order to switch
 from version FROM-VERSION to actual version."
@@ -949,7 +973,7 @@ from version FROM-VERSION to actual version."
 ;;------------------------------------------------------------------
 ;; efar file operations
 ;;------------------------------------------------------------------
-(defun efar-create-new-directory()
+(defun efar-create-new-directory ()
   "Create new directory."
   
   (efar-with-notification-disabled
@@ -968,7 +992,7 @@ from version FROM-VERSION to actual version."
        (efar-refresh-panel (efar-other-side))))))
 
 
-(defun efar-copy-or-move-files(operation &optional dest)
+(defun efar-copy-or-move-files (operation &optional dest)
   "Copy or move selected files depending on OPERATION.
 When DEST is given then use this path as destination path.
 Otherwise ask user where to copy/move files to."
@@ -1008,7 +1032,7 @@ Otherwise ask user where to copy/move files to."
 	
 	(efar-set-status "Ready"))))
 
-(defun efar-copy-or-move-files-int(operation files todir &optional fromdir overwrite?)
+(defun efar-copy-or-move-files-int (operation files todir &optional fromdir overwrite?)
   "Copy or move (depending on OPERATION) FILES into TODIR.
 When FROMDIR is not defined then `default-directory' is used.
 OVERWRITE? is a boolean indicating that existing files have to be overwritten.
@@ -1053,7 +1077,7 @@ User also can select an option to overwrite all remaining files to not be asked 
 				  ;; if user was already asked before and the answer was "All", we don't ask again
 				  (setf overwrite? (cond
 						    ((or (null overwrite?) (string= overwrite? "No") (string= overwrite? "Yes"))
-						     (ido-completing-read (concat "File " newfile " already exists. Overwrite? ") (list "Yes" "No" "All")))
+						     (efar-completing-read (concat "File " newfile " already exists. Overwrite? ") (list "Yes" "No" "All")))
 						    (t overwrite?)))
 				  ;; we copy file (overwrite) using elisp function if user approved it
 				  (unless (string= overwrite? "No")
@@ -1072,15 +1096,25 @@ User also can select an option to overwrite all remaining files to not be asked 
     ;; call local function first time
     (do-operation operation files todir fromdir)) )
 
+(defun efar-completing-read (prompt &optional options)
+  "Read a string in the minibuffer, with completion.
+PROMPT is a string to prompt with.
+OPTIONS is a collection with possible answers."
+  (let* ((completion-ignore-case t)
+	 (options (or options '("Yes" "No")))
+	 (prompt (concat prompt " ("
+			 (mapconcat #'identity options " | ")
+			 ") ")))
+    (completing-read prompt options nil t nil 'options (car options))))
 
-(defun efar-delete-selected()
+(defun efar-delete-selected ()
   "Delete selected file(s)."
   (unwind-protect
       (efar-with-notification-disabled
        (let* ((side (efar-get :current-panel))
 	      (selected-files (efar-selected-files side nil)))
 	 ;; ask user for confirmation
-	 (when (and selected-files (string= "Yes" (ido-completing-read "Delete selected files? " (list "Yes" "No"))))
+	 (when (and selected-files (string= "Yes" (efar-completing-read "Delete selected files?")))
 	   ;; do the deletion of selected files
 	   (efar-set-status "Deleting files...")
 	   (mapc(lambda (f)
@@ -1100,34 +1134,35 @@ User also can select an option to overwrite all remaining files to not be asked 
 ;; efar displaying status
 ;;------------------------------------------------------------------
 
-(defun efar-reset-status()
+(defun efar-reset-status ()
   "Reset eFar status to default one."
   (when (efar-get :reset-status?)
     (efar-set-status "Ready")))
 
-(defun efar-set-status(&optional status seconds reset?)
+(defun efar-set-status (&optional status seconds reset?)
   "Set eFar status to STATUS.
 When STATUS is nil use default 'Ready' status.
 When SECONDS is defined then status is displayed given time.
 When RESET? is t then status will be automatically changed to default
 on any next cursor movement."
-  (when reset?
-    (efar-set t :reset-status?))
-  
-  (let ((prev-status (efar-get :status))
-	(status (or status "Ready")))
-    
-    (efar-set status :status)
-    (setq mode-line-format (list " " mode-line-modes (or status (efar-get :status))))
-    (force-mode-line-update)
-    (sit-for 0.01)
-    
-    (when seconds
-      (run-at-time seconds nil
-		   `(lambda()
-		      (efar-set-status ',prev-status))))))
+  (with-current-buffer efar-buffer-name
 
-(defun efar-key-press-handle(func arg ignore-in-modes)
+    (when reset?
+      (efar-set t :reset-status?))
+
+    (let ((prev-status (efar-get :status))
+	  (status (or status "Ready")))
+      
+      (efar-set status :status)
+      (setq mode-line-format (list " " mode-line-modes (or status (efar-get :status))))
+      (force-mode-line-update)
+      
+      (when seconds
+	(run-at-time seconds nil
+		     `(lambda()
+			(efar-set-status ',prev-status)))))))
+  
+(defun efar-key-press-handle (func arg ignore-in-modes)
   "Handler for registered key-bindings.
 This handler calls function FUNC with argument ARG only in case when current
 mode is not in the list IGNORE-IN-MODES."
@@ -1141,7 +1176,7 @@ mode is not in the list IGNORE-IN-MODES."
 	  (funcall func arg)
 	(funcall func)))))
 
-(defun efar-show-help()
+(defun efar-show-help ()
   "Display a buffer with list of registered Efar key bindings."
   (interactive)
   (let ((buffer (get-buffer-create "*Efar key bindings*")))
@@ -1165,7 +1200,7 @@ mode is not in the list IGNORE-IN-MODES."
     (display-buffer buffer)))
 
 
-(defun efar-process-mouse-event(event)
+(defun efar-process-mouse-event (event)
   "Process mouse event EVENT."
   (select-window (get-buffer-window efar-buffer-name))
   
@@ -1198,7 +1233,7 @@ mode is not in the list IGNORE-IN-MODES."
   ;; finally redraw if necessary
   (efar-write-enable (efar-redraw)))
 
-(defun efar-process-mouse-down(event)
+(defun efar-process-mouse-down (event)
   "Do actions when mouse button is pressed.
 The point where mouse click occurred determined out of EVENT parameters."
   (let* ((pos (nth 1 (nth 1 event)))
@@ -1206,7 +1241,7 @@ The point where mouse click occurred determined out of EVENT parameters."
 	 (side (cdr (assoc :side props)))
 	 (control (cdr (assoc :control props))))
 
-    (setf efar-mouse-down? t)
+    (setf efar-mouse-down-p t)
     
     ;; when clicked on file entry select it
     (when (equal control :file-pos)
@@ -1217,7 +1252,7 @@ The point where mouse click occurred determined out of EVENT parameters."
 	       (not (equal (efar-get :current-panel) side)))
       (efar-switch-to-other-panel))))
 
-(defun efar-process-mouse-drag(event)
+(defun efar-process-mouse-drag (event)
   "Do actions when drag&drop action occurrs.
 The start and end points of drag&drop action determined out of EVENT parameters."
   (let* ((click-type (car event))
@@ -1228,7 +1263,7 @@ The start and end points of drag&drop action determined out of EVENT parameters.
 	 (operation (if (equal "C-drag-mouse-1" (symbol-name click-type))
 			:copy :move)))
 
-    (setf efar-mouse-down? nil)
+    (setf efar-mouse-down-p nil)
     
     (let ((destination (nth 0 (nth 2 event))))
       
@@ -1299,11 +1334,11 @@ The start and end points of drag&drop action determined out of EVENT parameters.
 	('frame (message-box "Drag&drop to outside world is not supported."))))))
 
 
-(defun efar-process-mouse-click(event)
+(defun efar-process-mouse-click (event)
   "Do actions when mouse button released.
 The point where mouse click occurred determined out of EVENT parameters."
 
-  (setf efar-mouse-down? nil)
+  (setf efar-mouse-down-p nil)
   
   (let* ((click-type (car event))
 	 (pos (nth 1 (nth 1 event)))
@@ -1377,7 +1412,7 @@ The point where mouse click occurred determined out of EVENT parameters."
      (when (equal control :directory-name)
        (efar-change-panel-mode :disks side))))
 
-(defun efar-process-mouse-wheel(event)
+(defun efar-process-mouse-wheel (event)
   "Do actions when mouse wheel is scrolled.
 The point where mouse scroll occurred determined out of EVENT parameters."
   (efar-move-cursor (if (string-match-p "down$" (symbol-name (car event)))
@@ -1385,12 +1420,12 @@ The point where mouse scroll occurred determined out of EVENT parameters."
 		      :left)
 		    'no-auto-read))
 
-(defun efar-cd()
+(defun efar-cd ()
   "Open directory selector (read-directory-name) and go to selected directory."
   (efar-go-to-dir (read-directory-name "Go to directory: " default-directory))
   (efar-write-enable (efar-redraw)))
 
-(defun efar-change-column-number(&optional increase side)
+(defun efar-change-column-number (&optional increase side)
   "Change the number of columns in panel SIDE if given or in current panel.
 Increase by 1 when INCREASE is t, decrease by 1 otherwise."
   (let* ((side (or side (efar-get :current-panel)))
@@ -1408,7 +1443,7 @@ Increase by 1 when INCREASE is t, decrease by 1 otherwise."
   (efar-calculate-widths)
   (efar-write-enable (efar-redraw)))
 
-(defun efar-change-mode(&optional side)
+(defun efar-change-mode (&optional side)
   "Switch mode from double to single-panel or vice versa.
 If a double mode is active then panel SIDE (or active one if not given)
 becomes fullscreen."
@@ -1424,18 +1459,18 @@ becomes fullscreen."
     (efar-calculate-widths)
     (efar-write-enable (efar-redraw))))
 
-(defun efar-open-dir-other-panel()
+(defun efar-open-dir-other-panel ()
   "Opens current pannel's direcotry in other panel."
   (efar-go-to-dir default-directory (efar-other-side))
   (efar-write-enable (efar-redraw)))
 
-(defun efar-copy-current-path()
+(defun efar-copy-current-path ()
   "Copies to the clipboard the full path to the current file or directory."
   (kill-new
    (caar
     (efar-selected-files (efar-get :current-panel) t t))))
 
-(defun efar-open-file-in-ext-app()
+(defun efar-open-file-in-ext-app ()
   "Open file under cursor in external application."
   (let* ((side (efar-get :current-panel))
 	 (fnum (+ (efar-get :panels side :start-file-number) (efar-get :panels side :current-pos) ))
@@ -1469,7 +1504,7 @@ becomes fullscreen."
 	   (lambda ($fpath) (let ((process-connection-type nil))
 			      (start-process "" nil "xdg-open" $fpath))) $file-list)))))))
 
-(defun efar-filter-files()
+(defun efar-filter-files ()
   "Set up file filtering in current panel.
 Ask user for file mask and show files in current panel matching this mask only."
   (let ((side (efar-get :current-panel)))
@@ -1482,17 +1517,7 @@ Ask user for file mask and show files in current panel matching this mask only."
     (efar-set 0 :panels side :current-pos)
     (efar-write-enable (efar-redraw))))
 
-(defun efar-display-console ()
-  "Open shell in new buffer and go to directory opened in current panel."
-  (if (not (get-buffer "*efar-shell*"))
-      (shell "*efar-shell*")
-    (let ((side (efar-get :current-panel)))
-      (with-current-buffer (get-buffer "*efar-shell*")
-	(insert (concat "cd " (efar-get :panels side :dir)))
-	(comint-send-input nil t))
-      (display-buffer "*efar-shell*"))))
-
-(defun efar-fast-search(k)
+(defun efar-fast-search (k)
   "Activate and/or perform incremental search.
 K is a character typed by the user."
   (let ((str (efar-get :fast-search-string)))
@@ -1544,7 +1569,7 @@ K is a character typed by the user."
 	(efar-write-enable (efar-redraw))))))
 
 
-(defun efar-quit-fast-search(&optional no-refresh?)
+(defun efar-quit-fast-search (&optional no-refresh?)
   "Quite fast search mode.
 When NO-REFRESH? is t the no eFar redraw occurs."
   (when efar-state
@@ -1578,7 +1603,7 @@ If there are no accessible directories, return `user-emacs-directory'."
 	;; otherwise check parent directory
 	(efar-get-accessible-directory-in-path parent-dir )))))
 
-(defun efar-refresh-panel(&optional side move-to-first? move-to-file-name)
+(defun efar-refresh-panel (&optional side move-to-first? move-to-file-name)
   "Refresh given panel (or a current one when SIDE is not given).
 When MOVE-TO-FIRST? is t move cursot to the first file.
 When MOVE-TO-FILE-NAME is given then move cursor to the file with that name."
@@ -1606,7 +1631,7 @@ When MOVE-TO-FILE-NAME is given then move cursor to the file with that name."
     (efar-write-enable (efar-redraw))))
 
 
-(defun efar-go-to-dir(dir &optional side no-hist?)
+(defun efar-go-to-dir (dir &optional side no-hist?)
   "Go to given DIR.
 When SIDE is given show directory in this panel, otherwise in current one.
 When NO-HIST? is t then DIR is not saved in the history list."
@@ -1655,14 +1680,14 @@ When NO-HIST? is t then DIR is not saved in the history list."
     (efar-write-enable (efar-redraw))))
 
 
-(defun efar-get-parent-dir(dir)
+(defun efar-get-parent-dir (dir)
   "Return parent directory of given DIR."
   (let ((parent (file-name-directory (directory-file-name dir))))
     (if (equal parent "/")
         parent
       (string-trim-right parent "[/]"))))
 
-(defun efar-go-to-file(file &optional side prev-file-number)
+(defun efar-go-to-file (file &optional side prev-file-number)
   "Move cursor to the given FILE or to PREV-FILE-NUMBER if file cannot be found.
 Do this in current panel, unless SIDE is given."
   (let* ((side (or side (efar-get :current-panel)))
@@ -1700,7 +1725,7 @@ Do this in current panel, unless SIDE is given."
 	(efar-set 0 :panels side :current-pos))))))
 
 
-(defun efar-current-file-number(&optional side)
+(defun efar-current-file-number (&optional side)
   "Return the number of file under cursor.
 Do that for current panel or for panel SIDE if it's given."
   (let* ((side (or side (efar-get :current-panel)))
@@ -1708,31 +1733,31 @@ Do that for current panel or for panel SIDE if it's given."
     
     (+ start-file-number (efar-get :panels side :current-pos))))
 
-(defun efar-current-file-name(&optional side)
+(defun efar-current-file-name (&optional side)
   "Return the full name of file under cursor.
 Do that for current panel or for panel SIDE if it's given."
   (car (efar-current-file side)))
 
-(defun efar-current-file(&optional side)
+(defun efar-current-file (&optional side)
   "Return the file under cursor with it's attributes.
 Do that for current panel or for panel SIDE if it's given."
   (let ((side (or side (efar-get :current-panel))))
     (nth (efar-current-file-number side) (efar-get :panels side :files))))
 
-(defun efar-other-side(&optional side)
+(defun efar-other-side (&optional side)
   "Return opposite panel to current panel or to panel SIDE if one is given.
 :left <-> :right"
   (let ((side (if side side (efar-get :current-panel))))
     (if (equal side :left) :right :left)))
 
-(defun efar-deselect-all()
+(defun efar-deselect-all ()
   "Unmark all marked files in current panel."
   (efar-write-enable
    (let ((side (efar-get :current-panel)))
      (efar-set '() :panels side :selected)
      (efar-redraw))))
 
-(defun efar-mark-file(&optional no-move?)
+(defun efar-mark-file (&optional no-move?)
   "Mark file under cursor in current panel.
 Unless NO-MOVE? move curosr one item down."
   (let* ((side (efar-get :current-panel))
@@ -1748,7 +1773,7 @@ Unless NO-MOVE? move curosr one item down."
     
     (unless no-move? (efar-move-cursor  :down))))
 
-(defun efar-edit-file(&optional for-read?)
+(defun efar-edit-file (&optional for-read?)
   "Visit file under cursor.
 When FOR-READ? is t switch back to eFar buffer."
   (let* ((side (efar-get :current-panel))
@@ -1793,18 +1818,18 @@ When FOR-READ? is t switch back to eFar buffer."
 	
 	buffer))))
 
-(defun efar-set-files-order(files side)
+(defun efar-set-files-order (files side)
   "Change sort direction of FILES in panel SIDE."
   (if (efar-get :panels side :sort-order)
       (reverse files)
     files))
 
-(defun efar-is-root-directory(dir)
+(defun efar-is-root-directory (dir)
   "Return t if DIR is a root directory, nil otherwise."
   (string= (file-name-as-directory dir)
 	   (file-name-directory (directory-file-name dir))))
 
-(defun efar-get-file-list(side)
+(defun efar-get-file-list (side)
   "Read file list from the directory showed in panel SIDE."
   (let* ((filter (efar-get :panels side :file-filter))
 	 (fast-search-string (efar-get :fast-search-string))
@@ -1826,11 +1851,11 @@ When FOR-READ? is t switch back to eFar buffer."
 				    (string-suffix-p "/." (car f))
 				    (string-suffix-p "/.." (car f))
 				    (and (or (not (cadr f))
-					     efar-filter-directories?)
+					     efar-filter-directories-p)
 					 (not (string-suffix-p "/.." (car f)))
 					 (> (length filter) 0 )
 					 (not (string-match (wildcard-to-regexp filter) (car f))))
-				    (and efar-fast-search-filter-enabled?
+				    (and efar-fast-search-filter-enabled-p
 					 fast-search-string
 					 (not (string-match (if (cl-position ?* fast-search-string) (wildcard-to-regexp fast-search-string) fast-search-string)
 							    (if (equal (car (efar-get :panels side :view (efar-get :panels side :mode) :file-disp-mode)) :long)
@@ -1871,32 +1896,35 @@ When FOR-READ? is t switch back to eFar buffer."
 			
 			
 			(:search
-			 (cl-copy-list efar-search-results)))))
+			 (cl-copy-list (reverse efar-search-results))))))
 		    
 		    
 		    ;; get selected sort function
 		    ;; we do sorting only in modes :files and :search
-		    (sort-function (when (cl-member mode '(:search :files))
+		    (sort-function (when (or (equal mode :files)
+					     (and (equal mode :search)
+						  (not efar-search-running-p)))
+				     ;;(cl-member mode '(:search :files))
 				     (efar-get-sort-function (efar-get :panels side :sort-function-name)))))
 		
-		;; sort file list according to selected sort function
+	 	;;sort file list according to selected sort function
 		(if sort-function
-		    (sort files sort-function)
-		  files))
+		   (sort files sort-function)
+		files))
 	      
 	      side))
      :panels side :files)
     
     (efar-set '() :panels side :selected)))
 
-(defun efar-move-cursor(direction &optional no-auto-read?)
+(defun efar-move-cursor (direction &optional no-auto-read?)
   "Move cursor in direction DIRECTION.
 When NO-AUTO-READ? is t then no auto file read happens."
-  (efar-reset-status)
+ 
   (let ((side (efar-get :current-panel)))
     (unless (= 0 (length (efar-get :panels side :files)))
       
-      (unless efar-fast-search-filter-enabled?
+      (unless efar-fast-search-filter-enabled-p
 	(efar-quit-fast-search))
       
       (efar-write-enable
@@ -2005,12 +2033,14 @@ When NO-AUTO-READ? is t then no auto file read happens."
 	 (efar-output-files side affected-item-numbers)
 	 
 	 (efar-output-file-details side)
+
+	 (efar-set-status)
 	 
 	 (condition-case err
 	     (unless no-auto-read? (efar-auto-read-file))
 	   (error (efar-set-status (concat "Error: "(error-message-string err)) nil t))))))))
 
-(defun efar-auto-read-file()
+(defun efar-auto-read-file ()
   "Automatically show content of the directory or file under cursor."
   
   (let* ((file (caar (efar-selected-files (efar-get :current-panel) t nil t)))
@@ -2023,11 +2053,8 @@ When NO-AUTO-READ? is t then no auto file read happens."
 			     (and file-ext (cl-member file-ext efar-auto-read-file-extensions :test 'equal)))) ;; or if files type is configured to be ato read
 		    
 		    (and efar-auto-read-directories ;; if directory auto read is enabled
-			 (file-directory-p file)) ;; current item under cursor is a directory
+			 (file-directory-p file)))) ;; current item under cursor is a directory
 		    
-		    (and (not (file-directory-p file)) ;; if current-item under cursor is a file
-			 (equal :search (efar-get :panels (efar-get :current-panel) :mode))))) ;; in a file search result
-      
       (let ((last-auto-read-buffer (efar-get :last-auto-read-buffer))) ;; get the last auto read buffer
 	;; we don't want to keep buffers for auto-opened files/dirs
 	;; so we kill last auto read buffer if:
@@ -2047,7 +2074,87 @@ When NO-AUTO-READ? is t then no auto file read happens."
 	  (unless last-auto-read-buffer-exists?
  	    (efar-set buffer :last-auto-read-buffer)))))))
 
-(defun efar-enter-directory(&optional go-to-parent?)
+(defun efar-handle-enter (&optional copy-to-shell?)
+  "Handle enter key pressing.
+Do action depending on the type of item under cursor:
+when directory - enter this directory
+when executable file - open shell and execute it in the shell
+when normal file - open it in external application.
+When COPY-TO-SHELL? is t file name is copied to the shell."
+  (let* ((side (efar-get :current-panel))
+	 (file (car (efar-selected-files side t t))))
+    
+    (cond ((and (not copy-to-shell?)
+		(or
+		 ;; file is a normal directory
+		 (equal (cadr file) t)
+		 ;; file is a symlink pointing to the directory
+		 (and (stringp (cadr file))
+		      (file-directory-p (cadr file)))))
+	   
+	   (efar-enter-directory))
+	  
+	  ((or copy-to-shell?
+	       (file-executable-p (car file)))
+	   (efar-execute-file copy-to-shell?))
+	  	 
+	  (t (efar-open-file-in-ext-app)))))
+
+(defun efar-display-shell (&optional go-to-dir?)
+  "Open eshell buffer.
+CD to `default-directory' when GO-TO-DIR? is t."
+  (save-window-excursion
+    (let* ((dir default-directory)
+	   (eshell-buffer-name efar-shell-buffer-name))
+      (eshell)
+      (when (and (null eshell-current-command)
+		 go-to-dir?)
+	(with-current-buffer eshell-buffer-name
+	  (goto-char (point-max))
+	  (let ((old-input (eshell-get-old-input)))
+	    (eshell-kill-input)
+	    (eshell/cd dir)
+	    (eshell-send-input)
+	    (insert old-input))))))
+  (switch-to-buffer-other-window efar-shell-buffer-name)
+  (goto-char (point-max)))
+
+(defun efar-execute-file (&optional dont-run?)
+  "Insert file name under cursor to shell buffer.
+Execute it unless DONT-RUN? is t."
+  (efar-display-shell nil)
+  (sit-for 0.1)
+  (select-window (get-buffer-window (get-buffer efar-buffer-name)))
+  
+  (let* ((subtask-running? (with-current-buffer efar-shell-buffer-name
+			     eshell-current-command ))
+	 (ready? (or (null (get-buffer efar-shell-buffer-name))
+		     (null subtask-running?)
+		     (equal "Yes" (efar-completing-read (concat "Operation is in progress '"
+							       (with-current-buffer efar-shell-buffer-name
+								 (concat eshell-last-command-name
+									 (when eshell-last-arguments
+									   (concat " "
+										   (string-join eshell-last-arguments " ")))))
+							       "'. Abort? "))))))
+    
+    (when ready?
+      (let* ((side (efar-get :current-panel))
+	     (file (caar (efar-selected-files side t t))))
+	
+	(when subtask-running?
+	  (with-current-buffer efar-shell-buffer-name
+	    (eshell-kill-process)))
+	(sit-for 0.1)
+	(efar-display-shell nil)
+	(goto-char (point-max))
+	(unless dont-run?
+	  (eshell-kill-input))
+	(insert "\"" file "\" ")
+	(unless dont-run?
+	  (eshell-send-input))))))
+
+(defun efar-enter-directory (&optional go-to-parent?)
   "Enter directory under cursor or parent directory when GO-TO-PARENT? is t."
   (let* ((side (efar-get :current-panel))
 	 (current-dir-path (efar-get :panels side :dir))
@@ -2077,7 +2184,7 @@ When NO-AUTO-READ? is t then no auto file read happens."
 	    (efar-calculate-widths)
 	    (efar-write-enable (efar-redraw)))))))))
 
-(defun efar-go-directory-history-cicle(direction)
+(defun efar-go-directory-history-cicle (direction)
   "Loop over directory history entries in direction DIRECTION."
   (let ((dir-hist (efar-get :directory-history)))
     (if (or (not dir-hist)
@@ -2093,11 +2200,11 @@ When NO-AUTO-READ? is t then no auto file read happens."
 	(efar-go-to-dir (car (nth new-index dir-hist)) side t)
 	(efar-write-enable (efar-redraw))))))
 
-(defun efar-scroll-other-window(direction)
+(defun efar-scroll-other-window (direction)
   "Scroll content of other window in direction DIRECTION."
   (scroll-other-window (if (eq direction :down) 1 -1)))
 
-(defun efar-switch-to-other-panel()
+(defun efar-switch-to-other-panel ()
   "Make other panel active."
   (efar-quit-fast-search)
   (when (equal (efar-get :mode) :both)
@@ -2112,13 +2219,13 @@ When NO-AUTO-READ? is t then no auto file read happens."
 	  (setf default-directory (efar-get :panels :left :dir)))))
     (efar-write-enable (efar-redraw))))
 
-(defun efar-calculate-window-size()
+(defun efar-calculate-window-size ()
   "Calculate and set windows sizes."
   (efar-set (- (window-width) 1) :window-width)
   (efar-set (window-height) :window-height)
   (efar-set (- (window-height) 6) :panel-height))
 
-(defun efar-redraw()
+(defun efar-redraw ()
   "The main function to output content of eFar buffer."
   (efar-calculate-window-size)
   (erase-buffer)
@@ -2142,22 +2249,20 @@ When NO-AUTO-READ? is t then no auto file read happens."
     (efar-output-file-details :left)
     (efar-output-file-details :right)
     ;; during drag we show hand pointer
-    (when efar-mouse-down?
-      (put-text-property (point-min) (point-max) 'pointer 'hand))
+    (when efar-mouse-down-p
+      (put-text-property (point-min) (point-max) 'pointer 'hand))))
 
-    (efar-set-status "Ready")))
-
-(defun efar-reinit()
+(defun efar-reinit ()
   "Reinitialize eFar state."
   (efar nil t))
 
-(defun efar-get-short-file-name(file)
+(defun efar-get-short-file-name (file)
   "Return short name of a given FILE."
   (if (nth 1 file)
       (file-name-nondirectory (directory-file-name (nth 0 file)))
     (file-name-nondirectory (nth 0 file))))
 
-(defun efar-output-file-details(side)
+(defun efar-output-file-details (side)
   "Output details of the file under cursor in panel SIDE."
   (let ((mode (efar-get :mode))
 	(file (car (efar-selected-files side t t t)))
@@ -2183,7 +2288,7 @@ When NO-AUTO-READ? is t then no auto file read happens."
 		       'efar-border-line-face
 		       width nil side :left t))))
 
-(defun efar-panel-width(side)
+(defun efar-panel-width (side)
   "Calculate and return the width of panel SIDE."
   (let ((widths (if (equal side :left)
 		    (car (efar-get :column-widths))
@@ -2193,7 +2298,7 @@ When NO-AUTO-READ? is t then no auto file read happens."
       (+ (apply #'+ widths)
 	 (- (length widths) 1)))))
 
-(defun efar-output-files(side &optional affected-item-numbers)
+(defun efar-output-files (side &optional affected-item-numbers)
   "Output the list of files in panel SIDE.
 Redraw files with numbers in AFFECTED-ITEM-NUMBERS if given,
 otherwise redraw all."
@@ -2282,6 +2387,8 @@ otherwise redraw all."
 				     (dir? (car real-file))
 				     ;; is it a normal file?
 				     (file? (not (car real-file)))
+				     ;; file is executable?
+				     (executable? (and file? (file-executable-p (car file))))
 				     ;; is it a file under cursor?
 				     (current? (and
 						(= cnt (efar-get :panels side :current-pos))
@@ -2311,14 +2418,19 @@ otherwise redraw all."
 				      (cond
 				       ((and (not exists?) current?) 'efar-non-existing-current-file-face)
 				       ((not exists?) 'efar-non-existing-file-face)
-				       
+
 				       ((and current? marked?) 'efar-marked-current-face)
 				       ((and (not current?) marked?) 'efar-marked-face)
+
+				       ((and current? executable?) 'efar-file-current-executable-face)
+				       ((and (not current?) executable?) 'efar-file-executable-face)
 				       
 				       ((and dir? current?) 'efar-dir-current-face)
 				       ((and file? current?) 'efar-file-current-face)
 				       ((and dir? (not current?)) 'efar-dir-face)
 				       ((and file? (not current?)) 'efar-file-face))))
+
+
 				  
 				  (efar-place-item
 				   ;; calculate start output position for column
@@ -2340,7 +2452,7 @@ otherwise redraw all."
 		     (goto-char 0)
 		     (forward-line 1))))))))
 
-(defun efar-output-header(side)
+(defun efar-output-header (side)
   "Output eFar header in panel SIDE."
   (let ((mode (efar-get :mode)))
     
@@ -2360,17 +2472,21 @@ otherwise redraw all."
 	     (str))
 
 	;; output controls to change sort function and sort order
-	(when (cl-member (efar-get :panels side :mode) '(:files :search))
+	(let ((panel-mode (efar-get :panels side :mode)))
 	  
-	  (setf str (substring (efar-get :panels side :sort-function-name) 0 1))
-	  (efar-place-item col 1 str 'efar-header-face nil nil nil nil nil
-			   (list (cons :side side) (cons :control :sort-func))
-			   'hand)
-
-	  (setf str (if (efar-get :panels side :sort-order) (char-to-string 9660) (char-to-string 9650)))
-	  (efar-place-item (+ col 1) 1 str 'efar-header-face nil nil nil nil nil
-			   (list (cons :side side) (cons :control :sort-order))
-			   'hand))
+	  (when (or (equal panel-mode :files)
+		    (and (equal panel-mode :search)
+			 (not efar-search-running-p)))
+	    
+	    (setf str (substring (efar-get :panels side :sort-function-name) 0 1))
+	    (efar-place-item col 1 str 'efar-header-face nil nil nil nil nil
+			     (list (cons :side side) (cons :control :sort-func))
+			     'hand)
+	    
+	    (setf str (if (efar-get :panels side :sort-order) (char-to-string 9660) (char-to-string 9650)))
+	    (efar-place-item (+ col 1) 1 str 'efar-header-face nil nil nil nil nil
+			     (list (cons :side side) (cons :control :sort-order))
+			     'hand)))
 	
 	;; output filter string
 	(unless (and (string-empty-p filter)
@@ -2406,7 +2522,7 @@ otherwise redraw all."
 			 (list (cons :side side) (cons :control :maximize))
 			 'hand)))))
 
-(defun efar-prepare-string(str len &optional cut-from-beginn? dont-fill?)
+(defun efar-prepare-string (str len &optional cut-from-beginn? dont-fill?)
   "Prepare file name STR.
 String is truncated to be not more than LEN characters long.
 When CUT-FROM-BEGINN? is t then string is truncated from the beginn,
@@ -2427,7 +2543,7 @@ Unless DONT-FILL? fill string with spaces if it shorter than LEN."
 	  (t
 	   str))))
 
-(defun efar-place-item(column line text face &optional max-length cut-from-beginn? side start-pos fill? control-params pointer)
+(defun efar-place-item (column line text face &optional max-length cut-from-beginn? side start-pos fill? control-params pointer)
   "Outputs an UI item.
 Start output from COLUMN in LINE.
 TEXT is a string representing item.
@@ -2478,7 +2594,7 @@ CONTROL-PARAMS - item is considered as control with given parameters"
       (when control-params
 	(put-text-property p (+ p length) :control control-params)))))
 
-(defun efar-output-dir-names(side)
+(defun efar-output-dir-names (side)
   "Output current directory name for panel SIDE."
   (let ((mode (efar-get :mode)))
     
@@ -2493,7 +2609,7 @@ CONTROL-PARAMS - item is considered as control with given parameters"
 			 (list (cons :side side) (cons :switch-to-panel t) (cons :control :directory-name))
 			 'hand)))))
 
-(defun efar-draw-border()
+(defun efar-draw-border ()
   "Draw eFar border using pseudo graphic characters."
   (goto-char 0)
   
@@ -2543,7 +2659,7 @@ CONTROL-PARAMS - item is considered as control with given parameters"
 			   9552 ;; ═
 			   nil)))
 
-(defun efar-draw-border-line(left center right filler splitter &optional newline)
+(defun efar-draw-border-line (left center right filler splitter &optional newline)
   "Draw the line according to given arguments.
 LEFT is a character to be used to draw left border.
 CENTER is a character to be used to draw vertical splitter between panels.
@@ -2584,7 +2700,7 @@ NEWLINE - if t the insert newline character."
       (newline)
       (forward-line))))
 
-(defun efar-calculate-widths()
+(defun efar-calculate-widths ()
   "Calculate widths of all columns in the panels."
   (let* ((splitter-shift (or (efar-get :splitter-shift) 0))
 	 (shift (cond ((equal splitter-shift 0) 0)
@@ -2641,7 +2757,7 @@ NEWLINE - if t the insert newline character."
     
     (efar-set widths :column-widths)))
 
-(defun efar-window-conf-changed()
+(defun efar-window-conf-changed ()
   "Function called when window configuration is changed.
 Redraws entire eFar buffer."
   (let ((window (get-buffer-window efar-buffer-name)))
@@ -2651,7 +2767,7 @@ Redraws entire eFar buffer."
       (efar-write-enable
        (efar-redraw)))))
 
-(defun efar-frame-size-changed(frame)
+(defun efar-frame-size-changed (frame)
   "Function called when FRAME size is changed.
 Redraws entire eFar buffer."
   
@@ -2663,13 +2779,13 @@ Redraws entire eFar buffer."
       (efar-write-enable
        (efar-redraw)))))
 
-(defun efar-buffer-killed()
+(defun efar-buffer-killed ()
   "Function is called when eFar buffer is killed.
 Saves eFar state and kills all subprocesses."
   (when (string= (buffer-name) efar-buffer-name)
     (efar-search-kill-all-processes)
     (when (and
-	   efar-save-state?
+	   efar-save-state-p
 	   
 	   (ignore-errors
 	     (efar-save-state))
@@ -2677,17 +2793,17 @@ Saves eFar state and kills all subprocesses."
 	   (efar-remove-notifier :right)))
     (setf efar-state nil)))
 
-(defun efar-emacs-killed()
+(defun efar-emacs-killed ()
   "Function is called when Emacs is killed.
 Saves eFar state and kills all subprocesses."
   (efar-search-kill-all-processes)
   (when (and
-	 efar-save-state?
+	 efar-save-state-p
 	 (get-buffer efar-buffer-name))
     (ignore-errors
       (efar-save-state))))
 
-(defun efar-get-root-directory(path)
+(defun efar-get-root-directory (path)
   "Return a root directory for given PATH."
   ;; get parent directory
   (let ((parent-dir
@@ -2699,7 +2815,7 @@ Saves eFar state and kills all subprocesses."
       ;; otherwise check parent directory
       (efar-get-root-directory parent-dir ))))
 
-(defun efar-selected-files(side current? &optional up-included? skip-non-existing?)
+(defun efar-selected-files (side current? &optional up-included? skip-non-existing?)
   "Return a list of selected files in panel SIDE.
 When CURRENT? is t return file under cursor only even if some more files marked.
 When UP-INCLUDED? is t include '..' directory in the list.
@@ -2719,7 +2835,7 @@ When SKIP-NON-EXISTING? is t then non-existing files removed from the list."
 				 (list current-file-number)
 			       marked-files)))))))
 
-(defun efar-abort()
+(defun efar-abort ()
   "Quit fast search mode when it's active.
 Switch current panel to :files mode otherwise."
   (unless (efar-get :fast-search-string)
@@ -2728,7 +2844,7 @@ Switch current panel to :files mode otherwise."
 	(efar-go-to-dir (efar-last-visited-dir side) side))))
   (efar-quit-fast-search))
 
-(defun efar-last-visited-dir(&optional thing)
+(defun efar-last-visited-dir (&optional thing)
   "Return last visited directory for the THING.
 THING could be :left or :right.  In this case it indicates corresponding panel.
 Or it could be a string representing Windows drive letter."
@@ -2744,7 +2860,7 @@ Or it could be a string representing Windows drive letter."
 	    user-emacs-directory
 	  thing))))
 
-(defun efar-change-file-disp-mode(&optional side)
+(defun efar-change-file-disp-mode (&optional side)
   "Change file display mode in panel SIDE.
 Mode is changed in the loop :short -> :detail -> :long."
   (let* ((side (or side (efar-get :current-panel)))
@@ -2759,7 +2875,7 @@ Mode is changed in the loop :short -> :detail -> :long."
   (efar-calculate-widths)
   (efar-write-enable (efar-redraw)))
 
-(defun efar-prepare-detailed-file-info(file width &optional full? max-uid-gid-widths)
+(defun efar-prepare-detailed-file-info (file width &optional full? max-uid-gid-widths)
   "Prepare string with detailed info for FILE (size and date).
 Truncate string to WIDTH characters.
 When FULL? t, then include also file modes, uid and gid.
@@ -2795,7 +2911,7 @@ widths for uid and gid columns."
 	    (t
 	     (concat (efar-prepare-string name 2) "   " (efar-prepare-string file-details (- width 5))))))))
  
-(defun efar-file-size-as-string(size)
+(defun efar-file-size-as-string (size)
   "Prepare human readable string representing file SIZE."
   (cond ((< size 1024)
 	 (concat (int-to-string size) " B"))
@@ -2806,7 +2922,7 @@ widths for uid and gid columns."
 	(t
 	 (concat (int-to-string (/ size 1024 1024 1024)) " GB"))))
 
-(defun efar-ediff-files()
+(defun efar-ediff-files ()
   "Run ediff to compare files under cursor in both panels."
   (let ((file1 (efar-selected-files :left nil))
 	(file2 (efar-selected-files :right nil)))
@@ -2818,7 +2934,7 @@ widths for uid and gid columns."
 	(efar-set-status "Please mark 2 files to run ediff" 5 t)
       (ediff (caar file1) (caar file2)))))
 
-(defun efar-current-file-stat()
+(defun efar-current-file-stat ()
   "Display statisctics for selected file/directory."
   (let ((ok? nil)
 	(current-file-entry (caar (efar-selected-files (efar-get :current-panel) t))))
@@ -2873,7 +2989,7 @@ widths for uid and gid columns."
 			     (:search . "Search results")))
 
 
-(defun efar-move-splitter(&optional shift)
+(defun efar-move-splitter (&optional shift)
   "Shift splitter between panels by SHIFT percantages."
   (let ((shift (cond ((equal shift :left)
 		      (+ (or (efar-get :splitter-shift) 0) 2))
@@ -2890,7 +3006,7 @@ widths for uid and gid columns."
     (efar-calculate-widths)
     (efar-write-enable (efar-redraw))))
 
-(defun efar-change-panel-mode(mode &optional side)
+(defun efar-change-panel-mode (mode &optional side)
   "Change mode of panel SIDE to MODE."
   (let ((side (or side (efar-get :current-panel)))
 	(mode-name (cdr (assoc mode efar-panel-modes))))
@@ -2901,7 +3017,7 @@ widths for uid and gid columns."
     
     (cond
      ((equal mode :search)
-      (efar-show-search-results side t))
+      (efar-show-search-results side))
      
      (t
       (efar-set mode-name :panels side :dir)
@@ -2912,12 +3028,12 @@ widths for uid and gid columns."
       (efar-calculate-widths)
       (efar-write-enable (efar-redraw))))))
 
-(defun efar-show-mode-selector()
+(defun efar-show-mode-selector ()
   "Show selector of panel modes.
 Current panel switched to selected mode."
   (let* ((side (efar-get :current-panel))
 	 (current-mode (efar-get :panels side :mode))
-	 (new-mode (car (rassoc (ido-completing-read "Switch to mode: "
+	 (new-mode (car (rassoc (efar-completing-read "Switch to mode: "
 						     (mapcar (lambda(m) (cdr m))
 							     (append (list (cons current-mode (cdr (assoc current-mode efar-panel-modes))))
 								     (cl-remove-if (lambda(m) (equal current-mode (car m))) efar-panel-modes))))
@@ -2931,11 +3047,9 @@ Current panel switched to selected mode."
       (:disks (efar-change-panel-mode :disks))
       (:search (efar-change-panel-mode :search)))
     
-    (efar-write-enable (efar-redraw))
-    ;;(efar-quit-fast-search)
-    ))
+    (efar-write-enable (efar-redraw))))
 
-(defun efar-add-bookmark()
+(defun efar-add-bookmark ()
   "Add file under cursor to bookmark list."
   (let ((current-file-entry (caar (efar-selected-files (efar-get :current-panel) t)))
 	(bookmarks (efar-get :bookmarks)))
@@ -2948,13 +3062,13 @@ Current panel switched to selected mode."
 
 
 
-(defun efar-delete-bookmark()
+(defun efar-delete-bookmark ()
   "Delete file from the bookmark list."
   (let* ((side (efar-get :current-panel))
 	 (bookmarks (efar-get :bookmarks))
 	 (entry (caar (efar-selected-files side t))))
     (when (and bookmarks
-	       (string= "Yes" (ido-completing-read "Delete bookmark? " (list "Yes" "No"))))
+	       (string= "Yes" (efar-completing-read "Delete bookmark?")))
       (setq bookmarks (cl-remove entry bookmarks :test 'equal))
       (efar-set bookmarks :bookmarks)
       (when (equal (efar-get :panels :left :mode) :bookmark)
@@ -2962,7 +3076,7 @@ Current panel switched to selected mode."
       (when (equal (efar-get :panels :right :mode) :bookmark)
 	(efar-change-panel-mode :bookmark :right)))))
 
-(defun efar-navigate-to-file()
+(defun efar-navigate-to-file ()
   "Go to the file under cursor."
   (let ((entry (caar (efar-selected-files (efar-get :current-panel) t nil t))))
     (efar-quit-fast-search)
@@ -2973,7 +3087,7 @@ Current panel switched to selected mode."
       (efar-calculate-widths)
       (efar-write-enable (efar-redraw)))))
 
-(defun efar-switch-to-disk()
+(defun efar-switch-to-disk ()
   "Change to the selected Windows drive or Unix mount point."
   (let ((entry (caar (efar-selected-files (efar-get :current-panel) t nil t))))
     (efar-quit-fast-search)
@@ -2982,7 +3096,7 @@ Current panel switched to selected mode."
       (efar-calculate-widths)
       (efar-write-enable (efar-redraw)))))
 
-(defun efar-suggest-hint()
+(defun efar-suggest-hint ()
   "Display in the statusbar the next tip for key bindings."
   (let* ;; get next tip number to show
       ((hint-number (efar-get :next-hint-number))
@@ -3016,14 +3130,14 @@ Current panel switched to selected mode."
   'action #'efar-search-find-file-button
   'face 'efar-search-line-link-face)
 
-(defun efar-search-process-command()
+(defun efar-search-process-command ()
   "Prepare the list with command line arguments for the search processes."
   (list (expand-file-name invocation-name invocation-directory)
 	"--batch"
 	"-l" (symbol-file 'efar)
 	"-eval" "(efar-process-search-request)"))
 
-(defun efar-run-search-processes()
+(defun efar-run-search-processes ()
   "Run search processes."
   (efar-search-kill-all-processes)
   (sleep-for 1)
@@ -3040,20 +3154,20 @@ Current panel switched to selected mode."
 			    :run-search-processes
 			    '()))
 
-(defun efar-start-search()
+(defun efar-start-search ()
   "Start file search."
   (interactive)
   ;; if search is already running, ask user if current search must be aborted
-  (when efar-search-running?
-    (when (string= "Yes" (ido-completing-read "Search is still running. Kill it? " (list "Yes" "No" )))
+  (when efar-search-running-p
+    (when (string= "Yes" (efar-completing-read "Search is still running. Kill it?"))
       ;; restart search processes
       (efar-run-search-processes)
-      (setq efar-search-running? nil)))
+      (setq efar-search-running-p nil)))
 
   ;; init efar if needed
   (efar nil nil t)
   
-  (unless efar-search-running?
+  (unless efar-search-running-p
     ;; gather search parameters
     (let* ((proposed-dir (if (called-interactively-p "interactive")
 			     default-directory
@@ -3068,8 +3182,8 @@ Current panel switched to selected mode."
 	   (dir (read-directory-name "Search in: " proposed-dir proposed-dir))
 	   (wildcard (read-string "File name mask: " efar-search-default-file-mask))
 	   (text (read-string "Text to search: " ""))
-	   (ignore-case? (and (not (string-empty-p text)) (string=  "Yes" (ido-completing-read "Ignore case? " (list "Yes" "No")))))
-	   (regexp? (and (not (string-empty-p text)) (string=  "Yes" (ido-completing-read "Use regexp? " (list "No" "Yes"))))))
+	   (ignore-case? (and (not (string-empty-p text)) (string=  "Yes" (efar-completing-read "Ignore case? " (list "Yes" "No")))))
+	   (regexp? (and (not (string-empty-p text)) (string=  "Yes" (efar-completing-read "Use regexp? " (list "No" "Yes"))))))
 
       (setq efar-last-search-params nil)
       (setq efar-last-search-params (list (cons :dir dir)
@@ -3089,7 +3203,7 @@ Current panel switched to selected mode."
 			   (when (equal :search (efar-get :panels :right :mode))
 			     (efar-change-panel-mode :search :right)))))
       (setq efar-search-results '())
-      (setq efar-search-running? t)
+      (setq efar-search-running-p t)
       (efar-change-panel-mode :search)
       ;; send command to the manager to start the search with given parameters
       (efar-search-send-command efar-search-process-manager
@@ -3099,7 +3213,7 @@ Current panel switched to selected mode."
       (when (called-interactively-p "interactive") (efar nil)))))
 
 
-(defun efar-search-kill-all-processes()
+(defun efar-search-kill-all-processes ()
   "Kill all search processes."
   (when (and efar-search-process-manager (process-live-p efar-search-process-manager))
     (process-send-string efar-search-process-manager (concat (prin1-to-string (cons :exit '())) "\n")))
@@ -3113,7 +3227,7 @@ Current panel switched to selected mode."
     (delete-process efar-search-server))
   (setq efar-search-server nil))
 
-(defun efar-search-start-server()
+(defun efar-search-start-server ()
   "Start search server which will consume messages from search subprocesses."
   (when (and efar-search-server
 	     (process-live-p efar-search-server))
@@ -3129,7 +3243,7 @@ Current panel switched to selected mode."
   (set-process-query-on-exit-flag efar-search-server nil)
   (setq efar-search-server-port (cadr (process-contact efar-search-server))))
 
-(defun efar-search-server-sentinel(proc message)
+(defun efar-search-server-sentinel (proc message)
   "Set up sentinel for the search server.
 When a connection from subprocess PROC is opened (MESSAGE 'open'),
 this subprocess is registered in the list of clients."
@@ -3139,7 +3253,7 @@ this subprocess is registered in the list of clients."
       (set-process-query-on-exit-flag proc nil)
       (push (process-name proc) efar-search-clients))))
 
-(defun efar-search-finished()
+(defun efar-search-finished ()
   "Function is called when search is finished."
   (while (accept-process-output))
   ;; cancel update timer
@@ -3149,11 +3263,11 @@ this subprocess is registered in the list of clients."
   ;; fix end time
   (push (cons :end-time (time-to-seconds (current-time))) efar-last-search-params)
   
-  (setq efar-search-running? nil)
+  (setq efar-search-running-p nil)
   
   (efar-change-panel-mode :search))
 
-(defun efar-make-search-process()
+(defun efar-make-search-process ()
   "Make search subprocess."
   (let ((proc (make-process
 	       :name "efar-search-process"
@@ -3169,7 +3283,7 @@ this subprocess is registered in the list of clients."
     
     proc))
 
-(defun efar-search-send-command(proc command args)
+(defun efar-search-send-command (proc command args)
   "Send COMMAND and ARGS to the subprocess PROC."
   (let ((cmd (concat (prin1-to-string (cons command args)) "\n")))
     
@@ -3203,7 +3317,7 @@ Processes message STRING arriving from search subprocess PROC."
     (setcdr pending message)))
 
 (defvar efar-count 0)
-(defun efar-search-process-message(proc message-type data)
+(defun efar-search-process-message (proc message-type data)
   "Process a message form subprocess PROC.
 Message consists of MESSAGE-TYPE and DATA."
   (pcase message-type
@@ -3230,7 +3344,7 @@ Message consists of MESSAGE-TYPE and DATA."
 		   (efar-search-finished)
 		   (efar-set-status (concat "Error occurred during search: " data)))))
 
-(defun efar-search-int-start-search(args)
+(defun efar-search-int-start-search (args)
   "Start file search with parameters defined in ARGS in the subprocess.
 Executed in search manager process."
   (let ((dir (cdr (assoc :dir args)))
@@ -3246,7 +3360,7 @@ Executed in search manager process."
     ;; inform main process that manager finished the search
     (process-send-string efar-search-server (concat (prin1-to-string (cons :finished '())) "\n"))))
 
-(defun efar-search-files-recursively(dir wildcard &optional text regexp? ignore-case?)
+(defun efar-search-files-recursively (dir wildcard &optional text regexp? ignore-case?)
   "Main search function.
 Does the search for files in directory DIR.
 Files should match file mask WILDCARD.
@@ -3274,7 +3388,7 @@ Case is ignored when IGNORE-CASE? is t."
 	       ;; when entry is a directory or a symlink pointing to the directory call function recursivelly for it
 	       (when (and dir?
 			  (or (not symlink?)
-			      efar-search-follow-symlinks?))
+			      efar-search-follow-symlinks-p))
 		 (efar-search-files-recursively real-file-name wildcard text regexp? ignore-case?))
 	       
 	       ;; when entry is a file or text for search inside files is not given
@@ -3303,7 +3417,7 @@ Case is ignored when IGNORE-CASE? is t."
 		     (process-send-string  efar-search-server (concat (prin1-to-string (cons :found-file (list (cons :name real-file-name) (cons :lines '())))) "\n")))))))))
 
 
-(defun efar-search-process-file(args)
+(defun efar-search-process-file (args)
   "Search text in the file according to the parameters defined in ARGS."
   (let ((file (cdr (assoc :file args)))
 	(text (cdr (assoc :text args)))
@@ -3336,7 +3450,7 @@ Case is ignored when IGNORE-CASE? is t."
 	 (process-send-string efar-search-server (concat (prin1-to-string (cons :file-error (cons file (error-message-string error)))) "\n")))))))
 
 
-(defun efar-process-search-request()
+(defun efar-process-search-request ()
   "Main entry point for search subprocesses.
 Waits for commands in standard input."
   (let ((coding-system-for-write efar-search-coding))
@@ -3391,7 +3505,7 @@ Waits for commands in standard input."
       (error
        (process-send-string  efar-search-server (concat (prin1-to-string (cons :common-error (error-message-string err))) "\n"))))))
 
-(defun efar-next-search-process()
+(defun efar-next-search-process ()
   "Get next search process from the pool.
 We do text search parallel sending files one by one to all subprocesses by turns."
   (let* ((processes efar-search-processes)
@@ -3399,9 +3513,8 @@ We do text search parallel sending files one by one to all subprocesses by turns
     (setq efar-search-processes (cons last (remove last processes)))
     (car efar-search-processes)))
 
-(defun efar-show-search-results(&optional side reset-position?)
-  "Show search results in panel SIDE.
-When RESET-POSITION? is t then move cursor to the beginning."
+(defun efar-show-search-results (&optional side)
+  "Show search results in panel SIDE."
 
   (let* ((side (or side (efar-get :current-panel)))
 	 (errors (cdr (assoc :errors efar-last-search-params)))
@@ -3425,7 +3538,7 @@ When RESET-POSITION? is t then move cursor to the beginning."
       
       
       
-      (setf status-string (concat (cond (efar-search-running?
+      (setf status-string (concat (cond (efar-search-running-p
 					 "Search running for files ")
 					((cdr (assoc :end-time efar-last-search-params))
 					 (concat "Search finished in " (int-to-string (round (- (cdr (assoc :end-time efar-last-search-params)) (cdr (assoc :start-time efar-last-search-params))))) " second(s) for files "))
@@ -3444,21 +3557,14 @@ When RESET-POSITION? is t then move cursor to the beginning."
     
     (efar-remove-notifier side)
     
-    (when (or (not (equal :search (efar-get :panels side :mode)))
-	      reset-position?)
-      (efar-set 0 :panels side :current-pos))
-    
-    (efar-set :search :panels side :mode)
-    
+    (efar-set-status status-string nil t)
     (efar-calculate-widths)
-    (efar-write-enable (efar-redraw))
-    
-    (efar-set-status status-string nil t)))
+    (efar-write-enable (efar-redraw))))
 
 
-(defun efar-show-search-results-in-buffer()
+(defun efar-show-search-results-in-buffer ()
   "Show detailed search results in other buffer."
-  (if efar-search-running?
+  (if efar-search-running-p
       
       (efar-set-status "Search is still running" nil t)
     
@@ -3479,28 +3585,29 @@ When RESET-POSITION? is t then move cursor to the beginning."
 	(erase-buffer)
 	
 	;; insert header with description of search parameters
-	(insert (concat "Found " (int-to-string (length (efar-get :panels (efar-get :current-panel) :files)))
-			" files in " (int-to-string (round (- (cdr (assoc :end-time efar-last-search-params)) (cdr (assoc :start-time efar-last-search-params))))) " second(s).\n"))
+	(insert "Found " (int-to-string (length (efar-get :panels (efar-get :current-panel) :files)))
+			" files in " (int-to-string (round (- (cdr (assoc :end-time efar-last-search-params)) (cdr (assoc :start-time efar-last-search-params))))) " second(s).\n")
 	
 	;; in case if some file were skipped uring search we add corresponding hint to the header
 	(when errors
 	  (let ((p (point)))
-	    (insert (concat (int-to-string (length errors)) " file(s) skipped. See list at the bottom."))
+	    (insert (int-to-string (length errors)) " file(s) skipped. See list at the bottom.")
 	    (add-text-properties p (point)
 				 '(face efar-non-existing-current-file-face))
 	    (insert "\n")))
 	
-	(insert (concat "Directory: " dir "\n"
-			"File name mask: " wildcard "\n"
-			(when text
-			  (concat "Text '" text "' found in "
-				  (let ((hits 0))
-				    (cl-loop for file in (efar-get :panels (efar-get :current-panel) :files) do
-					     (setq hits (+ hits (length (nth 13 file)))))
-				    (int-to-string hits)) " line(s)\n"
-				    "Ignore case: " (if ignore-case? "yes" "no") "\n"
-				    "Use regexp: " (if regexp? "yes" "no") "\n"))
-			"\n"))
+	(insert "Directory: " dir "\n"
+		"File name mask: " wildcard "\n"
+		(or (when text
+		      (concat "Text '" text "' found in "
+			      (let ((hits 0))
+				(cl-loop for file in (efar-get :panels (efar-get :current-panel) :files) do
+					 (setq hits (+ hits (length (nth 13 file)))))
+				(int-to-string hits)) " line(s)\n"
+				"Ignore case: " (if ignore-case? "yes" "no") "\n"
+				"Use regexp: " (if regexp? "yes" "no") "\n"))
+		    "")
+		"\n")
 	
 	;; output list of found files (and source lines when searching for text)
 	(cl-loop for file in (efar-get :panels (efar-get :current-panel) :files) do
@@ -3546,7 +3653,7 @@ When RESET-POSITION? is t then move cursor to the beginning."
       (switch-to-buffer-other-window buffer)
       (efar-set-status "Ready"))))
 
-(defun efar-search-find-file-button(button)
+(defun efar-search-find-file-button (button)
   "Open file from search results buffer and navigate to searched text.
 BUTTON is a button clicked."
   (let ((file (button-get button :file))
@@ -3604,7 +3711,7 @@ BUTTON is a button clicked."
 
 (defvar efar-menu  "Keymap for the eFar buffer menu bar.")
 
-(defun efar-customize()
+(defun efar-customize ()
   "Open customization buffer for eFar."
   (interactive)
   (customize-group 'efar))
@@ -3628,5 +3735,5 @@ BUTTON is a button clicked."
     (add-hook 'window-configuration-change-hook #'efar-window-conf-changed)
     (add-hook 'kill-buffer-hook #'efar-buffer-killed nil 'local)
     (add-hook 'kill-emacs-hook #'efar-emacs-killed)))
-  
+
 ;;; efar.el ends here
