@@ -1104,7 +1104,7 @@ OPTIONS is a collection with possible answers."
   (let* ((completion-ignore-case t)
 	 (options (or options '("Yes" "No")))
 	 (prompt (concat prompt " ("
-			 (mapconcat 'identity options " | ")
+			 (mapconcat #'identity options " | ")
 			 ") ")))
     (completing-read prompt options nil t nil 'options (car options))))
 
@@ -2151,7 +2151,7 @@ Execute it unless DONT-RUN? is t."
 	(goto-char (point-max))
 	(unless dont-run?
 	  (eshell-kill-input))
-	(insert (concat "\"" file "\" "))
+	(insert "\"" file "\" ")
 	(unless dont-run?
 	  (eshell-send-input))))))
 
@@ -3586,18 +3586,18 @@ We do text search parallel sending files one by one to all subprocesses by turns
 	(erase-buffer)
 	
 	;; insert header with description of search parameters
-	(insert (concat "Found " (int-to-string (length (efar-get :panels (efar-get :current-panel) :files)))
-			" files in " (int-to-string (round (- (cdr (assoc :end-time efar-last-search-params)) (cdr (assoc :start-time efar-last-search-params))))) " second(s).\n"))
+	(insert "Found " (int-to-string (length (efar-get :panels (efar-get :current-panel) :files)))
+			" files in " (int-to-string (round (- (cdr (assoc :end-time efar-last-search-params)) (cdr (assoc :start-time efar-last-search-params))))) " second(s).\n")
 	
 	;; in case if some file were skipped uring search we add corresponding hint to the header
 	(when errors
 	  (let ((p (point)))
-	    (insert (concat (int-to-string (length errors)) " file(s) skipped. See list at the bottom."))
+	    (insert (int-to-string (length errors)) " file(s) skipped. See list at the bottom.")
 	    (add-text-properties p (point)
 				 '(face efar-non-existing-current-file-face))
 	    (insert "\n")))
 	
-	(insert (concat "Directory: " dir "\n"
+	(insert "Directory: " dir "\n"
 			"File name mask: " wildcard "\n"
 			(when text
 			  (concat "Text '" text "' found in "
@@ -3607,7 +3607,7 @@ We do text search parallel sending files one by one to all subprocesses by turns
 				    (int-to-string hits)) " line(s)\n"
 				    "Ignore case: " (if ignore-case? "yes" "no") "\n"
 				    "Use regexp: " (if regexp? "yes" "no") "\n"))
-			"\n"))
+			"\n")
 	
 	;; output list of found files (and source lines when searching for text)
 	(cl-loop for file in (efar-get :panels (efar-get :current-panel) :files) do
