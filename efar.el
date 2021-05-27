@@ -38,7 +38,6 @@
 
 ;;; Code:
 
-(require 'ido)
 (require 'subr-x)
 (require 'filenotify)
 (require 'dired)
@@ -3598,16 +3597,17 @@ We do text search parallel sending files one by one to all subprocesses by turns
 	    (insert "\n")))
 	
 	(insert "Directory: " dir "\n"
-			"File name mask: " wildcard "\n"
-			(when text
-			  (concat "Text '" text "' found in "
-				  (let ((hits 0))
-				    (cl-loop for file in (efar-get :panels (efar-get :current-panel) :files) do
-					     (setq hits (+ hits (length (nth 13 file)))))
-				    (int-to-string hits)) " line(s)\n"
-				    "Ignore case: " (if ignore-case? "yes" "no") "\n"
-				    "Use regexp: " (if regexp? "yes" "no") "\n"))
-			"\n")
+		"File name mask: " wildcard "\n"
+		(or (when text
+		      (concat "Text '" text "' found in "
+			      (let ((hits 0))
+				(cl-loop for file in (efar-get :panels (efar-get :current-panel) :files) do
+					 (setq hits (+ hits (length (nth 13 file)))))
+				(int-to-string hits)) " line(s)\n"
+				"Ignore case: " (if ignore-case? "yes" "no") "\n"
+				"Use regexp: " (if regexp? "yes" "no") "\n"))
+		    "")
+		"\n")
 	
 	;; output list of found files (and source lines when searching for text)
 	(cl-loop for file in (efar-get :panels (efar-get :current-panel) :files) do
