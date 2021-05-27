@@ -4,7 +4,7 @@
 
 ;; Author: "Vladimir Suntsov" <vladimir@suntsov.online>
 ;; Maintainer: vladimir@suntsov.online
-;; Version: 1.15
+;; Version: 1.16
 ;; Package-Requires: ((emacs "26.1"))
 ;; Keywords: files
 ;; URL: https://github.com/suntsov/efar
@@ -45,7 +45,7 @@
 (require 'esh-mode)
 (require 'em-dirs)
 
-(defconst efar-version 1.15 "Current eFar version number.")
+(defconst efar-version 1.16 "Current eFar version number.")
 
 (defvar efar-state nil)
 (defvar efar-mouse-down-p nil)
@@ -3176,8 +3176,7 @@ Current panel switched to selected mode."
 				    default-directory)
 				   ((file-directory-p selected-item)
 				    selected-item)
-				   (t
-				    (print selected-item t)
+				   (t				 
 				    (efar-get-parent-dir selected-item))))))
 	   (dir (read-directory-name "Search in: " proposed-dir proposed-dir))
 	   (wildcard (read-string "File name mask: " efar-search-default-file-mask))
@@ -3195,7 +3194,7 @@ Current panel switched to selected mode."
       
       ;; set up timer that will update search list result during search
       (setq efar-update-search-results-timer
-	    (run-at-time nil 1
+	    (run-at-time nil 2
 			 (lambda()
 			   (when (equal :search (efar-get :panels :left :mode))
 			     (efar-change-panel-mode :search :left))
@@ -3204,6 +3203,7 @@ Current panel switched to selected mode."
 			     (efar-change-panel-mode :search :right)))))
       (setq efar-search-results '())
       (setq efar-search-running-p t)
+      (efar-set 0 :panels :left :current-pos)
       (efar-change-panel-mode :search)
       ;; send command to the manager to start the search with given parameters
       (efar-search-send-command efar-search-process-manager
@@ -3216,7 +3216,7 @@ Current panel switched to selected mode."
 (defun efar-search-kill-all-processes ()
   "Kill all search processes."
   (when (and efar-search-process-manager (process-live-p efar-search-process-manager))
-    (process-send-string efar-search-process-manager (concat (prin1-to-string (cons :exit '())) "\n")))
+    (kill-process efar-search-process-manager))
   (setq efar-search-process-manager nil)
   
   (cl-loop for proc in efar-search-processes do
@@ -3225,7 +3225,10 @@ Current panel switched to selected mode."
   (when (and efar-search-server
 	     (process-live-p efar-search-server))
     (delete-process efar-search-server))
-  (setq efar-search-server nil))
+  (setq efar-search-server nil)
+  (setq efar-last-search-params nil)
+  (setq efar-search-results '())
+  (setq efar-search-running-p t))
 
 (defun efar-search-start-server ()
   "Start search server which will consume messages from search subprocesses."
