@@ -34,7 +34,7 @@ When Efar is called with universal argument, default-directory of actual buffer 
 ### Appearance
 * change mode double-panel <-> single-panel - **C-c v M**
 * change number of columns in current panel - **C-c v +   or   C-c v -**
-* change file display mode (short, long, detailed) - **C-c v m**
+* change file display mode (short, long, detailed, full) - **C-c v m**
 
 ### Selecting disks (Windows) or mount points (Unix)
 * display list of available disks (Windows) or mount points (Unix) - **C-c f d**
@@ -101,6 +101,11 @@ Many operations within eFar buffer can be performed using mouse
 * click on the directory name at top to show disk/mout mount selector
 * use controls in the panel header to change sort order, file display mode, column number, etc.
 * drag or double click the splitter between panels to change the widths of panels
+
+### Shell
+* when double-click or press enter on a executable file an eFar Emacs Shell is opened and the file is then executed in the shell
+* a single Shell buffer is used when running files from eFar
+* use **C-c c o** to switch to the shell buffer
 
 ### Help
 * display list of all available key bindigs - **C-c ?**
