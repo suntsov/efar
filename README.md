@@ -56,6 +56,7 @@ When Efar is called with universal argument, default-directory of actual buffer 
 * show statistic (size, number of file and directories) for the directory under cursor - **C-c c s**
 * run ediff for selected files - **C-c c e**
 * copy to the clipboard path to the file under cursor - **C-c c p**
+* change file modes (permissions) for selected files - **C-c f m**
 
 ### Changing sort order, filtering
 * change sort order and direction - **C-c f s**

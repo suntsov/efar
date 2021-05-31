@@ -4,7 +4,7 @@
 
 ;; Author: "Vladimir Suntsov" <vladimir@suntsov.online>
 ;; Maintainer: vladimir@suntsov.online
-;; Version: 1.17
+;; Version: 1.18
 ;; Package-Requires: ((emacs "26.1"))
 ;; Keywords: files
 ;; URL: https://github.com/suntsov/efar
@@ -45,7 +45,7 @@
 (require 'esh-mode)
 (require 'em-dirs)
 
-(defconst efar-version 1.17 "Current eFar version number.")
+(defconst efar-version 1.18 "Current eFar version number.")
 
 (defvar efar-state nil)
 (defvar efar-mouse-down-p nil)
@@ -340,7 +340,7 @@
 	    ,@body
 	  (error (when
 		     (string= "Yes"
-			      (completing-read
+			      (efar-completing-read
 			       (concat "Error: \"" (error-message-string err) "\". Try again? ")
 			       (list "Yes" "No")))
 		   "error"))))))
@@ -418,6 +418,9 @@ IGNORE-IN-MODES is a list of modes which should ignore this key binding."
  		   "open file under cursor in external application" t)
 (efar-register-key "<f3>"  'efar-edit-file   t 'efar-read-file-key
  		   "show content of the file in other window" :space-after)
+
+(efar-register-key "C-c f m"  'efar-set-file-modes  nil 'efar-set-file-modes-key
+ 		   "set file modes (permissions) for selected items" :space-after)
 
 (efar-register-key "<f5>"   'efar-copy-or-move-files :copy 'efar-copy-file-key
   		   "copy selected file(s)" t (list :file-hist :dir-hist :bookmark :disks :search))
@@ -856,8 +859,7 @@ Notifications in the queue will be processed only if there are no new notificati
 		    :notification-timer))))))
 
 
-(defun efar-process-pending-notifications ()
-  
+(defun efar-process-pending-notifications ()  
   "Process all pending file notifications."
   
   ;; while there are notifications in a queue
@@ -868,10 +870,10 @@ Notifications in the queue will be processed only if there are no new notificati
 			     (pop pending-notifications)
 			   (efar-set pending-notifications :pending-notifications))))
 	(when descriptor
-	  ;; if event comes from the watch is registered for left panel directory, refersh left panel
+	  ;; if event comes from the watcher registered for left panel directory, refersh left panel
 	  (when (equal descriptor (cdr (efar-get :panels :left :file-notifier)))
 	    (efar-refresh-panel :left))
-	  ;; if event comes from the watch is registered for right panel directory, refersh right panel
+	  ;; if event comes from the watcher registered for right panel directory, refersh right panel
 	  (when (equal descriptor (cdr (efar-get :panels :right :file-notifier)))
 	    (efar-refresh-panel :right))))))
 
@@ -889,13 +891,16 @@ Notifications in the queue will be processed only if there are no new notificati
   (with-temp-file efar-state-file-name
     (let ((copy (copy-hash-table efar-state)))
       
-      ;; clear up data not not relevant for saving
+      ;; clear up data not relevant for saving
       (puthash :file-notifier nil (gethash :left (gethash :panels copy)))
       (puthash :file-notifier nil (gethash :right (gethash :panels copy)))
       (puthash :notification-timer nil copy)
       (puthash :pending-notifications () copy)
       (puthash :files () (gethash :left (gethash :panels copy)))
       (puthash :files () (gethash :right (gethash :panels copy)))
+      (puthash :selected () (gethash :left (gethash :panels copy)))
+      (puthash :selected () (gethash :right (gethash :panels copy)))
+
       (puthash :last-auto-read-buffer nil copy)
       
       ;; add eFar version tag
@@ -953,16 +958,20 @@ from version FROM-VERSION to actual version."
 	    (efar-set 1 :panels :left :view :file-hist :column-number)
 	    (efar-set '(:long) :panels :left :view :file-hist :file-disp-mode)
 	    (efar-set 1 :panels :right :view :file-hist :column-number)
-	    (efar-set '(:long) :panels :right :view :file-hist :file-disp-mode)
-	    
-	    
+	    (efar-set '(:long) :panels :right :view :file-hist :file-disp-mode)	    	    
 	    (message "State file upgraded to version 1.0"))
 
 	  ;; 1.12 -> 1.13
 	  (when (< from-version 1.13)
 	    (efar-set '(:short :long :detailed :full) :panels :right :view :files :file-disp-mode)
 	    (efar-set '(:short :long :detailed :full) :panels :left :view :files :file-disp-mode)
-	    (message "State file upgraded to version 1.13")))
+	    (message "State file upgraded to version 1.13"))
+
+	  ;; 1.17 -> 1.18
+	  (when (< from-version 1.18)
+	    (efar-set '() :panels :left :selected)
+	    (efar-set '() :panels :left :selected)
+	    (message "State file upgraded to version 1.17")))
     
       (error
        (message "Error occured during upgrading state file: %s. State file skipped." (error-message-string err))
@@ -1010,7 +1019,9 @@ Otherwise ask user where to copy/move files to."
 	     (when files
 	       
 	       (let ((destination (or dest
-				      (read-directory-name (if (equal operation :copy) "Copy selected file(s) to " "Move selected file(s) to ")
+				      (read-directory-name (if (equal operation :copy)
+							       "Copy selected file(s) to "
+							     "Move selected file(s) to ")
 							   (file-name-as-directory todir)
 							   nil
 							   nil
@@ -1124,6 +1135,26 @@ OPTIONS is a collection with possible answers."
 		selected-files)
 	   
 	   (efar-refresh-panel side)
+	   
+	   (when (string= (efar-get :panels side :dir) (efar-get :panels (efar-other-side) :dir))
+	     (efar-refresh-panel (efar-other-side)))))))
+  
+  (efar-set-status "Ready"))
+
+(defun efar-set-file-modes ()
+  "Set file modes for selected items."
+  (unwind-protect
+      (efar-with-notification-disabled
+       (let* ((side (efar-get :current-panel))
+	      (selected-files (efar-selected-files side nil)))
+	 (when selected-files
+	   (let ((modes (read-file-modes)))
+	     (efar-set-status "Setting mode for selected files...")
+	     (mapc (lambda (f)
+		     (efar-retry-when-error (set-file-modes (car f) modes)))
+		   selected-files))
+	     
+	   (efar-refresh-panel side nil nil)
 	   
 	   (when (string= (efar-get :panels side :dir) (efar-get :panels (efar-other-side) :dir))
 	     (efar-refresh-panel (efar-other-side)))))))
@@ -1344,6 +1375,7 @@ The point where mouse click occurred determined out of EVENT parameters."
 	 (pos (nth 1 (nth 1 event)))
 	 (props (plist-get (text-properties-at pos) :control))
 	 (side (cdr (assoc :side props)))
+	 (files (efar-get :panels side :files))
 	 (control (cdr (assoc :control props))))
     
      ;; when single click on a file entry - auto read file
@@ -1358,7 +1390,9 @@ The point where mouse click occurred determined out of EVENT parameters."
      ;; when clicked with shift we mark all items between clicked item and item marked last time
      (when (and (equal click-type 'S-mouse-1)
 		(equal control :file-pos))
-       (let ((last-marked (car (efar-get :panels side :selected)))
+       (let ((last-marked (cl-position-if
+			   (lambda(e) (equal (car e) (caar (efar-get :panels side :selected))))
+			   files))
 	     (selected-file-number (+ (cdr (assoc :file-number props)) (efar-get :panels side :start-file-number)))
 	     (selected '()))
 	 (if (not last-marked)
@@ -1367,7 +1401,7 @@ The point where mouse click occurred determined out of EVENT parameters."
 	   (cl-loop for n in (number-sequence last-marked
 					      selected-file-number
 					      (if (< last-marked selected-file-number) 1 -1))
-		    do (push n selected))
+		    do (push (nth n files) selected))
 	   (efar-set selected :panels side :selected))))
      
      ;;when double clicked
@@ -1606,7 +1640,8 @@ If there are no accessible directories, return `user-emacs-directory'."
 (defun efar-refresh-panel (&optional side move-to-first? move-to-file-name)
   "Refresh given panel (or a current one when SIDE is not given).
 When MOVE-TO-FIRST? is t move cursot to the first file.
-When MOVE-TO-FILE-NAME is given then move cursor to the file with that name."
+When MOVE-TO-FILE-NAME is given then move cursor to the file with that name.
+When DONT-UNMARK is t then marked items remains marked."
   (let* ((side (or side (efar-get :current-panel)))
 	 (mode (efar-get :panels side :mode)))
     
@@ -1614,7 +1649,6 @@ When MOVE-TO-FILE-NAME is given then move cursor to the file with that name."
       (efar-set (efar-get-accessible-directory-in-path (efar-get :panels side :dir))
 		:panels side :dir))
     
-    (efar-set () :panels side :selected)
     (efar-set nil :panels side :fast-search-string)
     
     (let ((current-file-name (cond
@@ -1624,12 +1658,21 @@ When MOVE-TO-FILE-NAME is given then move cursor to the file with that name."
 	  (current-file-number (if move-to-first? 0 (efar-current-file-number side))))
       
       (efar-get-file-list side)
+
+      ;; keep selection of still existing files
+      (let ((selected (efar-get :panels side :selected))
+	    (files (efar-get :panels side :files)))
+	(efar-set (cl-remove-if (lambda(e1)
+			       (not (cl-member-if (lambda(e2)
+						 (equal (car e1) (car e2)))
+					       files)))
+			     selected)
+		  :panels side :selected))
       
       (when (> (length (efar-get :panels side :files)) 0)
 	(efar-go-to-file current-file-name side current-file-number)))
     
     (efar-write-enable (efar-redraw))))
-
 
 (defun efar-go-to-dir (dir &optional side no-hist?)
   "Go to given DIR.
@@ -1760,16 +1803,14 @@ Do that for current panel or for panel SIDE if it's given."
 (defun efar-mark-file (&optional no-move?)
   "Mark file under cursor in current panel.
 Unless NO-MOVE? move curosr one item down."
-  (let* ((side (efar-get :current-panel))
-	 (start-file-number (efar-get :panels side :start-file-number))
-	 (current-position (efar-get :panels side :current-pos))
-	 (selected-file-number (+ start-file-number current-position))
+  (let* ((side (efar-get :current-panel))	
+	 (current-item (car (efar-selected-files side t nil)))
 	 (selected-items (efar-get :panels side :selected)))
     
-    (or (string= (car (nth selected-file-number (efar-get :panels side :files))) "..")
-	(if (member selected-file-number selected-items)
-	    (efar-set (delete selected-file-number selected-items) :panels side :selected)
-	  (efar-set (push selected-file-number selected-items) :panels side :selected)))
+    (when current-item
+      (if (cl-member-if (lambda(e) (equal (car e) (car current-item))) selected-items)
+	  (efar-set (cl-delete-if  (lambda(e) (equal (car e) (car current-item))) selected-items) :panels side :selected)
+	(efar-set (push current-item selected-items) :panels side :selected)))
     
     (unless no-move? (efar-move-cursor  :down))))
 
@@ -1913,9 +1954,7 @@ When FOR-READ? is t switch back to eFar buffer."
 		files))
 	      
 	      side))
-     :panels side :files)
-    
-    (efar-set '() :panels side :selected)))
+     :panels side :files)))
 
 (defun efar-move-cursor (direction &optional no-auto-read?)
   "Move cursor in direction DIRECTION.
@@ -2173,16 +2212,12 @@ Execute it unless DONT-RUN? is t."
 	   (and (stringp (cadr file))
 		(file-directory-p (cadr file))))
       (let ((newdir (expand-file-name (car file) current-dir-path)))
-	(cond
-	 
+	(cond	 
 	 ((not (file-accessible-directory-p  newdir))
 	  (efar-set-status (concat "Directory "  newdir " is not accessible") 3))
 	 
 	 (t
-	  (progn
-	    (efar-go-to-dir newdir side)
-	    (efar-calculate-widths)
-	    (efar-write-enable (efar-redraw)))))))))
+	  (efar-go-to-dir newdir side)))))))
 
 (defun efar-go-directory-history-cicle (direction)
   "Loop over directory history entries in direction DIRECTION."
@@ -2376,7 +2411,8 @@ otherwise redraw all."
 				    ;; current file to output
 				    ((file (nth cnt files))
 				     ;; is current file marked?
-				     (marked? (member (+ (efar-get :panels side :start-file-number) cnt) (efar-get :panels side :selected)))
+				     (marked? (cl-member-if (lambda(e) (equal (car file) (car e)))
+							 (efar-get :panels side :selected)))
 				     ;; is it an existing file?
 				     (exists? (file-exists-p (car file)))
 				     ;; get real file (for symlinks)
@@ -2824,16 +2860,13 @@ When SKIP-NON-EXISTING? is t then non-existing files removed from the list."
 	 (start-file-number (efar-get :panels side :start-file-number))
 	 (current-file-number (+ start-file-number (efar-get :panels side :current-pos)))
 	 (files (efar-get :panels side :files)))
-    
+  
     (when (> (length files) 0)
       (cl-remove-if (lambda(f) (and skip-non-existing? (not (file-exists-p (car f)))))
 		    (remove (unless up-included? (list ".." t))
-			    (mapcar
-			     (lambda (fn)
-			       (nth fn files))
-			     (if (or current? (not marked-files))
-				 (list current-file-number)
-			       marked-files)))))))
+			    (if (or current? (not marked-files))
+				(list (nth current-file-number files))
+			      marked-files))))))
 
 (defun efar-abort ()
   "Quit fast search mode when it's active.
@@ -3179,8 +3212,9 @@ Current panel switched to selected mode."
 				   (t				 
 				    (efar-get-parent-dir selected-item))))))
 	   (dir (read-directory-name "Search in: " proposed-dir proposed-dir))
-	   (wildcard (read-string "File name mask: " efar-search-default-file-mask))
-	   (text (read-string "Text to search: " ""))
+	   (wildcard (read-string "File name mask: " (or (cdr (assoc :wildcard efar-last-search-params))
+							 efar-search-default-file-mask)))
+	   (text (read-string "Text to search: " (cdr (assoc :text efar-last-search-params))))
 	   (ignore-case? (and (not (string-empty-p text)) (string=  "Yes" (efar-completing-read "Ignore case? " (list "Yes" "No")))))
 	   (regexp? (and (not (string-empty-p text)) (string=  "Yes" (efar-completing-read "Use regexp? " (list "No" "Yes"))))))
 
