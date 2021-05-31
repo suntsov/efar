@@ -420,7 +420,7 @@ IGNORE-IN-MODES is a list of modes which should ignore this key binding."
  		   "show content of the file in other window" :space-after)
 
 (efar-register-key "C-c f m"  'efar-set-file-modes  nil 'efar-set-file-modes-key
- 		   "set file modes for selected items" :space-after)
+ 		   "set file modes (permissions) for selected items" :space-after)
 
 (efar-register-key "<f5>"   'efar-copy-or-move-files :copy 'efar-copy-file-key
   		   "copy selected file(s)" t (list :file-hist :dir-hist :bookmark :disks :search))
@@ -3212,8 +3212,9 @@ Current panel switched to selected mode."
 				   (t				 
 				    (efar-get-parent-dir selected-item))))))
 	   (dir (read-directory-name "Search in: " proposed-dir proposed-dir))
-	   (wildcard (read-string "File name mask: " efar-search-default-file-mask))
-	   (text (read-string "Text to search: " ""))
+	   (wildcard (read-string "File name mask: " (or (cdr (assoc :wildcard efar-last-search-params))
+							 efar-search-default-file-mask)))
+	   (text (read-string "Text to search: " (cdr (assoc :text efar-last-search-params))))
 	   (ignore-case? (and (not (string-empty-p text)) (string=  "Yes" (efar-completing-read "Ignore case? " (list "Yes" "No")))))
 	   (regexp? (and (not (string-empty-p text)) (string=  "Yes" (efar-completing-read "Use regexp? " (list "No" "Yes"))))))
 
