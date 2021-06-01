@@ -104,6 +104,12 @@
     :group 'efar-parameters
     :type 'string))
 
+(eval-and-compile
+  (defcustom efar-batch-rename-buffer-name "*eFAR batch rename*"
+    "Name for the buffer to preview batch rename operation reults."
+    :group 'efar-parameters
+    :type 'string))
+
 (defcustom efar-state-file-name (concat user-emacs-directory ".efar-state")
   "Path to the eFar state save file."
   :group 'efar-parameters
@@ -476,6 +482,8 @@ IGNORE-IN-MODES is a list of modes which should ignore this key binding."
 		   "show last visited directories" t)
 (efar-register-key "C-c c f" 'efar-change-panel-mode  :file-hist 'efar-show-file-history-key
 		   "show last edited files" t)
+(efar-register-key "C-c c r" 'efar-batch-rename  nil 'efar-batch-rename-key
+		   "batch rename files" t)
 (efar-register-key "C-c c m" 'efar-show-mode-selector  nil 'efar-show-mode-selector-key
 		   "show panel mode selector" :space-after)
 
@@ -2260,32 +2268,37 @@ Execute it unless DONT-RUN? is t."
   (efar-set (window-height) :window-height)
   (efar-set (- (window-height) 6) :panel-height))
 
-(defun efar-redraw ()
+(defun efar-redraw (&optional reread-files?)
   "The main function to output content of eFar buffer."
-  (efar-calculate-window-size)
-  (erase-buffer)
-  
-  (if (< (efar-get :window-width) 30)
-      (insert "eFar buffer is too narrow")
-    ;; draw all border lines
-    (efar-draw-border )
-    ;; apply default face
-    (put-text-property (point-min) (point-max) 'face 'efar-border-line-face)
-    ;; output directory names above each panel
-    (efar-output-dir-names :left)
-    (efar-output-dir-names :right)
-    ;; output panel headers with panel controls
-    (efar-output-header :left)
-    (efar-output-header :right)
-    ;; output file lists
-    (efar-output-files :left)
-    (efar-output-files :right)
-    ;; output details about files under cursor
-    (efar-output-file-details :left)
-    (efar-output-file-details :right)
-    ;; during drag we show hand pointer
-    (when efar-mouse-down-p
-      (put-text-property (point-min) (point-max) 'pointer 'hand))))
+  (interactive)
+  (with-current-buffer efar-buffer-name 
+    (efar-calculate-window-size)
+    (erase-buffer)
+    
+    (if (< (efar-get :window-width) 30)
+	(insert "eFar buffer is too narrow")
+      ;; draw all border lines
+      (efar-draw-border )
+      ;; apply default face
+      (put-text-property (point-min) (point-max) 'face 'efar-border-line-face)
+      ;; output directory names above each panel
+      (efar-output-dir-names :left)
+      (efar-output-dir-names :right)
+      ;; output panel headers with panel controls
+      (efar-output-header :left)
+      (efar-output-header :right)
+      ;; output file lists
+      (when reread-files?
+	(efar-get-file-list :left)
+	(efar-get-file-list :right))
+      (efar-output-files :left)
+      (efar-output-files :right)
+      ;; output details about files under cursor
+      (efar-output-file-details :left)
+      (efar-output-file-details :right)
+      ;; during drag we show hand pointer
+      (when efar-mouse-down-p
+	(put-text-property (point-min) (point-max) 'pointer 'hand)))))
 
 (defun efar-reinit ()
   "Reinitialize eFar state."
@@ -2967,6 +2980,95 @@ widths for uid and gid columns."
 	(efar-set-status "Please mark 2 files to run ediff" 5 t)
       (ediff (caar file1) (caar file2)))))
 
+(defun efar-batch-rename ()
+  "Very simple batch file renamer.
+It's allowed to use following tags in the format string:
+  #name  -  replaced by whole file name with extension
+  #basename  -  replaced by file name without extension
+  #ext  -  replaced by extension with leading '.'
+  #number  -  replaced by running number."
+  (let* ((side (efar-get :current-panel))
+	 (selected-files (efar-get :panels side :selected))
+	 ;;gather files to rename
+	 ;; get marked files if any
+	 ;; get all files shown in the directory otherwise
+	 (files (cl-remove-if (lambda(e)
+				(or (equal (car e) "..")
+				    (and selected-files
+					 (not (cl-member-if (lambda(e1) (equal (car e) (car e1)))
+							    selected-files)))))
+			      (efar-get :panels side :files)))
+	 ;; format string to use for renaming
+	 (format-string (read-string "Input format string: " "#basename-#number#ext"))
+	 (cnt 0)
+	 (rename-map '()))
+
+    ;; fill the renaming map 
+    (cl-loop for f in files do	 
+	     (incf cnt)
+	     (let* ((name (efar-get-short-file-name f))
+		    (base-name (file-name-base (car f)))
+		    (ext (file-name-extension (car f)))		    
+		    (new-name format-string))
+	       (setf new-name (replace-regexp-in-string "#name" name new-name))
+	       (setf new-name (replace-regexp-in-string "#basename" base-name new-name))
+	       (setf new-name (replace-regexp-in-string "#number" (int-to-string cnt) new-name))
+	       (setf new-name (replace-regexp-in-string "#ext" (if ext (concat "." ext) "") new-name))
+	       
+	       (push (cons (car f) new-name) rename-map)))
+
+    ;; show renaming map in the separate buffer
+    (and (get-buffer efar-batch-rename-buffer-name) (kill-buffer efar-batch-rename-buffer-name))
+    (let ((buffer (get-buffer-create efar-batch-rename-buffer-name))
+	  (duplicates? nil))
+
+      (with-current-buffer buffer
+	(read-only-mode 0)
+	(erase-buffer)
+	(setq-local efar-rename-map rename-map)
+	(cl-loop for f in (reverse rename-map) do
+		 (let ((p (point)))
+		   (insert (car f) "\t->\t" (cdr f))
+		   ;; when the result list contains duplicated file names
+		   ;; highlight these duplicates
+		   (when (> (cl-count-if (lambda(e) (equal (cdr f) (cdr e))) efar-rename-map) 1)
+		     (setf duplicates? t)
+		     (add-text-properties p (point)
+					  '(face efar-non-existing-current-file-face))))
+		 (newline))
+	
+	(align-regexp (point-min) (point-max) "\\(\\s-*\\)\t")
+	(goto-char 0)
+
+	;; insert header
+	(insert "Check the preliminary renaming results  bellow.")
+	(newline)
+	(if duplicates?
+	    (progn 
+	      (insert "There are duplicates in the result list. Renaming is not possible.")
+	      (newline)
+	      (insert "Press 'C-g' to quit"))	      
+	  (insert "Press 'r' to confirm and run batch renaming or 'C-g' to cancel it."))
+	(newline)
+	(newline)
+	(read-only-mode 1)
+
+	;; activate key binding to run actual renaming
+	(unless duplicates?
+	  (local-set-key (kbd "r") (lambda()
+				     (interactive)
+				     (cl-loop for f in efar-rename-map do
+					      (rename-file (car f) (cdr f)))
+				     (kill-buffer efar-batch-rename-buffer-name)
+				     (efar-write-enable (efar-redraw 'reread-files))
+				     (efar nil))))
+	;; activate key binding to quit
+	(local-set-key (kbd "C-g") (lambda()
+				   (interactive)
+				   (kill-buffer efar-batch-rename-buffer-name)
+				   (efar nil)))
+      (switch-to-buffer-other-window buffer)))))
+    
 (defun efar-current-file-stat ()
   "Display statisctics for selected file/directory."
   (let ((ok? nil)

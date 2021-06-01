@@ -58,6 +58,17 @@ When Efar is called with universal argument, default-directory of actual buffer 
 * copy to the clipboard path to the file under cursor - **C-c c p**
 * change file modes (permissions) for selected files - **C-c f m**
 
+### Batch file renaming
+eFar has a very simple batch file renamer. Press **C-c c r** to run it.
+* renamer asks for a format string to use for renaming, default #basename-#number#ext
+* possible keywords in the format string:
+  #name - replaced by the whole file name including extension
+  #basename - replaced by the file name without extension
+  #ext - replaced by the file extension (if any) with leading '.'
+  #number - replaced by the running number
+* preliminary results of renaming are shown in a separate buffer
+* user can run actual renaming or cancel it
+
 ### Changing sort order, filtering
 * change sort order and direction - **C-c f s**
 * set/remove filtering by file mask - **C-c f f**
