@@ -56,17 +56,18 @@ When Efar is called with universal argument, default-directory of actual buffer 
 * change file modes (permissions) for selected files - **C-c f m**
 
 ### Batch file renaming
-eFar has a very simple batch file renamer. Press **C-c c r** to run it.
-The files to rename are the marked ones (if any) or the whole (might be filtered) file list in the current directory .
-Renamer asks for a format string to use for renaming, default to #basename-#number#ext
-Possible keywords in the format string:
-- #name - replaced by the whole file name including extension
-- #basename - replaced by the file name without extension
-- #ext - replaced by the file extension (if any) with leading '.'
-- #number - replaced by the running number
-Keyword can be written in different form:
-- <name>, <NAME> or <Name>
-Depending on the form corresponding part will be translated to lower case, upper case or will be capitalized.
+eFar has a very simple batch file renamer.
+* Press **C-c c r** to run it.
+* The files to rename are the marked ones (if any) or the whole (might be filtered) file list in the current directory .
+* Renamer asks for a format string to use for renaming, default to #basename-#number#ext
+* Possible keywords in the format string:
+  - #name - replaced by the whole file name including extension
+  - #basename - replaced by the file name without extension
+  - #ext - replaced by the file extension (if any) with leading '.'
+  - #number - replaced by the running number
+* Keyword can be written in different form:
+  - \<name\>, \<NAME\> or \<Name\>
+* Depending on the form corresponding part will be translated to lower case, upper case or will be capitalized.
 
 Preliminary results of renaming are shown in a separate buffer.
 User can run actual renaming or cancel it.
