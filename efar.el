@@ -49,6 +49,7 @@
 
 (defvar efar-state nil)
 (defvar efar-mouse-down-p nil)
+(defvar efar-rename-map nil)
 ;;variables for file search
 (defvar efar-search-processes '())
 (defvar efar-search-process-manager nil)
@@ -867,9 +868,8 @@ Notifications in the queue will be processed only if there are no new notificati
 		    :notification-timer))))))
 
 
-(defun efar-process-pending-notifications ()  
+(defun efar-process-pending-notifications ()
   "Process all pending file notifications."
-  
   ;; while there are notifications in a queue
   (while
       ;; pop next notification
@@ -966,7 +966,7 @@ from version FROM-VERSION to actual version."
 	    (efar-set 1 :panels :left :view :file-hist :column-number)
 	    (efar-set '(:long) :panels :left :view :file-hist :file-disp-mode)
 	    (efar-set 1 :panels :right :view :file-hist :column-number)
-	    (efar-set '(:long) :panels :right :view :file-hist :file-disp-mode)	    	    
+	    (efar-set '(:long) :panels :right :view :file-hist :file-disp-mode)
 	    (message "State file upgraded to version 1.0"))
 
 	  ;; 1.12 -> 1.13
@@ -1811,7 +1811,7 @@ Do that for current panel or for panel SIDE if it's given."
 (defun efar-mark-file (&optional no-move?)
   "Mark file under cursor in current panel.
 Unless NO-MOVE? move curosr one item down."
-  (let* ((side (efar-get :current-panel))	
+  (let* ((side (efar-get :current-panel))
 	 (current-item (car (efar-selected-files side t nil)))
 	 (selected-items (efar-get :panels side :selected)))
     
@@ -2220,7 +2220,7 @@ Execute it unless DONT-RUN? is t."
 	   (and (stringp (cadr file))
 		(file-directory-p (cadr file))))
       (let ((newdir (expand-file-name (car file) current-dir-path)))
-	(cond	 
+	(cond
 	 ((not (file-accessible-directory-p  newdir))
 	  (efar-set-status (concat "Directory "  newdir " is not accessible") 3))
 	 
@@ -2269,9 +2269,10 @@ Execute it unless DONT-RUN? is t."
   (efar-set (- (window-height) 6) :panel-height))
 
 (defun efar-redraw (&optional reread-files?)
-  "The main function to output content of eFar buffer."
+  "The main function to output content of eFar buffer.
+When REREAD-FILES? is t then reread file list for both panels."
   (interactive)
-  (with-current-buffer efar-buffer-name 
+  (with-current-buffer efar-buffer-name
     (efar-calculate-window-size)
     (erase-buffer)
     
@@ -3003,12 +3004,12 @@ It's allowed to use following tags in the format string:
 	 (cnt 0)
 	 (rename-map '()))
 
-    ;; fill the renaming map 
-    (cl-loop for f in files do	 
-	     (incf cnt)
+    ;; fill the renaming map
+    (cl-loop for f in files do
+	     (cl-incf cnt)
 	     (let* ((name (efar-get-short-file-name f))
 		    (base-name (file-name-base (car f)))
-		    (ext (file-name-extension (car f)))		    
+		    (ext (file-name-extension (car f)))
 		    (new-name format-string))
 	       (setf new-name (replace-regexp-in-string "#name" name new-name))
 	       (setf new-name (replace-regexp-in-string "#basename" base-name new-name))
@@ -3044,10 +3045,10 @@ It's allowed to use following tags in the format string:
 	(insert "Check the preliminary renaming results  bellow.")
 	(newline)
 	(if duplicates?
-	    (progn 
+	    (progn
 	      (insert "There are duplicates in the result list. Renaming is not possible.")
 	      (newline)
-	      (insert "Press 'C-g' to quit"))	      
+	      (insert "Press 'C-g' to quit"))
 	  (insert "Press 'r' to confirm and run batch renaming or 'C-g' to cancel it."))
 	(newline)
 	(newline)
@@ -3311,7 +3312,7 @@ Current panel switched to selected mode."
 				    default-directory)
 				   ((file-directory-p selected-item)
 				    selected-item)
-				   (t				 
+				   (t
 				    (efar-get-parent-dir selected-item))))))
 	   (dir (read-directory-name "Search in: " proposed-dir proposed-dir))
 	   (wildcard (read-string "File name mask: " (or (cdr (assoc :wildcard efar-last-search-params))
