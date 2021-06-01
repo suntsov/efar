@@ -2984,10 +2984,16 @@ widths for uid and gid columns."
 (defun efar-batch-rename ()
   "Very simple batch file renamer.
 It's allowed to use following tags in the format string:
-  #name  -  replaced by whole file name with extension
-  #basename  -  replaced by file name without extension
-  #ext  -  replaced by extension with leading '.'
-  #number  -  replaced by running number."
+  <name>  -  replaced by whole file name with extension
+  <basename>  -  replaced by file name without extension
+  <ext>  -  replaced by extension with leading '.'
+  <number>  -  replaced by running number.
+
+Tags also can be written in different form:
+  <name>, <NAME>, <Name>
+
+Depending on the form corresponding part will be written in 
+lower case, upper case or will be capitalized."
   (let* ((side (efar-get :current-panel))
 	 (selected-files (efar-get :panels side :selected))
 	 ;;gather files to rename
@@ -3000,7 +3006,7 @@ It's allowed to use following tags in the format string:
 							    selected-files)))))
 			      (efar-get :panels side :files)))
 	 ;; format string to use for renaming
-	 (format-string (read-string "Input format string: " "#basename-#number#ext"))
+	 (format-string (read-string "Input format string: " "<basename>-<number><ext>"))
 	 (cnt 0)
 	 (rename-map '()))
 
@@ -3011,10 +3017,38 @@ It's allowed to use following tags in the format string:
 		    (base-name (file-name-base (car f)))
 		    (ext (file-name-extension (car f)))
 		    (new-name format-string))
-	       (setf new-name (replace-regexp-in-string "#name" name new-name))
-	       (setf new-name (replace-regexp-in-string "#basename" base-name new-name))
-	       (setf new-name (replace-regexp-in-string "#number" (int-to-string cnt) new-name))
-	       (setf new-name (replace-regexp-in-string "#ext" (if ext (concat "." ext) "") new-name))
+	       
+	       (setf new-name (replace-regexp-in-string "<name>"
+							(let ((case-fold-search nil))
+							  (cond ((string-match "<NAME>" format-string)
+								 (upcase name))
+								((string-match "<name>" format-string)
+								 (downcase name))
+								((string-match "<Name>" format-string)
+								 (capitalize name))))
+							new-name))
+	       (setf new-name (replace-regexp-in-string "<basename>"
+							(let ((case-fold-search nil))
+							  (cond ((string-match "<BASENAME>" format-string)
+								 (upcase base-name))
+								((string-match "<basename>" format-string)
+								 (downcase base-name))
+								((string-match "<Basename>" format-string)
+								 (capitalize base-name))))
+							new-name))
+	       (setf new-name (replace-regexp-in-string "<number>" (int-to-string cnt) new-name))
+	       (setf new-name (replace-regexp-in-string "<ext>"
+							(if ext
+							    (concat "."
+								    (let ((case-fold-search nil))
+								      (cond ((string-match "<EXT>" format-string)
+									     (upcase ext))
+									    ((string-match "<ext>" format-string)
+									     (downcase ext))
+									    ((string-match "<Ext>" format-string)
+									     (capitalize ext))))))
+								    
+							new-name))
 	       
 	       (push (cons (car f) new-name) rename-map)))
 
@@ -3030,9 +3064,9 @@ It's allowed to use following tags in the format string:
 	(cl-loop for f in (reverse rename-map) do
 		 (let ((p (point)))
 		   (insert (car f) "\t->\t" (cdr f))
-		   ;; when the result list contains duplicated file names
-		   ;; highlight these duplicates
-		   (when (> (cl-count-if (lambda(e) (equal (cdr f) (cdr e))) efar-rename-map) 1)
+		   ;; when the result list contains duplicated file names		 
+		   (when (or (> (cl-count-if (lambda(e) (equal (cdr f) (cdr e))) efar-rename-map) 1))
+		     ;; highlight these duplicates
 		     (setf duplicates? t)
 		     (add-text-properties p (point)
 					  '(face efar-non-existing-current-file-face))))
@@ -3046,7 +3080,7 @@ It's allowed to use following tags in the format string:
 	(newline)
 	(if duplicates?
 	    (progn
-	      (insert "There are duplicates in the result list. Renaming is not possible.")
+	      (insert "There are duplicates in the result list or files with resulting names already exist. Renaming is not possible.")
 	      (newline)
 	      (insert "Press 'C-g' to quit"))
 	  (insert "Press 'r' to confirm and run batch renaming or 'C-g' to cancel it."))
@@ -3058,8 +3092,9 @@ It's allowed to use following tags in the format string:
 	(unless duplicates?
 	  (local-set-key (kbd "r") (lambda()
 				     (interactive)
+				     ;; do the renaming
 				     (cl-loop for f in efar-rename-map do
-					      (rename-file (car f) (cdr f)))
+					      (efar-retry-when-error (rename-file (car f) (cdr f))))
 				     (kill-buffer efar-batch-rename-buffer-name)
 				     (efar-write-enable (efar-redraw 'reread-files))
 				     (efar nil))))
