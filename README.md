@@ -14,9 +14,6 @@ When Efar is called with universal argument, default-directory of actual buffer 
 ## Requirements
 * Emacs 26.1 or newer.
 
-## What's new in version 1.1
-* mouse interaction 
-
 ## Features
 
 ### Navigation
@@ -62,10 +59,10 @@ When Efar is called with universal argument, default-directory of actual buffer 
 eFar has a very simple batch file renamer. Press **C-c c r** to run it.
 * renamer asks for a format string to use for renaming, default #basename-#number#ext
 * possible keywords in the format string:
-  #name - replaced by the whole file name including extension
-  #basename - replaced by the file name without extension
-  #ext - replaced by the file extension (if any) with leading '.'
-  #number - replaced by the running number
+  - #name - replaced by the whole file name including extension
+  - #basename - replaced by the file name without extension
+  - #ext - replaced by the file extension (if any) with leading '.'
+  - #number - replaced by the running number
 * preliminary results of renaming are shown in a separate buffer
 * user can run actual renaming or cancel it
 
