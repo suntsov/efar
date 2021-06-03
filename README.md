@@ -56,9 +56,9 @@ When Efar is called with universal argument, default-directory of actual buffer 
 * change file modes (permissions) for selected files - **C-c f m**
 
 ### Batch file renaming
-eFar has a very simple batch file renamer.
-* Press **C-c c r** to run it.
-* The files to rename are the marked ones (if any) or the whole (might be filtered) file list in the current directory .
+eFar has a very simple batch file renamer
+* Press **C-c c n** to run it.
+* The files to rename are the marked ones (if any) or the whole (might be filtered) file list in the current directory.
 * Renamer asks for a format string to use for renaming, default to #basename-#number#ext
 * Possible keywords in the format string:
   - #name - replaced by the whole file name including extension
@@ -71,6 +71,10 @@ eFar has a very simple batch file renamer.
 
 Preliminary results of renaming are shown in a separate buffer.
 User can run actual renaming or cancel it.
+
+### Batch regexp replace in files
+* press **C-c c r** to start batch regexp replace in selected files
+* The files to replace in are the marked ones (if any) or the whole (might be filtered) file list in the current directory 
 
 ### Changing sort order, filtering
 * change sort order and direction - **C-c f s**
