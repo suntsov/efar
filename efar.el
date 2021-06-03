@@ -106,8 +106,8 @@
     :type 'string))
 
 (eval-and-compile
-  (defcustom efar-batch-rename-buffer-name "*eFAR batch rename*"
-    "Name for the buffer to preview batch rename operation reults."
+  (defcustom efar-batch-buffer-name "*eFAR batch operation*"
+    "Name for the buffer to perform batch operations."
     :group 'efar-parameters
     :type 'string))
 
@@ -438,7 +438,6 @@ IGNORE-IN-MODES is a list of modes which should ignore this key binding."
 (efar-register-key "<f8>"  '((:files . efar-delete-selected) (:bookmark . efar-delete-bookmark))   nil 'efar-delete-file-key
  		   "delete selected file(s) or bookmark" :space-after '(:file-hist :dir-hist :disks :search))
 
-
 (efar-register-key "S-C-<left>"  'efar-move-splitter  :left 'efar-move-splitter-left-key
 		   "move splitter between panels to the left" t)
 (efar-register-key "S-C-<right>"  'efar-move-splitter  :right 'efar-move-splitter-right-key
@@ -483,8 +482,10 @@ IGNORE-IN-MODES is a list of modes which should ignore this key binding."
 		   "show last visited directories" t)
 (efar-register-key "C-c c f" 'efar-change-panel-mode  :file-hist 'efar-show-file-history-key
 		   "show last edited files" t)
-(efar-register-key "C-c c r" 'efar-batch-rename  nil 'efar-batch-rename-key
-		   "batch rename files" t)
+(efar-register-key "C-c c n" 'efar-batch-rename  nil 'efar-batch-rename-key
+		   "perform batch file renaming" t)
+(efar-register-key "C-c c r" 'efar-batch-replace  nil 'efar-batch-replace-key
+		   "perform batch regexp replace in files" t)
 (efar-register-key "C-c c m" 'efar-show-mode-selector  nil 'efar-show-mode-selector-key
 		   "show panel mode selector" :space-after)
 
@@ -701,7 +702,6 @@ REINIT? is a boolean indicating that configuration should be generated enew."
   "Store VALUE by KEYS."
   (let ((place nil))
     (mapc
-     
      (lambda(key)
        (if place
 	   (setf place (puthash key (gethash key place (make-hash-table :test `equal)) place))
@@ -710,7 +710,6 @@ REINIT? is a boolean indicating that configuration should be generated enew."
      (cl-subseq keys 0 -1))
     
     (puthash (car (cl-subseq keys -1)) value (or place efar-state))))
-
 
 ;;--------------------------------------------------------------------------------
 ;; file sort functions
@@ -944,6 +943,7 @@ Notifications in the queue will be processed only if there are no new notificati
      ;; else if current eFar version is greater then version stored in state file
      ;; we do "upgrade" of state file
      (t
+      (copy-file efar-state-file-name (concat efar-state-file-name "_" (int-to-string state-version)) 1)
       (efar-upgrade-state-file state state-version)))))
 
 (defun efar-upgrade-state-file (state from-version)
@@ -2981,6 +2981,9 @@ widths for uid and gid columns."
 	(efar-set-status "Please mark 2 files to run ediff" 5 t)
       (ediff (caar file1) (caar file2)))))
 
+;;--------------------------------------------------------------------------------
+;; Batch file renaming
+;;--------------------------------------------------------------------------------
 (defun efar-batch-rename ()
   "Very simple batch file renamer.
 It's allowed to use following tags in the format string:
@@ -2992,7 +2995,7 @@ It's allowed to use following tags in the format string:
 Tags also can be written in different form:
   <name>, <NAME>, <Name>
 
-Depending on the form corresponding part will be written in 
+Depending on the form corresponding part will be written in
 lower case, upper case or will be capitalized."
   (let* ((side (efar-get :current-panel))
 	 (selected-files (efar-get :panels side :selected))
@@ -3017,44 +3020,29 @@ lower case, upper case or will be capitalized."
 		    (base-name (file-name-base (car f)))
 		    (ext (file-name-extension (car f)))
 		    (new-name format-string))
-	       
-	       (setf new-name (replace-regexp-in-string "<name>"
-							(let ((case-fold-search nil))
-							  (cond ((string-match "<NAME>" format-string)
-								 (upcase name))
-								((string-match "<name>" format-string)
-								 (downcase name))
-								((string-match "<Name>" format-string)
-								 (capitalize name))))
-							new-name))
-	       (setf new-name (replace-regexp-in-string "<basename>"
-							(let ((case-fold-search nil))
-							  (cond ((string-match "<BASENAME>" format-string)
-								 (upcase base-name))
-								((string-match "<basename>" format-string)
-								 (downcase base-name))
-								((string-match "<Basename>" format-string)
-								 (capitalize base-name))))
-							new-name))
+
+	       (cl-labels
+		   ((change-case (tag string value)
+				 (let ((case-fold-search nil))
+				   (cond ((string-match (upcase tag) string)
+					  (upcase value))
+					 ((string-match (downcase tag) string)
+					  (downcase value))
+					 ((string-match (capitalize tag) string)
+					  (capitalize value))
+					 (t value)))))
+		 
+		 (setf new-name (replace-regexp-in-string "<name>" (change-case "<name>" format-string name) new-name))
+		 (setf new-name (replace-regexp-in-string "<basename>" (change-case "<basename>" format-string base-name) new-name))
+		 (setf new-name (replace-regexp-in-string "<ext>" (if ext
+								      (concat "." (change-case "<ext>" format-string ext)))
+							  new-name)))
 	       (setf new-name (replace-regexp-in-string "<number>" (int-to-string cnt) new-name))
-	       (setf new-name (replace-regexp-in-string "<ext>"
-							(if ext
-							    (concat "."
-								    (let ((case-fold-search nil))
-								      (cond ((string-match "<EXT>" format-string)
-									     (upcase ext))
-									    ((string-match "<ext>" format-string)
-									     (downcase ext))
-									    ((string-match "<Ext>" format-string)
-									     (capitalize ext))))))
-								    
-							new-name))
-	       
 	       (push (cons (car f) new-name) rename-map)))
 
     ;; show renaming map in the separate buffer
-    (and (get-buffer efar-batch-rename-buffer-name) (kill-buffer efar-batch-rename-buffer-name))
-    (let ((buffer (get-buffer-create efar-batch-rename-buffer-name))
+    (and (get-buffer efar-batch-buffer-name) (kill-buffer efar-batch-buffer-name))
+    (let ((buffer (get-buffer-create efar-batch-buffer-name))
 	  (duplicates? nil))
 
       (with-current-buffer buffer
@@ -3064,7 +3052,7 @@ lower case, upper case or will be capitalized."
 	(cl-loop for f in (reverse rename-map) do
 		 (let ((p (point)))
 		   (insert (car f) "\t->\t" (cdr f))
-		   ;; when the result list contains duplicated file names		 
+		   ;; when the result list contains duplicated file names
 		   (when (or (> (cl-count-if (lambda(e) (equal (cdr f) (cdr e))) efar-rename-map) 1))
 		     ;; highlight these duplicates
 		     (setf duplicates? t)
@@ -3095,15 +3083,161 @@ lower case, upper case or will be capitalized."
 				     ;; do the renaming
 				     (cl-loop for f in efar-rename-map do
 					      (efar-retry-when-error (rename-file (car f) (cdr f))))
-				     (kill-buffer efar-batch-rename-buffer-name)
+				     (kill-buffer efar-batch-buffer-name)
 				     (efar-write-enable (efar-redraw 'reread-files))
 				     (efar nil))))
 	;; activate key binding to quit
 	(local-set-key (kbd "C-g") (lambda()
 				   (interactive)
-				   (kill-buffer efar-batch-rename-buffer-name)
+				   (kill-buffer efar-batch-buffer-name)
 				   (efar nil)))
       (switch-to-buffer-other-window buffer)))))
+
+;;--------------------------------------------------------------------------------
+;; Batch replace in files
+;;--------------------------------------------------------------------------------
+(define-button-type 'efar-batch-replace-line-button
+  'face 'efar-search-line-link-face )
+
+(define-button-type 'efar-batch-replace-file-button
+  'face 'efar-search-file-link-face )
+
+(defun efar-batch-replace ()
+  "Replace text in selected files interactively."
+  (let* ((side (efar-get :current-panel))
+	 (selected-files (efar-get :panels side :selected))
+	 ;;gather files
+	 ;; get marked files if any
+	 ;; get all files shown in the directory otherwise
+	 (files (cl-remove-if (lambda(e)
+				(or (equal (car e) "..")
+				    (and selected-files
+					 (not (cl-member-if (lambda(e1) (equal (car e) (car e1)))
+							    selected-files)))))
+			      (efar-get :panels side :files)))
+	 (regexp (read-string "String to replace (regexp): " ))
+	 (replacement (read-string "Replace by: ")))
+
+    ;; search string in selected files
+    (let ((hits (make-hash-table)))
+      (cl-loop for f in files do
+	       (with-temp-buffer
+		 (insert-file-contents (car f))
+		 (goto-char 0)
+		 (while (re-search-forward regexp nil 'noerror)
+		   (let ((h (or (gethash (car f) hits)
+				(puthash (car f) '() hits))))
+		     
+		     (push (cons (line-number-at-pos)
+				 (replace-regexp-in-string "\n" "" (thing-at-point 'line t)))
+			   h)
+		     (puthash (car f) h hits))
+		   (forward-line))))
+
+      ;; prepare buffer to output preliminary results
+      (and (get-buffer efar-batch-buffer-name) (kill-buffer efar-batch-buffer-name))
+      (let ((buffer (get-buffer-create efar-batch-buffer-name)))
+	
+	(with-current-buffer buffer
+	  (read-only-mode 0)
+	  (erase-buffer)
+	  ;; output file names and matches found in these files
+	  (when (hash-table-empty-p hits) (insert "No matches in selected files\n"))
+	  (cl-loop for f being the hash-key of hits do
+		   (insert-button f
+				  :type 'efar-batch-replace-file-button
+				  :file f)
+		   (newline)
+		   (cl-loop for hit in (reverse (gethash f hits)) do
+
+			    (insert-button (concat (int-to-string (car hit)) ":\t" (cdr hit))
+					   :type 'efar-batch-replace-line-button
+					   :file f
+					   :line-number (car hit))
+			    (newline))
+		   (newline))
+	  ;; output header
+	  (goto-char 0)
+	  (highlight-regexp regexp 'hi-yellow)
+	  (goto-char 0)
+	  ;; insert header
+	  (insert "Replace '" regexp "' by '" replacement "'\n\n")
+	  (insert "Press 'R' to replace all matches in all files\n\n")
+	  (insert "Press 'r' to:\n")
+	  (insert "  - replace all matches in particular file when point is over the line with file name\n")
+	  (insert "  - replace matches in a single line when point is over the sorce line\n\n")
+	  (insert "Press 'd' to remove from the list the item at point\n\n")
+	  (insert "Press 'q' to close this buffer.\n\n")
+	  (read-only-mode 1)
+
+	  ;; setup keys
+	  ;; key to close buffer
+	  (local-set-key (kbd "q") (lambda ()
+				     (interactive)
+				     (kill-buffer efar-batch-buffer-name)
+				     (efar nil)))
+	  ;; function to process single line from the buffer
+	  (cl-labels ((process-single (&optional replace)
+				      ;; look for button at current position
+				      (let* ((button (button-at (point)))
+					     (file (when button (button-get button :file)))
+					     (line-number (when button (button-get button :line-number))))
+					;; if buton exists
+					(if button
+					    (progn
+					      ;; do replacement in the corrsponding file
+					      (when replace
+						(efar-retry-when-error (efar-batch-replace-in-file file regexp replacement line-number)))
+					      (read-only-mode 0)
+					      ;; delete processed line from the buffer
+					      (delete-region (line-beginning-position) (1+ (line-end-position)))
+					      ;; if thatwas a line representing file name
+					      ;; delete all source line belonging to that file
+					      (unless line-number
+						(while (and (button-at (point))
+							    (button-get (button-at (point)) :line-number))
+						  (delete-region (line-beginning-position) (1+ (line-end-position)))
+						  (when (equal (length (thing-at-point 'line t)) 1)
+						    (delete-region (line-beginning-position) (1+ (line-end-position))))))
+					      (read-only-mode 1))
+					  (forward-line)))))
+
+	    ;; key to process all lines in the buffer
+	    (local-set-key (kbd "R") (lambda ()
+				       (interactive)
+				       (goto-char 0)
+				       (while (not (eobp))
+					 (process-single t))))
+	    ;; to process single line
+	    (local-set-key (kbd "r") (lambda ()
+				       (interactive)
+				       (process-single t)))
+
+	    ;; to remove single line without processing
+	    (local-set-key (kbd "d") (lambda ()
+				       (interactive)
+				       (process-single)))))
+	
+	(switch-to-buffer-other-window buffer)))))
+
+(defun efar-batch-replace-in-file (file regexp replacement &optional line-number)
+  "Replace in FILE text matching REGEXP by REPLACEMENT.
+When optional LINE-NUMBER is given then do replacement on corresponding line only."
+  (let ((visited (get-file-buffer file))
+	(buffer (find-file-noselect file))
+	(modified nil))
+    
+    (with-current-buffer buffer
+      (setf modified (buffer-modified-p))
+      (goto-char 0)
+      (when line-number (forward-line (- line-number 1)))
+      (while (search-forward regexp (when line-number (line-end-position)) t)
+	(replace-match replacement))
+      (when (or (not modified)
+		(equal "Yes" (efar-completing-read (concat "File " file " has unsaved changes. Save?"))))
+	(save-buffer))
+      (unless visited
+	(kill-buffer buffer)))))
     
 (defun efar-current-file-stat ()
   "Display statisctics for selected file/directory."
@@ -3299,7 +3433,7 @@ Current panel switched to selected mode."
 (define-button-type 'efar-search-find-line-button
   'follow-link t
   'action #'efar-search-find-file-button
-  'face 'efar-search-line-link-face)
+  'face 'efar-search-line-link-face )
 
 (defun efar-search-process-command ()
   "Prepare the list with command line arguments for the search processes."
