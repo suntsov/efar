@@ -3136,26 +3136,30 @@ lower case, upper case or will be capitalized."
 
       ;; prepare buffer to output preliminary results
       (and (get-buffer efar-batch-buffer-name) (kill-buffer efar-batch-buffer-name))
-      (let ((buffer (get-buffer-create efar-batch-buffer-name)))
+      (let ((buffer (get-buffer-create efar-batch-buffer-name))
+	    (files 0)
+	    (matches 0))
 	
 	(with-current-buffer buffer
 	  (read-only-mode 0)
-	  (erase-buffer)
+	  (erase-buffer)	  
 	  ;; output file names and matches found in these files
-	  (when (hash-table-empty-p hits) (insert "No matches in selected files\n"))
 	  (cl-loop for f being the hash-key of hits do
 		   (insert-button f
 				  :type 'efar-batch-replace-file-button
 				  :file f)
 		   (newline)
+		   (cl-incf files)
 		   (cl-loop for hit in (reverse (gethash f hits)) do
 
 			    (insert-button (concat (int-to-string (car hit)) ":\t" (cdr hit))
 					   :type 'efar-batch-replace-line-button
 					   :file f
 					   :line-number (car hit))
-			    (newline))
+			    (newline)
+			    (cl-incf matches))
 		   (newline))
+	  
 	  ;; output header
 	  (goto-char 0)
 	  (highlight-regexp regexp 'hi-yellow)
@@ -3168,6 +3172,7 @@ lower case, upper case or will be capitalized."
 	  (insert "  - replace matches in a single line when point is over the sorce line\n\n")
 	  (insert "Press 'd' to remove from the list the item at point\n\n")
 	  (insert "Press 'q' to close this buffer.\n\n")
+	  (insert (int-to-string matches) " hit(s) in " (int-to-string files) " file(s)\n\n")
 	  (read-only-mode 1)
 
 	  ;; setup keys
@@ -3251,7 +3256,7 @@ When optional LINE-NUMBER is given then do replacement on corresponding line onl
 	      (skipped 0))
 	  
 	  (efar-set-status (format "Calculating size of '%s'..." current-file-entry))
-	  
+	  (sit-for 0.001)
 	  (cl-labels
 	      ((int-file-size(file)
 			     ;; if item is a directory
