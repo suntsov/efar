@@ -411,8 +411,10 @@ IGNORE-IN-MODES is a list of modes which should ignore this key binding."
 
 (efar-register-key "<insert>" 'efar-mark-file   nil 'efar-mark-file-key
  		   "mark item under cursor" t (list :file-hist :dir-hist :bookmark :disks :search))
-(efar-register-key "<C-insert>" 'efar-deselect-all  nil 'efar-deselect-all-key
- 		   "unmark all items in the list" :space-after (list :file-hist :dir-hist :bookmark :disks :search))
+(efar-register-key "<C-insert>" 'efar-select-all  t 'efar-deselect-all-key
+ 		   "unmark all items in current directory" t (list :file-hist :dir-hist :bookmark :disks :search))
+(efar-register-key "<C-M-insert>" 'efar-select-all  nil 'efar-select-all-key
+ 		   "mark all items in current directory" :space-after (list :file-hist :dir-hist :bookmark :disks :search))
 
 (efar-register-key "TAB" 'efar-switch-to-other-panel nil 'efar-switch-to-other-panel-key
  		   "switch to other panel" t)
@@ -1800,11 +1802,14 @@ Do that for current panel or for panel SIDE if it's given."
   (let ((side (if side side (efar-get :current-panel))))
     (if (equal side :left) :right :left)))
 
-(defun efar-deselect-all ()
-  "Unmark all marked files in current panel."
+(defun efar-select-all (&optional deselect)
+  "Mark (unmark when DESELECT is t) all files in current panel."
   (efar-write-enable
    (let ((side (efar-get :current-panel)))
-     (efar-set '() :panels side :selected)
+     (efar-set (unless deselect
+		 (cl-remove-if (lambda(e) (equal (car e) ".."))
+			       (efar-get :panels side :files)))
+	       :panels side :selected)
      (efar-redraw))))
 
 (defun efar-mark-file (&optional no-move?)
@@ -3930,10 +3935,11 @@ We do text search parallel sending files one by one to all subprocesses by turns
 		"\n")
 	
 	;; output list of found files (and source lines when searching for text)
-	(cl-loop for file in (efar-get :panels (efar-get :current-panel) :files) do
-		 
+	(let ((cnt 0))
+	  (cl-loop for file in (efar-get :panels (efar-get :current-panel) :files) do
+		 (cl-incf cnt)
 		 ;; create a link to the file
-		 (insert-button (car file)
+		 (insert-button (concat (int-to-string cnt) ". " (car file))
 				:type 'efar-search-find-file-button
 				:file (car file))
 		 (insert "\n")
@@ -3951,7 +3957,7 @@ We do text search parallel sending files one by one to all subprocesses by turns
 					   :ignore-case? ignore-case?
 					   :regexp? regexp?))
 			  (insert "\n"))
-		 (insert "\n"))
+		 (insert "\n")))
 	
 	
 	;; output skipped files
