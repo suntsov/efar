@@ -3146,7 +3146,7 @@ lower case, upper case or will be capitalized."
 	
 	(with-current-buffer buffer
 	  (read-only-mode 0)
-	  (erase-buffer)	  
+	  (erase-buffer)
 	  ;; output file names and matches found in these files
 	  (cl-loop for f being the hash-key of hits do
 		   (insert-button f
