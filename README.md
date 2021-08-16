@@ -5,11 +5,11 @@ This package provides FAR-like file manager for Emacs.
 ![](efar.png)
 
 ## Usage
-Package is not available in MELPA yet (there is a plan to publish it in nearest future, though).
+Package is available in MELPA.
 
-To start eFar just load file efar.el and type **M-x efar**.
+To start eFar just type **M-x efar**.
 
-When Efar is called with universal argument, default-directory of actual buffer is automatically opened in left panel - **C-u M-x efar**.
+When Efar is called with universal argument, default-directory of actual buffer is automatically opened in the left panel - **C-u M-x efar**.
 
 ## Requirements
 * Emacs 26.1 or newer.
