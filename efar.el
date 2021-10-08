@@ -525,10 +525,21 @@ IGNORE-IN-MODES is a list of modes which should ignore this key binding."
 		   "compare contents of two directories" t)
 (efar-register-key "<S-f6>" 'efar-change-panel-mode :dir-diff 'efar-show-dir-diff-results-key
 		   "show last result of directory comparision" t)
-(efar-register-key "C-c <f6>" 'efar-show-dir-diff-toggle-changed-only nil 'efar-show-dir-toggle-changed-only-key
-		   "toggle filtering of directory comparision results - all <-> changed" nil (list :file-hist :dir-hist :bookmark :disks :files :search))
 (efar-register-key "<C-M-f6>" 'efar-show-dir-diff-results-in-buffer nil 'efar-show-dir-diff-results-in-buffer-key
-		   "display directory comparision results in a separate buffer" :space-after (list :file-hist :dir-hist :bookmark :disks :files :search))
+		   "display directory comparision results in a separate buffer" t (list :file-hist :dir-hist :bookmark :disks :files :search))
+(efar-register-key "C-c <f6> a" 'efar-show-dir-diff-toggle-changed-only nil 'efar-show-dir-toggle-changed-only-key
+		   "toggle filtering of directory comparision results - all <-> changed" t (list :file-hist :dir-hist :bookmark :disks :files :search))
+(efar-register-key "C-c <f6> s" 'efar-dir-diff-toggle-copmarision-display-options :size 'efar-show-dir-difference-in-size-key
+		   "toggle displaying difference in file size" t (list :file-hist :dir-hist :bookmark :disks :files :search))
+(efar-register-key "C-c <f6> h" 'efar-dir-diff-toggle-copmarision-display-options :hash 'efar-show-dir-difference-in-checksum-key
+		   "toggle displaying difference in checksum" t (list :file-hist :dir-hist :bookmark :disks :files :search))
+(efar-register-key "C-c <f6> o" 'efar-dir-diff-toggle-copmarision-display-options :owner 'efar-show-dir-difference-in-owner-key
+		   "toggle displaying difference in file owner" t (list :file-hist :dir-hist :bookmark :disks :files :search))
+(efar-register-key "C-c <f6> g" 'efar-dir-diff-toggle-copmarision-display-options :group 'efar-show-dir-difference-in-group-key
+		   "toggle displaying difference in file group" t (list :file-hist :dir-hist :bookmark :disks :files :search))
+(efar-register-key "C-c <f6> m" 'efar-dir-diff-toggle-copmarision-display-options :modes 'efar-show-dir-difference-in-modes-key
+		   "toggle displaying difference in file modes (permissions)" :space-after (list :file-hist :dir-hist :bookmark :disks :files :search))
+
 
 (efar-register-key "C-g" 'efar-abort  nil nil
 		   "quit fast search mode or switch panel to files mode" t)
@@ -1115,7 +1126,7 @@ User also can select an option to overwrite all remaining files to not be asked 
 			    (let ((newfile
 				   (if (file-directory-p todir)
 				       (expand-file-name (efar-get-short-file-name f) todir)
-				     todir)))			      
+				     todir)))
 			      (cond
 			       ;; if file is a real file and doesn't exist in destination folder
 			       ((and (not (equal (cadr f) t)) (not (file-exists-p newfile)))
@@ -1291,7 +1302,7 @@ mode is not in the list IGNORE-IN-MODES."
      ((or (equal "down-mouse-1" (symbol-name click-type))
 	  (equal "C-down-mouse-1" (symbol-name click-type))
 	  (equal "S-down-mouse-1" (symbol-name click-type)))
-      (efar-process-mouse-down event))     
+      (efar-process-mouse-down event))
      
      ;; MOUSE DRAG HAPPENED
      ((or (equal "drag-mouse-1" (symbol-name click-type))
@@ -1468,20 +1479,10 @@ The point where mouse click occurred determined out of EVENT parameters."
     (when (equal control :dir-diff-display-changed-only)
       (efar-show-dir-diff-toggle-changed-only))
 
-    ;; when clicked on ToDo
+    ;; when clicked on directory comparision option controls
     (when (equal control :dir-diff-comp-param-switcher)
       (let ((par (cdr (assoc :param props))))
-	(print par)
-	(if (member par efar-dir-diff-actual-comp-params)
-	    (setf efar-dir-diff-actual-comp-params (delete par efar-dir-diff-actual-comp-params))
-	  (push par efar-dir-diff-actual-comp-params)))
-      (cl-loop for k in (hash-table-keys efar-dir-diff-results) do
-	       (let ((e (gethash k efar-dir-diff-results)))
-		 (setf e (delete :children-changed e))
-		 (puthash k e efar-dir-diff-results)))
-      (cl-loop for k in (hash-table-keys efar-dir-diff-results) do
-	       (efar-dir-diff-update-parents k))
-      (efar-write-enable (efar-redraw 'reread-files)))
+	(efar-dir-diff-toggle-copmarision-display-options par)))
     
     ;; when clicked on sorting controls
     (when (or (equal control :sort-func)
@@ -1895,7 +1896,7 @@ When FOR-READ? is t switch back to eFar buffer."
 	 (file (caar (efar-selected-files side t)))
 	 (mode (efar-get :panels side :mode)))
 
-    ;; open file in other window    
+    ;; open file in other window
     (when file
 
       (when (not (file-exists-p file))
@@ -1951,7 +1952,7 @@ When FOR-READ? is t switch back to eFar buffer."
 	   (file-name-directory (directory-file-name dir))))
 
 (defun efar-get-file-list (side)
-  "Read file list from the directory showed in panel SIDE."
+  "Read file list for the directory showed in panel SIDE."
   (let* ((filter (efar-get :panels side :file-filter))
 	 (fast-search-string (efar-get :fast-search-string))
 	 (mode (efar-get :panels side :mode))
@@ -2008,7 +2009,8 @@ When FOR-READ? is t switch back to eFar buffer."
      :panels side :files)))
 
 (defun efar-get-file-list-int (side mode)
-  ""
+  "Prepare file list in panel SIDE.
+The way to build a list depends on MODE."
   (pcase mode
     
     ;; panel is in mode :files
@@ -3224,7 +3226,7 @@ widths for uid and gid columns."
 			   (car selected-left)))
 	 (file-name-right (if (equal :dir-diff (efar-get :panels :right :mode))
 			      (expand-file-name (car (last selected-right 2)) (cdr (assoc :right efar-dir-diff-last-command-params)))
-			    (car selected-right))))	      
+			    (car selected-right))))
     (ediff file-name-left file-name-right)))
 
 ;;--------------------------------------------------------------------------------
@@ -3540,7 +3542,7 @@ When optional LINE-NUMBER is given then do replacement on corresponding line onl
       (unless ok?
 	(efar-set-status "Size calculation failed" nil t)))))
 
-(defconst efar-panel-modes 
+(defconst efar-panel-modes
   '((:files . "Files")
     (:bookmark . "Bookmarks")
     (:dir-hist . "Directory history")
@@ -3768,7 +3770,7 @@ Message consists of MESSAGE-TYPE and DATA."
 			   
 			   (let ((result (gethash key efar-dir-diff-results)))
 			     (when checksum-differs
-			       (push :hash result)			       
+			       (push :hash result)
 			       (puthash key result efar-dir-diff-results))
 			     
 			     (when comp-result
@@ -3929,7 +3931,8 @@ We do subprocess tasks sending commands one by one to all subprocesses by turns.
     (car efar-subprocess-processes)))
 
 (defun efar-subprocess-work-finished ()
-  ""
+  "Execute actions when subprocess work is finished.
+Restart subprocesses finally."
   (cond (efar-search-running-p (efar-search-finished))
 	(efar-dir-diff-running-p (efar-dir-diff-finished)))
   (make-thread 'efar-subprocess-run-processes))
@@ -4104,7 +4107,7 @@ Case is ignored when IGNORE-CASE? is t."
 		     (process-send-string  efar-subprocess-server (concat (prin1-to-string (cons :found-file (list (cons :name real-file-name) (cons :lines '())))) "\n")))))))))
 
 (defun efar-search-clearup ()
-  ""
+  "."
   ;;(setq efar-search-results nil)
   (setq efar-search-running-p nil)
   ;;(setq efar-search-last-command-params nil)
@@ -4333,7 +4336,8 @@ Case is ignored."
        (downcase (nth 13 b))))))
 
 (defun efar-dir-diff-equal (item &optional dont-check-children)
-  ""
+  "Check if files defined in ITEM have any difference.
+Child items are not taken into account if DONT-CHECK-CHILDREN is not nil."
   (and (or dont-check-children
 	   (not (member :children-changed item)))
        (not (member :size item))
@@ -4345,7 +4349,7 @@ Case is ignored."
        (not (member :right item))))
        
 (defun efar-dir-diff-build-file-list (dir)
-  ""
+  "Build and return file list in directory DIR."
   (let ((list (make-hash-table :test 'equal))
 	(dir (file-name-as-directory dir)))
 	
@@ -4372,7 +4376,7 @@ Case is ignored."
     list))
 
 (defun efar-dir-diff-compare ()
-  ""
+  "Start comparision of directries selected in both panels."
   ;; if directory comparision or search is running, ask user whether to stop them
   (when (or (and efar-search-running-p
 		 (string= "Yes" (efar-completing-read "Search is running. Kill it?")))
@@ -4453,7 +4457,8 @@ Case is ignored."
   (efar-change-panel-mode :dir-diff))
 
 (defun efar-dir-diff-int-start-compare (params)
-  ""      
+  "Do directory comparision.
+Directories and comparision parameters are passed in PARAMS."
   (let* ((dir-left (cdr (assoc :left params)))
 	 (dir-right (cdr (assoc :right params)))
 	 (include-masks (mapcar (lambda(e)
@@ -4475,7 +4480,7 @@ Case is ignored."
 	     (let* ((exists-in (if (gethash k list2)
 				   :both
 				 :left))
-		    (e (gethash k list1))		    
+		    (e (gethash k list1))
 		    ;; ignore case when applying wildcard
 		    (case-fold-search t)
 		    
@@ -4491,7 +4496,7 @@ Case is ignored."
 	       (when (and included?
 			  (not excluded?))
 	
-		 (if (equal exists-in :both)		    		     		 		   
+		 (if (equal exists-in :both)
 		     (let* ((other (gethash k list2))
 			    (attrs (cdr (car (cl-subseq e -4 -3))))
 			    (attrs-other (cdr (car (cl-subseq other -4 -3))))
@@ -4500,7 +4505,6 @@ Case is ignored."
 		       ;; compare type (dir/file/link)
 		       (when (not (equal (file-attribute-type attrs)
 					 (file-attribute-type attrs-other)))
-			 (setf type-changed? t)
 			 (push :type e))
 		       
 		       ;; compare owner
@@ -4547,14 +4551,14 @@ Case is ignored."
 
 		 (push exists-in e))
 	       	     
-	       (remhash k list2) 
+	       (remhash k list2)
 	       
 	       (process-send-string  efar-subprocess-server (concat (prin1-to-string (cons :file-comp-result (list (cons :key k) (cons :result e)))) "\n"))))
     
     (let ((keys2 (sort (hash-table-keys list2) (lambda(a b) (string< a b)))))
       (cl-loop for k in keys2
 	       do
-	       (let ((e (gethash k list2))		     
+	       (let ((e (gethash k list2))
 		     (included? (catch :included
 				  (cl-loop for mask in include-masks do
 					   (when (string-match-p mask k)
@@ -4577,18 +4581,17 @@ Case is ignored."
     (process-send-string efar-subprocess-server (concat (prin1-to-string (cons :finished '())) "\n"))))
 
 (defun efar-dir-diff-compare-checksums (args)
-  ""
+  "Compare checksums of two files defined in ARGS."
   (let* ((key (cdr (assoc :key args)))
 	 (file1 (cdr (assoc :file1 args)))
 	 (file2 (cdr (assoc :file2 args)))
 	 (changed?  (not (equal (efar-get-file-checksum file1)
 				(efar-get-file-checksum file2)))))
-
     (when changed?
       (process-send-string efar-subprocess-server (concat (prin1-to-string (cons :file-comp-result (list (cons :key key) (cons :checksum-differs t)))) "\n")))))
 
 (defun efar-dir-diff-update-parents (key)
-  ""
+  "Update all parent directories as updated if item with KEY has differences."
   ;;if differences detected
   ;;mark parent directories as :children-changed
   (when (cl-intersection efar-dir-diff-actual-comp-params
@@ -4604,7 +4607,7 @@ Case is ignored."
 	  (setf parent-key (efar-get-parent-dir parent-key)))))))
 
 (defun efar-dir-diff-show-results ()
-  ""
+  "Show directory comparision results."
   (let* ((errors (cdr (assoc :errors efar-dir-diff-last-command-params)))
 	 (result-string nil)
 	 (status-string nil))
@@ -4646,19 +4649,20 @@ Case is ignored."
     (efar-write-enable (efar-redraw)))))
 
 (defun efar-get-file-checksum (file)
-  ""
+  "Calculate checksum for the FILE."
   (let ((coding-system-for-write efar-subprocess-coding))
     (with-temp-buffer
       (insert-file-contents-literally file)
       (secure-hash 'md5 (buffer-string)))))
 
 (defun efar-show-dir-diff-toggle-changed-only ()
-  ""
+  "Toggle display of unchanged items."
   (setf efar-dir-diff-show-changed-only-p (not efar-dir-diff-show-changed-only-p))
   (efar-write-enable (efar-redraw 'reread-files)))
 
-(defun efar-dir-diff-enter-directory (&optional go-to-parent?)	
-  ""
+(defun efar-dir-diff-enter-directory (&optional go-to-parent?)
+  "Enter directory under cursor.
+Go to parent directory when GO-TO-PARENT? is not nil."
   (unless (and go-to-parent?
 	       (null efar-dir-diff-current-dir))
     (let* ((entry (car (efar-selected-files (efar-get :current-panel) t t nil)))
@@ -4692,8 +4696,22 @@ Case is ignored."
 		 (efar-go-to-file "" :right 0)))
 	(efar-write-enable (efar-redraw))))))
 
-(defun efar-show-dir-diff-results-in-buffer ()
+(defun efar-dir-diff-toggle-copmarision-display-options (par)
   ""
+  (if (member par efar-dir-diff-actual-comp-params)
+      (setf efar-dir-diff-actual-comp-params (delete par efar-dir-diff-actual-comp-params))
+    (push par efar-dir-diff-actual-comp-params))
+  
+  (cl-loop for k in (hash-table-keys efar-dir-diff-results) do
+	   (let ((e (gethash k efar-dir-diff-results)))
+	     (setf e (delete :children-changed e))
+	     (puthash k e efar-dir-diff-results)))
+  (cl-loop for k in (hash-table-keys efar-dir-diff-results) do
+	   (efar-dir-diff-update-parents k))
+  (efar-write-enable (efar-redraw 'reread-files)))
+
+(defun efar-show-dir-diff-results-in-buffer ()
+  "Show list of changed items together with comparision details."
    (if efar-dir-diff-running-p
       
       (efar-set-status "Directory comparision is still running" nil t)
@@ -4775,11 +4793,8 @@ Case is ignored."
 							       (capitalize (substring (symbol-name e) 1 2)))
 							     results
 							     ",")))
-			   
-			   (insert (format "[%s]" result-shortcuts))
-			   
-			   (insert " ")
-			   (insert-button "ediff"
+
+			   (insert-button (format "[%s]" result-shortcuts)
 					  :type 'efar-dir-diff-button
 					  :ediff t
 					  :file1 file-name1
@@ -4822,7 +4837,7 @@ Case is ignored."
   'face 'efar-search-file-link-face)
 
 (defun efar-dir-diff-button (button)
-  ""
+  "Execute actions when BUTTON is clicked."
   (let ((file (button-get button :file))
 	(ediff (button-get button :ediff))
 	(file1 (button-get button :file1))
@@ -4834,8 +4849,6 @@ Case is ignored."
     (when ediff
       (ediff file1 file2))))
       
-
-  
 ;;--------------------------------------------------------------------------------
 ;; eFar major mode
 ;;--------------------------------------------------------------------------------
