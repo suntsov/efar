@@ -2398,8 +2398,8 @@ When REREAD-FILES? is t then reread file list for both panels."
 	(efar-output-dir-names :left)
 	(efar-output-dir-names :right)
 	;; output panel headers with panel controls
-	(efar-output-header :left)
-	(efar-output-header :right)
+	(efar-output-controls :left)
+	(efar-output-controls :right)
 	;; output file lists
 	(when reread-files?
 	  (efar-get-file-list :left)
