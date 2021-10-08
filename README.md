@@ -4,15 +4,17 @@ This package provides FAR-like file manager for Emacs.
 
 ![](efar.png)
 
-## Usage
-Package is not available in MELPA yet (there is a plan to publish it in nearest future, though).
-
-To start eFar just load file efar.el and type **M-x efar**.
-
-When Efar is called with universal argument, default-directory of actual buffer is automatically opened in left panel - **C-u M-x efar**.
-
 ## Requirements
 * Emacs 26.1 or newer.
+
+## Installation
+* Manually: download efar.el and add the location to load path.
+* From melpa: ensure you have melpa in your package-archives (see Melpa Installation). Then, **M-x package-install [RET] efar**
+
+## Usage
+To start eFar just type **M-x efar**.
+
+When Efar is called with universal argument, default-directory of actual buffer is automatically opened in left panel - **C-u M-x efar**.
 
 ## Features
 
@@ -89,6 +91,18 @@ User can run actual renaming or cancel it.
 * when opening file from the file search results an incremental search is automatically activated for the searched text
 * no external tools used for search functionality, it's completely implemented using pure elisp
 * multiprocessing used when searching for text inside files
+
+### Directory comparison
+* start comparing directories selected in right and left panels - **\<M-f6\>**
+* display last comparison results - **\<S-f6\>**
+* display comparison results with details in a separate buffer - **\<C-M-f6\>**
+* show/hide unchanged files - **C-c \<f6\> a**
+* togle displaying difference in size - **C-c \<f6\> s**
+* togle displaying difference in modes - **C-c \<f6\> m**
+* togle displaying difference in owner - **C-c \<f6\> o**
+* togle displaying difference in group - **C-c \<f6\> g**
+* togle displaying difference in checksum - **C-c \<f6\> h**
+* multiprocessing used when coparing directories
 
 ### Last visited directories
 * display list of last visited directories - **C-c c h**
