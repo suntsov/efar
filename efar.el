@@ -2271,34 +2271,40 @@ Execute it unless DONT-RUN? is t."
   "The main function to output content of eFar buffer.
 When REREAD-FILES? is t then reread file list for both panels."
   (interactive)
-  (with-current-buffer efar-buffer-name
-    (efar-calculate-window-size)
-    (erase-buffer)
+  
+  ;; fix for the issue https://github.com/suntsov/efar/issues/17
+  ;; don't redraw when focus in minibuffer
+  (unless (minibuffer-prompt)
+  ;; end fix
     
-    (if (< (efar-get :window-width) 30)
-	(insert "eFar buffer is too narrow")
-      ;; draw all border lines
-      (efar-draw-border )
-      ;; apply default face
-      (put-text-property (point-min) (point-max) 'face 'efar-border-line-face)
-      ;; output directory names above each panel
-      (efar-output-dir-names :left)
-      (efar-output-dir-names :right)
-      ;; output panel headers with panel controls
-      (efar-output-header :left)
-      (efar-output-header :right)
-      ;; output file lists
-      (when reread-files?
-	(efar-get-file-list :left)
-	(efar-get-file-list :right))
-      (efar-output-files :left)
-      (efar-output-files :right)
-      ;; output details about files under cursor
-      (efar-output-file-details :left)
-      (efar-output-file-details :right)
-      ;; during drag we show hand pointer
-      (when efar-mouse-down-p
-	(put-text-property (point-min) (point-max) 'pointer 'hand)))))
+    (with-current-buffer efar-buffer-name
+      (efar-calculate-window-size)
+      (erase-buffer)
+      
+      (if (< (efar-get :window-width) 30)
+	  (insert "eFar buffer is too narrow")
+	;; draw all border lines
+	(efar-draw-border )
+	;; apply default face
+	(put-text-property (point-min) (point-max) 'face 'efar-border-line-face)
+	;; output directory names above each panel
+	(efar-output-dir-names :left)
+	(efar-output-dir-names :right)
+	;; output panel headers with panel controls
+	(efar-output-header :left)
+	(efar-output-header :right)
+	;; output file lists
+	(when reread-files?
+	  (efar-get-file-list :left)
+	  (efar-get-file-list :right))
+	(efar-output-files :left)
+	(efar-output-files :right)
+	;; output details about files under cursor
+	(efar-output-file-details :left)
+	(efar-output-file-details :right)
+	;; during drag we show hand pointer
+	(when efar-mouse-down-p
+	  (put-text-property (point-min) (point-max) 'pointer 'hand))))))
 
 (defun efar-reinit ()
   "Reinitialize eFar state."
