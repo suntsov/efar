@@ -68,6 +68,8 @@
 (defvar efar-dir-diff-update-results-timer nil)
 (defvar efar-dir-diff-current-dir nil)
 (defvar efar-dir-diff-show-changed-only-p nil)
+(defconst efar-dir-diff-comp-params '(:size :hash :owner :group :modes))
+(defvar efar-dir-diff-actual-comp-params '(:size :hash :owner :group :modes))
 
 (provide 'efar)
 
@@ -2565,7 +2567,7 @@ otherwise redraw all."
 								  (not (equal ".." (car file)))
 								  (not (string-empty-p (car file))))
 
-							 (let* ((results (intersection efar-dir-diff-actual-comp-params
+							 (let* ((results (cl-intersection efar-dir-diff-actual-comp-params
 										       (cl-remove-if (lambda(e) (or (equal e :left)
 														    (equal e :right)
 														    (equal e :both)))
@@ -2616,7 +2618,7 @@ otherwise redraw all."
 						 (new? (member side comp-values))
 						 (removed? (member (efar-other-side side) comp-values))
 						 (changed? (or (member :children-changed comp-values)
-							       (intersection efar-dir-diff-actual-comp-params
+							       (cl-intersection efar-dir-diff-actual-comp-params
 									     comp-values))))
 					    (cond
 					     ((and removed? current?) 'efar-dir-diff-removed-current-face)
@@ -4474,7 +4476,6 @@ Case is ignored."
 				   :both
 				 :left))
 		    (e (gethash k list1))		    
-		    (type-changed? nil)
 		    ;; ignore case when applying wildcard
 		    (case-fold-search t)
 		    
@@ -4586,14 +4587,11 @@ Case is ignored."
     (when changed?
       (process-send-string efar-subprocess-server (concat (prin1-to-string (cons :file-comp-result (list (cons :key key) (cons :checksum-differs t)))) "\n")))))
 
-(defconst efar-dir-diff-comp-params '(:size :hash :owner :group :modes))
-(defvar efar-dir-diff-actual-comp-params '(:size :hash :owner :group :modes))
-
 (defun efar-dir-diff-update-parents (key)
   ""
   ;;if differences detected
   ;;mark parent directories as :children-changed
-  (when (intersection efar-dir-diff-actual-comp-params
+  (when (cl-intersection efar-dir-diff-actual-comp-params
 		      (gethash key efar-dir-diff-results))
     (let ((parent-key (efar-get-parent-dir key)))
       (catch :exit
