@@ -4112,7 +4112,7 @@ Case is ignored when IGNORE-CASE? is t."
   (setq efar-search-running-p nil)
   ;;(setq efar-search-last-command-params nil)
   ;; cancel update timer
-  (when (and (not (null efar-search-update-results-timer))
+  (when (and efar-search-update-results-timer
 	     (timerp efar-search-update-results-timer))
     (cancel-timer efar-search-update-results-timer))
   (setq efar-search-update-results-timer nil))
@@ -4434,7 +4434,7 @@ Child items are not taken into account if DONT-CHECK-CHILDREN is not nil."
   ""
   (setq efar-dir-diff-running-p nil)
   ;; cancel update timer
-  (when (and (not (null efar-dir-diff-update-results-timer))
+  (when (and efar-dir-diff-update-results-timer
 	     (timerp efar-dir-diff-update-results-timer))
     (cancel-timer efar-dir-diff-update-results-timer))
   (setq efar-dir-diff-update-results-timer nil))
@@ -4697,7 +4697,7 @@ Go to parent directory when GO-TO-PARENT? is not nil."
 	(efar-write-enable (efar-redraw))))))
 
 (defun efar-dir-diff-toggle-copmarision-display-options (par)
-  ""
+  "Toggle displaying differences of type PAR."
   (if (member par efar-dir-diff-actual-comp-params)
       (setf efar-dir-diff-actual-comp-params (delete par efar-dir-diff-actual-comp-params))
     (push par efar-dir-diff-actual-comp-params))
