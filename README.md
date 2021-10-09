@@ -1,4 +1,4 @@
-[![MELPA](https://melpa.org/packages/efar-badge.svg)](https://melpa.org/#/efar)
+[![MELPA](https://melpa.org/packages/efar-badge.svg)](https://melpa.org/#/efar) [![MELPA Stable](https://stable.melpa.org/packages/efar-badge.svg)](https://stable.melpa.org/#/efar)
 
 # eFar
 
