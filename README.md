@@ -1,4 +1,4 @@
-[![MELPA](https://melpa.org/packages/multiple-cursors-badge.svg)](https://melpa.org/#/efar)
+[![MELPA](https://melpa.org/packages/efar-badge.svg)](https://melpa.org/#/efar)
 
 # eFar
 
