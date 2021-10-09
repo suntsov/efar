@@ -327,6 +327,62 @@
   "The face used for representing the link to the source code line"
   :group 'efar-search-faces)
 
+;; faces for directory comparator
+(defface efar-dir-diff-equal-face
+  '((t :foreground "white"
+       :background "navy"
+       :underline nil))
+  ""
+  :group 'efar-faces)
+
+(defface efar-dir-diff-equal-current-face
+  '((t :foreground "black"
+       :background "cadet blue"
+       :underline nil))
+  ""
+  :group 'efar-faces)
+
+(defface efar-dir-diff-removed-face
+  '((t :foreground "red"
+       :background "navy"
+       :underline nil))
+  ""
+  :group 'efar-faces)
+
+(defface efar-dir-diff-removed-current-face
+  '((t :foreground "red"
+       :background "cadet blue"
+       :underline nil))
+  ""
+  :group 'efar-faces)
+
+(defface efar-dir-diff-new-face
+  '((t :foreground "green"
+       :background "navy"
+       :underline nil))
+  ""
+  :group 'efar-faces)
+
+(defface efar-dir-diff-new-current-face
+  '((t :foreground "dark green"
+       :background "cadet blue"
+       :underline nil))
+  ""
+  :group 'efar-faces)
+
+(defface efar-dir-diff-changed-face
+  '((t :foreground "deep sky blue"
+       :background "navy"
+       :underline nil))
+  ""
+  :group 'efar-faces)
+
+(defface efar-dir-diff-changed-current-face
+  '((t :foreground "dark blue"
+       :background "cadet blue"
+       :underline nil))
+  ""
+  :group 'efar-faces)
 
 ;; macros
 (defmacro efar-with-notification-disabled(&rest body)
@@ -2674,62 +2730,6 @@ otherwise redraw all."
 		     
 		     (goto-char 0)
 		     (forward-line 1))))))))
-
-(defface efar-dir-diff-equal-face
-  '((t :foreground "white"
-       :background "navy"
-       :underline nil))
-  ""
-  :group 'efar-faces)
-
-(defface efar-dir-diff-equal-current-face
-  '((t :foreground "white"
-       :background "cadet blue"
-       :underline nil))
-  ""
-  :group 'efar-faces)
-
-(defface efar-dir-diff-removed-face
-  '((t :foreground "red"
-       :background "navy"
-       :underline nil))
-  ""
-  :group 'efar-faces)
-
-(defface efar-dir-diff-removed-current-face
-  '((t :foreground "red"
-       :background "cadet blue"
-       :underline nil))
-  ""
-  :group 'efar-faces)
-
-(defface efar-dir-diff-new-face
-  '((t :foreground "green"
-       :background "navy"
-       :underline nil))
-  ""
-  :group 'efar-faces)
-
-(defface efar-dir-diff-new-current-face
-  '((t :foreground "green"
-       :background "cadet blue"
-       :underline nil))
-  ""
-  :group 'efar-faces)
-
-(defface efar-dir-diff-changed-face
-  '((t :foreground "deep sky blue"
-       :background "navy"
-       :underline nil))
-  ""
-  :group 'efar-faces)
-
-(defface efar-dir-diff-changed-current-face
-  '((t :foreground "deep sky blue"
-       :background "cadet blue"
-       :underline nil))
-  ""
-  :group 'efar-faces)
 
 (defun efar-output-controls (side)
   "Output eFar header with controls in panel SIDE."
