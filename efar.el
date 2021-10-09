@@ -4600,8 +4600,8 @@ Directories and comparision parameters are passed in PARAMS."
   "Update all parent directories as updated if item with KEY has differences."
   ;;if differences detected
   ;;mark parent directories as :children-changed
-  (when (cl-intersection efar-dir-diff-actual-comp-params
-		      (gethash key efar-dir-diff-results))
+  (when (cl-intersection (append efar-dir-diff-actual-comp-params '(:left :right))
+			 (gethash key efar-dir-diff-results))
     (let ((parent-key (efar-get-parent-dir key)))
       (catch :exit
 	(while parent-key
