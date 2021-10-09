@@ -2426,48 +2426,45 @@ Execute it unless DONT-RUN? is t."
 
 (defun efar-calculate-window-size ()
   "Calculate and set windows sizes."
-  (efar-set (- (window-width) 1) :window-width)
-  (efar-set (window-height) :window-height)
-  (efar-set (- (window-height) 6) :panel-height))
+  ;; fix for the issue https://github.com/suntsov/efar/issues/17
+  ;; request window-width and window-height of eFar buffer window explicitelly
+  (let ((efar-window (get-buffer-window efar-buffer-name)))
+    (efar-set (- (window-width efar-window) 1) :window-width)
+    (efar-set (window-height efar-window) :window-height)
+    (efar-set (- (window-height efar-window) 6) :panel-height)))
 
 (defun efar-redraw (&optional reread-files?)
   "The main function to output content of eFar buffer.
 When REREAD-FILES? is t then reread file list for both panels."
   (interactive)
-  
-  ;; fix for the issue https://github.com/suntsov/efar/issues/17
-  ;; don't redraw when focus in minibuffer
-  (unless (minibuffer-prompt)
-  ;; end fix
+  (with-current-buffer efar-buffer-name
+    (efar-calculate-window-size)
+    (erase-buffer)
     
-    (with-current-buffer efar-buffer-name
-      (efar-calculate-window-size)
-      (erase-buffer)
-      
-      (if (< (efar-get :window-width) 30)
-	  (insert "eFar buffer is too narrow")
-	;; draw all border lines
-	(efar-draw-border )
-	;; apply default face
-	(put-text-property (point-min) (point-max) 'face 'efar-border-line-face)
-	;; output directory names above each panel
-	(efar-output-dir-names :left)
-	(efar-output-dir-names :right)
-	;; output panel headers with panel controls
-	(efar-output-controls :left)
-	(efar-output-controls :right)
-	;; output file lists
-	(when reread-files?
-	  (efar-get-file-list :left)
-	  (efar-get-file-list :right))
-	(efar-output-files :left)
-	(efar-output-files :right)
-	;; output details about files under cursor
-	(efar-output-file-details :left)
-	(efar-output-file-details :right)
-	;; during drag we show hand pointer
-	(when efar-mouse-down-p
-	  (put-text-property (point-min) (point-max) 'pointer 'hand))))))
+    (if (< (efar-get :window-width) 30)
+	(insert "eFar buffer is too narrow")
+      ;; draw all border lines
+      (efar-draw-border )
+      ;; apply default face
+      (put-text-property (point-min) (point-max) 'face 'efar-border-line-face)
+      ;; output directory names above each panel
+      (efar-output-dir-names :left)
+      (efar-output-dir-names :right)
+      ;; output panel headers with panel controls
+      (efar-output-controls :left)
+      (efar-output-controls :right)
+      ;; output file lists
+      (when reread-files?
+	(efar-get-file-list :left)
+	(efar-get-file-list :right))
+      (efar-output-files :left)
+      (efar-output-files :right)
+      ;; output details about files under cursor
+      (efar-output-file-details :left)
+      (efar-output-file-details :right)
+      ;; during drag we show hand pointer
+      (when efar-mouse-down-p
+	(put-text-property (point-min) (point-max) 'pointer 'hand)))))
 
 (defun efar-reinit ()
   "Reinitialize eFar state."
