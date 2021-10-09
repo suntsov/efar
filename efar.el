@@ -3577,17 +3577,20 @@ When optional LINE-NUMBER is given then do replacement on corresponding line onl
   (let ((side (or side (efar-get :current-panel)))
 	(mode-name (cdr (assoc mode efar-panel-modes))))
     (efar-quit-fast-search 'no-refresh)
-    ;;    (efar-abort)
-     (efar-set mode :panels side :mode)
+    
+    (efar-set mode :panels side :mode)
     (efar-get-file-list side)
     
     (cond
      ((equal mode :search)
+      (efar-set 0 :panels side :current-pos)
       (efar-show-search-results side))
      
      ((equal mode :dir-diff)
       (efar-set mode :panels (efar-other-side side) :mode)
       (efar-get-file-list (efar-other-side side))
+      (efar-set 0 :panels side :current-pos)
+      (efar-set 0 :panels (efar-other-side side) :current-pos)
       (efar-dir-diff-show-results))
      
      (t
