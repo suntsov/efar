@@ -1,3 +1,5 @@
+[![MELPA](https://melpa.org/packages/multiple-cursors-badge.svg)](https://melpa.org/#/efar)
+
 # eFar
 
 This package provides FAR-like file manager for Emacs.
