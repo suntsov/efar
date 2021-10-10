@@ -1109,8 +1109,7 @@ from version FROM-VERSION to actual version."
 	    (efar-set '(:short) :panels :left :view :search-hist :file-disp-mode)
 	    (efar-set 1 :panels :right :view :search-hist :column-number)
 	    (efar-set '(:short) :panels :right :view :search-hist :file-disp-mode)
-	    (message "eFar state file upgraded to version 1.24"))
-	  )
+	    (message "eFar state file upgraded to version 1.24")))
       
       (error
        (message "Error occured during upgrading state file: %s. State file skipped." (error-message-string err))
@@ -1329,7 +1328,7 @@ When NOTIFY-WITH-COLOR? is t then blink red."
 
       (when notify-with-color?
 	(run-at-time 0.6 nil
-		     '(lambda()
+		     #'(lambda()
 			(setq mode-line-format (list " " mode-line-modes (efar-get :status)))
 			(force-mode-line-update))))
 
@@ -2141,7 +2140,7 @@ The way to build a list depends on MODE."
 			  (list (concat "Search"
 					(when text (format " '%s'" text))
 					(format " in %s (%s)"
-						(cdr (assoc :dir (car e))) (string-join (cdr (assoc :wildcards (car e))) ","))
+						dir (string-join wildcards ","))
 					(concat " -> "
 						(when text
 						  (let ((hits 0))
@@ -4219,7 +4218,7 @@ Case is ignored when IGNORE-CASE? is t."
 			    (search-func (if regexp? 're-search-forward 'search-forward))) ;; use regular expression for search when regexp? is t
 			;; open file in temp buffer
 			(with-temp-buffer
-			  (insert-file-contents-literally file)
+			  (insert-file-contents file)
 			  (goto-char 0)
 			  ;; do search the text
 			  (while (funcall search-func text nil t)
@@ -4403,9 +4402,9 @@ BUTTON is a button clicked."
 
   
 (defun efar-search-open-from-history ()
-  ""
+  "Open selected search result."
   (if efar-search-running-p
-      (efar-set-status (format "Wait until current search ends. Press %S to show current search results"  efar-show-search-results-key)
+      (efar-set-status (format "Wait until current search ends. Press %S to show current search results"  (symbol-value 'efar-show-search-results-key))
 		       5 t t)
     
     (let* ((number (efar-current-file-number))
