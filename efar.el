@@ -3658,10 +3658,13 @@ When optional LINE-NUMBER is given then do replacement on corresponding line onl
 	(mode-name (cdr (assoc mode efar-panel-modes))))
     (efar-quit-fast-search 'no-refresh)
     
+    (unless (equal mode (efar-get :panels side :mode))
+      (efar-set 0 :panels side :current-pos)
+      (efar-set 0 :panels side :start-file-number)
+      (when (equal mode :dir-diff)
+	(efar-set 0 :panels (efar-other-side side) :current-pos)))
     (efar-set mode :panels side :mode)
     (efar-get-file-list side)
-    (efar-set 0 :panels side :current-pos)
-    (efar-set 0 :panels side :start-file-number)
     
     (cond
      ((equal mode :search)
@@ -3670,7 +3673,6 @@ When optional LINE-NUMBER is given then do replacement on corresponding line onl
      ((equal mode :dir-diff)
       (efar-set mode :panels (efar-other-side side) :mode)
       (efar-get-file-list (efar-other-side side))
-      (efar-set 0 :panels (efar-other-side side) :current-pos)
       (efar-dir-diff-show-results))
      
      (t
