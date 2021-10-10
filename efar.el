@@ -1305,12 +1305,13 @@ OPTIONS is a collection with possible answers."
   (when (efar-get :reset-status?)
     (efar-set-status "Ready")))
 
-(defun efar-set-status (&optional status seconds reset?)
+(defun efar-set-status (&optional status seconds reset? notify-with-color?)
   "Set eFar status to STATUS.
 When STATUS is nil use default 'Ready' status.
 When SECONDS is defined then status is displayed given time.
 When RESET? is t then status will be automatically changed to default
-on any next cursor movement."
+on any next cursor movement.
+When NOTIFY-WITH-COLOR? is t then blink red."
   (with-current-buffer efar-buffer-name
     
     (when reset?
@@ -1320,7 +1321,18 @@ on any next cursor movement."
 	  (status (or status "Ready")))
       
       (efar-set status :status)
-      (setq mode-line-format (list " " mode-line-modes (or status (efar-get :status))))
+
+      (let ((status-string (if notify-with-color?
+			       (propertize status 'face '(:background "red"))
+			     status)))
+	(setq mode-line-format (list " " mode-line-modes status-string)))
+
+      (when notify-with-color?
+	(run-at-time 0.6 nil
+		     '(lambda()
+			(setq mode-line-format (list " " mode-line-modes (efar-get :status)))
+			(force-mode-line-update))))
+
       (force-mode-line-update)
       
       (when seconds
@@ -1337,7 +1349,7 @@ mode is not in the list IGNORE-IN-MODES."
       (setq func (symbol-function (cdr (assoc mode func)))))
     
     (if (cl-member mode ignore-in-modes)
-	(efar-set-status (concat "Function is not allowed in mode " (symbol-name mode)) nil t)
+	(efar-set-status (concat "Function is not allowed in mode " (symbol-name mode)) nil t t)
       (if arg
 	  (funcall func arg)
 	(funcall func)))))
@@ -2279,7 +2291,7 @@ When NO-AUTO-READ? is t then no auto file read happens."
 			     
 			     (condition-case err
 				 (unless no-auto-read? (efar-auto-read-file))
-			       (error (efar-set-status (concat "Error: "(error-message-string err)) nil t)))))))
+			       (error (efar-set-status (concat "Error: "(error-message-string err)) nil t t)))))))
 	
 	(move-for-side side)
 	(when (equal panel-mode :dir-diff)
@@ -2420,7 +2432,7 @@ Execute it unless DONT-RUN? is t."
       (let ((newdir (expand-file-name (car file) current-dir-path)))
 	(cond
 	 ((not (file-accessible-directory-p  newdir))
-	  (efar-set-status (concat "Directory "  newdir " is not accessible") 3))
+	  (efar-set-status (concat "Directory "  newdir " is not accessible") 3 nil t))
 	 
 	 (t
 	  (efar-go-to-dir newdir side)))))))
@@ -2431,7 +2443,7 @@ Execute it unless DONT-RUN? is t."
     (if (or (not dir-hist)
 	    (zerop (length dir-hist)))
 	
-	(efar-set-status "Directory history is empty" 2 t)
+	(efar-set-status "Directory history is empty" 2 t t)
       
       (let* ((side (efar-get :current-panel))
 	     (index (cl-position (efar-get :panels side :dir) dir-hist :test (lambda(a b) (equal a (car b)))))
@@ -3611,7 +3623,7 @@ When optional LINE-NUMBER is given then do replacement on corresponding line onl
 	  (setf ok? t))
       
       (unless ok?
-	(efar-set-status "Size calculation failed" nil t)))))
+	(efar-set-status "Size calculation failed" nil t t)))))
 
 (defconst efar-panel-modes
   '((:files . "Files")
@@ -3873,7 +3885,7 @@ Message consists of MESSAGE-TYPE and DATA."
 		     (efar-subprocess-killall-processes)
 		     (make-thread 'efar-subprocess-run-processes)
 		     (efar-subprocess-work-finished)
-		     (efar-set-status (concat "Error occurred during background operation: " data))))))
+		     (efar-set-status (concat "Error occurred during background operation: " data) nil nil t)))))
 
 (defun efar-subprocess-make-process ()
   "Make subprocess."
@@ -4278,7 +4290,7 @@ Case is ignored when IGNORE-CASE? is t."
   "Show detailed search results in other buffer."
   (if efar-search-running-p
       
-      (efar-set-status "Search is still running" nil t)
+      (efar-set-status "Search is still running" nil t t)
     
     (efar-set-status "Generating report with search results...")
     
@@ -4394,7 +4406,7 @@ BUTTON is a button clicked."
   ""
   (if efar-search-running-p
       (efar-set-status (format "Wait until current search ends. Press %S to show current search results"  efar-show-search-results-key)
-		       5 t)
+		       5 t t)
     
     (let* ((number (efar-current-file-number))
 	   (result (nth number (reverse efar-search-history))))
@@ -4801,7 +4813,7 @@ Go to parent directory when GO-TO-PARENT? is not nil."
   "Show list of changed items together with comparision details."
    (if efar-dir-diff-running-p
       
-      (efar-set-status "Directory comparision is still running" nil t)
+      (efar-set-status "Directory comparision is still running" nil t t)
     
     (efar-set-status "Generating report for directory comparision results...")
     
