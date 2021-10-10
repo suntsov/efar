@@ -61,6 +61,8 @@
 (defvar efar-search-update-results-timer nil)
 (defvar efar-search-running-p nil)
 (defvar efar-search-last-command-params nil)
+(defvar efar-search-history nil)
+
 ;; variables for directory compare
 (defvar efar-dir-diff-results (make-hash-table :test 'equal))
 (defvar efar-dir-diff-last-command-params nil)
@@ -125,7 +127,7 @@
   :group 'efar-parameters
   :type 'string)
 
-(defcustom efar-state-file-name (concat user-emacs-directory ".efar-state")
+(defcustom efar-state-file-name (expand-file-name ".efar-state" user-emacs-directory)
   "Path to the eFar state save file."
   :group 'efar-parameters
   :type 'string)
@@ -465,7 +467,7 @@ IGNORE-IN-MODES is a list of modes which should ignore this key binding."
 (efar-register-key "C-<up>" '((:files . efar-enter-directory)
 			      (:dir-diff . efar-dir-diff-enter-directory))
 		   t 'efar-go-to-parent-dir-key
- 		   "go to parent directory" t (list :file-hist :dir-hist :bookmark :disks :search))
+ 		   "go to parent directory" t (list :file-hist :dir-hist :bookmark :disks :search :search-hist))
 (efar-register-key "C-M-<down>" 'efar-go-directory-history-cicle :forward 'efar-next-directory-in-history-key
  		   "loop over directories in directory history forward" t)
 (efar-register-key "C-M-<up>" 'efar-go-directory-history-cicle :backward 'efar-prev-directory-in-history-key
@@ -476,12 +478,13 @@ IGNORE-IN-MODES is a list of modes which should ignore this key binding."
 			   (:bookmark . efar-navigate-to-file)
 			   (:disks . efar-switch-to-disk)
 			   (:search . efar-navigate-to-file)
+			   (:search-hist . efar-search-open-from-history)
 			   (:dir-diff . efar-dir-diff-enter-directory))
 		   nil  'efar-enter-directory-key
  		   "go into/to the item under cursor or run executable file in the shell" :space-after)
 
 (efar-register-key "M-RET" 'efar-handle-enter t 'efar-copy-to-shell-key
-		   "insert file name into the shell buffer" t (list :file-hist :dir-hist :bookmark :disks :search))
+		   "insert file name into the shell buffer" t (list :file-hist :dir-hist :bookmark :disks :search :search-hist))
 
 (efar-register-key "M-<down>" 'efar-scroll-other-window :down 'efar-scroll-other-down-key
  		   "scroll other window down" t)
@@ -489,11 +492,11 @@ IGNORE-IN-MODES is a list of modes which should ignore this key binding."
  		   "scroll other window up" t)
 
 (efar-register-key "<insert>" 'efar-mark-file   nil 'efar-mark-file-key
- 		   "mark item under cursor" t (list :file-hist :dir-hist :bookmark :disks :search :dir-diff))
+ 		   "mark item under cursor" t (list :file-hist :dir-hist :bookmark :disks :search :dir-diff :search-hist))
 (efar-register-key "<C-insert>" 'efar-select-all  t 'efar-deselect-all-key
- 		   "unmark all items in current directory" t (list :file-hist :dir-hist :bookmark :disks :search :dir-diff))
+ 		   "unmark all items in current directory" t (list :file-hist :dir-hist :bookmark :disks :search :dir-diff :search-hist))
 (efar-register-key "<C-M-insert>" 'efar-select-all  nil 'efar-select-all-key
- 		   "mark all items in current directory" :space-after (list :file-hist :dir-hist :bookmark :disks :search :dir-diff))
+ 		   "mark all items in current directory" :space-after (list :file-hist :dir-hist :bookmark :disks :search :dir-diff :search-hist))
 
 (efar-register-key "TAB" 'efar-switch-to-other-panel nil 'efar-switch-to-other-panel-key
  		   "switch to other panel" t)
@@ -501,23 +504,23 @@ IGNORE-IN-MODES is a list of modes which should ignore this key binding."
  		   "open current directory in other panel" :space-after)
 
 (efar-register-key "<f4>"   'efar-edit-file   nil 'efar-open-file-key
- 		   "edit file under cursor" t)
+ 		   "edit file under cursor" t (list :search-hist))
 (efar-register-key "<M-f4>"  'efar-open-file-in-ext-app nil 'efar-open-file-in-ext-app-key
- 		   "open file under cursor in external application" t)
+ 		   "open file under cursor in external application" t (list :search-hist))
 (efar-register-key "<f3>"  'efar-edit-file   t 'efar-read-file-key
- 		   "show content of the file in other window" :space-after)
+ 		   "show content of the file in other window" :space-after (list :search-hist))
 
 (efar-register-key "C-c f m"  'efar-set-file-modes  nil 'efar-set-file-modes-key
  		   "set file modes (permissions) for selected items" :space-after)
 
 (efar-register-key "<f5>"   'efar-copy-or-move-files :copy 'efar-copy-file-key
-  		   "copy selected file(s)" t (list :file-hist :dir-hist :bookmark :disks :search :dir-diff))
+  		   "copy selected file(s)" t (list :file-hist :dir-hist :bookmark :disks :search :dir-diff :search-hist))
 (efar-register-key "<f6>"  'efar-copy-or-move-files :move 'efar-move-file-key
- 		   "move selected file(s)" t (list :file-hist :dir-hist :bookmark :disks :search :dir-diff))
+ 		   "move selected file(s)" t (list :file-hist :dir-hist :bookmark :disks :search :dir-diff :search-hist))
 (efar-register-key "<f7>"  'efar-create-new-directory nil 'efar-create-direcotry-key
- 		   "create new directory" t (list :file-hist :dir-hist :bookmark :disks :search :dir-diff))
+ 		   "create new directory" t (list :file-hist :dir-hist :bookmark :disks :search :dir-diff :search-hist))
 (efar-register-key "<f8>"  '((:files . efar-delete-selected) (:bookmark . efar-delete-bookmark))   nil 'efar-delete-file-key
- 		   "delete selected file(s) or bookmark" :space-after '(:file-hist :dir-hist :disks :search :dir-diff))
+ 		   "delete selected file(s) or bookmark" :space-after '(:file-hist :dir-hist :disks :search :dir-diff :search-hist))
 
 (efar-register-key "S-C-<left>"  'efar-move-splitter  :left 'efar-move-splitter-left-key
 		   "move splitter between panels to the left" t)
@@ -528,9 +531,9 @@ IGNORE-IN-MODES is a list of modes which should ignore this key binding."
 (efar-register-key "C-c f d" 'efar-change-panel-mode  :disks 'efar-show-disk-selector-key
 		   "show list of available disks (Windows) or mount points (Unix)" t)
 (efar-register-key "C-c f s" 'efar-change-sort-function  nil 'efar-change-sort-key
-		   "change sort function and/or order for current panel" t (list :file-hist :dir-hist :bookmark :disks :dir-diff))
+		   "change sort function and/or order for current panel" t (list :file-hist :dir-hist :bookmark :disks :dir-diff :search-hist))
 (efar-register-key "C-c f f" 'efar-filter-files  nil 'efar-filter-files-key
-		   "set/remove filtering for current panel" :space-after (list :file-hist :dir-hist :bookmark :disks :search :dir-diff))
+		   "set/remove filtering for current panel" :space-after (list :file-hist :dir-hist :bookmark :disks :search :dir-diff :search-hist))
 
 (efar-register-key "C-c v M" 'efar-change-mode  nil 'efar-change-mode-key
 		   "toggle mode: double panel <-> single panel" t)
@@ -546,7 +549,7 @@ IGNORE-IN-MODES is a list of modes which should ignore this key binding."
 (efar-register-key "C-c c d" 'efar-cd   nil 'efar-cd-key
 		   "go to specific directory" t)
 (efar-register-key "C-c c e" 'efar-ediff-files  nil 'efar-ediff-files-key
-		   "run ediff for selected files" t (list :file-hist :dir-hist :bookmark :disks :search))
+		   "run ediff for selected files" t (list :file-hist :dir-hist :bookmark :disks :search :search-hist))
 (efar-register-key "C-c c s" 'efar-current-file-stat  nil 'efar-current-file-stat-key
 		   "show directory stats (size and files number)" t)
 (efar-register-key "C-c c o" 'efar-display-shell  t 'efar-display-shell-key
@@ -574,17 +577,19 @@ IGNORE-IN-MODES is a list of modes which should ignore this key binding."
 		   "run file search" t)
 (efar-register-key "<S-f7>" 'efar-change-panel-mode :search 'efar-show-search-results-key
 		   "show file search results" t)
+(efar-register-key "<C-f7>" 'efar-change-panel-mode :search-hist 'efar-show-search-history-key
+		   "show file search history" t)
 (efar-register-key "<C-M-f7>" 'efar-show-search-results-in-buffer nil 'efar-show-search-results-in-buffer-key
-		   "display search results in a separate buffer" :space-after (list :file-hist :dir-hist :bookmark :disks :files :dir-diff))
+		   "display search results in a separate buffer" :space-after (list :file-hist :dir-hist :bookmark :disks :files :dir-diff :search-hist))
 
 (efar-register-key "<M-f6>" 'efar-dir-diff-compare nil 'efar-dir-diff-compare-key
-		   "compare contents of two directories" t)
+		   "compare contents of two directories" t )
 (efar-register-key "<S-f6>" 'efar-change-panel-mode :dir-diff 'efar-show-dir-diff-results-key
 		   "show last result of directory comparision" t)
 (efar-register-key "<C-M-f6>" 'efar-show-dir-diff-results-in-buffer nil 'efar-show-dir-diff-results-in-buffer-key
-		   "display directory comparision results in a separate buffer" t (list :file-hist :dir-hist :bookmark :disks :files :search))
+		   "display directory comparision results in a separate buffer" t (list :file-hist :dir-hist :bookmark :disks :files :search :search-hist))
 (efar-register-key "C-c <f6> a" 'efar-show-dir-diff-toggle-changed-only nil 'efar-show-dir-toggle-changed-only-key
-		   "toggle filtering of directory comparision results - all <-> changed" t (list :file-hist :dir-hist :bookmark :disks :files :search))
+		   "toggle filtering of directory comparision results - all <-> changed" t (list :file-hist :dir-hist :bookmark :disks :files :search :search-hist))
 (efar-register-key "C-c <f6> s" 'efar-dir-diff-toggle-copmarision-display-options :size 'efar-show-dir-difference-in-size-key
 		   "toggle displaying difference in file size" t (list :file-hist :dir-hist :bookmark :disks :files :search))
 (efar-register-key "C-c <f6> h" 'efar-dir-diff-toggle-copmarision-display-options :hash 'efar-show-dir-difference-in-checksum-key
@@ -766,6 +771,8 @@ REINIT? is a boolean indicating that configuration should be generated enew."
   (efar-set '(:long) :panels :left :view :search :file-disp-mode)
   (efar-set 1 :panels :left :view :dir-diff :column-number)
   (efar-set '(:short) :panels :left :view :dir-diff :file-disp-mode)
+  (efar-set 1 :panels :left :view :search-history :column-number)
+  (efar-set '(:short) :panels :left :view :search-history :file-disp-mode)
   
   (efar-set 1 :panels :right :view :files :column-number)
   (efar-set '(:short :long :detailed :full) :panels :right :view :files :file-disp-mode)
@@ -781,6 +788,8 @@ REINIT? is a boolean indicating that configuration should be generated enew."
   (efar-set '(:long) :panels :right :view :search :file-disp-mode)
   (efar-set 1 :panels :right :view :dir-diff :column-number)
   (efar-set '(:short) :panels :right :view :dir-diff :file-disp-mode)
+  (efar-set 1 :panels :right :view :search-history :column-number)
+  (efar-set '(:short) :panels :right :view :search-history :file-disp-mode)
   
   (efar-set nil :last-auto-read-buffer)
   
@@ -1072,19 +1081,19 @@ from version FROM-VERSION to actual version."
 	    (efar-set '(:long) :panels :left :view :file-hist :file-disp-mode)
 	    (efar-set 1 :panels :right :view :file-hist :column-number)
 	    (efar-set '(:long) :panels :right :view :file-hist :file-disp-mode)
-	    (message "State file upgraded to version 1.0"))
+	    (message "eFar state file upgraded to version 1.0"))
 	  
 	  ;; 1.12 -> 1.13
 	  (when (< from-version 1.13)
 	    (efar-set '(:short :long :detailed :full) :panels :right :view :files :file-disp-mode)
 	    (efar-set '(:short :long :detailed :full) :panels :left :view :files :file-disp-mode)
-	    (message "State file upgraded to version 1.13"))
+	    (message "eFar state file upgraded to version 1.13"))
 	  
 	  ;; 1.17 -> 1.18
 	  (when (< from-version 1.18)
 	    (efar-set '() :panels :left :selected)
 	    (efar-set '() :panels :left :selected)
-	    (message "State file upgraded to version 1.17"))
+	    (message "eFar state file upgraded to version 1.17"))
 	  
 	  ;; 1.20 -> 1.21
 	  (when (< from-version 1.21)
@@ -1092,7 +1101,16 @@ from version FROM-VERSION to actual version."
 	    (efar-set '(:short) :panels :left :view :dir-diff :file-disp-mode)
 	    (efar-set 1 :panels :right :view :dir-diff :column-number)
 	    (efar-set '(:short) :panels :right :view :dir-diff :file-disp-mode)
-	    (message "State file upgraded to version 1.21")))
+	    (message "eFar state file upgraded to version 1.21"))
+
+	  ;; 1.23 -> 1.24
+	  (when (< from-version 1.24)
+	    (efar-set 1 :panels :left :view :search-hist :column-number)
+	    (efar-set '(:short) :panels :left :view :search-hist :file-disp-mode)
+	    (efar-set 1 :panels :right :view :search-hist :column-number)
+	    (efar-set '(:short) :panels :right :view :search-hist :file-disp-mode)
+	    (message "eFar state file upgraded to version 1.24"))
+	  )
       
       (error
        (message "Error occured during upgrading state file: %s. State file skipped." (error-message-string err))
@@ -2101,6 +2119,28 @@ The way to build a list depends on MODE."
     
     (:search
      (cl-copy-list (reverse efar-search-results)))
+
+    (:search-hist
+     (mapcar (lambda(e) (let ((text (cdr (assoc :text (car e))))
+			      (dir (cdr (assoc :dir (car e))))
+			      (wildcards (cdr (assoc :wildcards (car e)))))
+
+
+			  (list (concat "Search"
+					(when text (format " '%s'" text))
+					(format " in %s (%s)"
+						(cdr (assoc :dir (car e))) (string-join (cdr (assoc :wildcards (car e))) ","))
+					(concat " -> "
+						(when text
+						  (let ((hits 0))
+						    (cl-loop for file in (cdr e) do
+							     (setq hits (+ hits (length (nth 13 file)))))
+						    (format "%d hit(s) in" hits)))
+
+						
+						(format " %d file(s)" (length (cdr e)))))
+				t)))
+	     (reverse efar-search-history)))
     
     (:dir-diff
      (mapcar (lambda(e)
@@ -2479,7 +2519,9 @@ When REREAD-FILES? is t then reread file list for both panels."
 (defun efar-output-file-details (side)
   "Output details of the file under cursor in panel SIDE."
   (let* ((mode (efar-get :mode))
-	 (selected-file (car (efar-selected-files side t t t)))
+	 (panel-mode (efar-get :panels side :mode))
+	 (selected-file (car (efar-selected-files side t t
+						  (not (equal :search-hist panel-mode)))))
 	 (file (if (and (not (equal (car selected-file) ".."))
 			(equal :dir-diff (efar-get :panels side :mode)))
 		   (when selected-file
@@ -2489,18 +2531,34 @@ When REREAD-FILES? is t then reread file list for both panels."
 	 (status-string (if (efar-get :panels side :files) "Non-existing or not-accessible file!" "")))
     
     (when (or (equal mode :both) (equal mode side))
-      (when (and file
-		 (efar-get :panels side :files)
-		 (or (equal mode :both) (equal mode side)))
-	
-	(setf status-string (concat  (efar-get-short-file-name file)
-				     "  "
-				     (format-time-string "%x %X" (nth 6 file))
-				     "  "
-				     (if (equal (nth 1 file) t)
-					 "Directory"
-				       (when (numberp (nth 8 file))
-					 (format "%d bytes (%s)" (nth 8 file) (efar-file-size-as-string (nth 8 file))))))))
+      
+      (cond
+       ;; in search history mode we show some details about selected search request
+       ((equal panel-mode :search-hist)
+	(let* ((search-rec (nth (efar-current-file-number side) (reverse efar-search-history)))
+	       (started (cdr (assoc :start-time (car search-rec))))	       
+	       (finished (cdr (assoc :end-time (car search-rec))))
+	       (ignore-case? (cdr (assoc :ignore-case? (car search-rec))))
+	       (regexp? (cdr (assoc :regexp? (car search-rec)))))
+	  (setf status-string (format "Started: %s Took: %ds Regexp?: %S Ignore case?: %S"
+				      (format-time-string "%D %T" started)
+				      (- finished started)
+				      regexp?
+				      ignore-case?))))
+       ;; in all other modes we show details about selected file/directory
+       (t
+	(when (and file
+		   (efar-get :panels side :files)
+		   (or (equal mode :both) (equal mode side)))
+	  
+	  (setf status-string (concat  (efar-get-short-file-name file)
+				       "  "
+				       (format-time-string "%x %X" (nth 6 file))
+				       "  "
+				       (if (equal (nth 1 file) t)
+					   "Directory"
+					 (when (numberp (nth 8 file))
+					   (format "%d bytes (%s)" (nth 8 file) (efar-file-size-as-string (nth 8 file))))))))))
       
       (efar-place-item nil (+ 3 (efar-get :panel-height))
 		       status-string
@@ -2620,6 +2678,9 @@ otherwise redraw all."
 					    ;; in short mode we just output short file name with optional ending "/"
 					    (:short
 					     (cond
+					      ;; search history mode
+					      ((equal :search-hist panel-mode)
+					       (car file))
 					      ;; in dir-compare mode we add shortcuts of comparision results
 					      ((equal :dir-diff panel-mode)
 					       (concat (file-name-nondirectory (car file))
@@ -2674,39 +2735,46 @@ otherwise redraw all."
 					    (:full (efar-prepare-detailed-file-info file column-width 'full uid-gid-max-widths))))
 				     ;; get corresponding face
 				     (face
-				      (if (equal panel-mode :dir-diff)
-					  (let* ((comp-values (nth 14 file))
-						 (new? (member side comp-values))
-						 (removed? (member (efar-other-side side) comp-values))
-						 (changed? (or (member :children-changed comp-values)
-							       (cl-intersection efar-dir-diff-actual-comp-params
-									     comp-values))))
-					    (cond
-					     ((and removed? current?) 'efar-dir-diff-removed-current-face)
-					     ((and removed? (not current?)) 'efar-dir-diff-removed-face)
-					     
-					     ((and new? current?) 'efar-dir-diff-new-current-face)
-					     ((and new? (not current?)) 'efar-dir-diff-new-face)
-					     
-					     ((and changed? current?)  'efar-dir-diff-changed-current-face)
-					     ((and changed? (not current?))  'efar-dir-diff-changed-face)
-					     
-					     (current? 'efar-dir-diff-equal-current-face)
-					     (t  'efar-dir-diff-equal-face)))
-					(cond
-					 ((and (not exists?) current?) 'efar-non-existing-current-file-face)
-					 ((not exists?) 'efar-non-existing-file-face)
-					 
-					 ((and current? marked?) 'efar-marked-current-face)
-					 ((and (not current?) marked?) 'efar-marked-face)
-					 
-					 ((and current? executable?) 'efar-file-current-executable-face)
-					 ((and (not current?) executable?) 'efar-file-executable-face)
-					 
-					 ((and dir? current?) 'efar-dir-current-face)
-					 ((and file? current?) 'efar-file-current-face)
-					 ((and dir? (not current?)) 'efar-dir-face)
-					 ((and file? (not current?)) 'efar-file-face)))))
+				      (cond
+				       ;; directory comparator mode
+				       ((equal panel-mode :dir-diff)
+					(let* ((comp-values (nth 14 file))
+					       (new? (member side comp-values))
+					       (removed? (member (efar-other-side side) comp-values))
+					       (changed? (or (member :children-changed comp-values)
+							     (cl-intersection efar-dir-diff-actual-comp-params
+									      comp-values))))
+					  (cond
+					   ((and removed? current?) 'efar-dir-diff-removed-current-face)
+					   ((and removed? (not current?)) 'efar-dir-diff-removed-face)
+					   
+					   ((and new? current?) 'efar-dir-diff-new-current-face)
+					   ((and new? (not current?)) 'efar-dir-diff-new-face)
+					   
+					   ((and changed? current?)  'efar-dir-diff-changed-current-face)
+					   ((and changed? (not current?))  'efar-dir-diff-changed-face)
+					   
+					   (current? 'efar-dir-diff-equal-current-face)
+					   (t  'efar-dir-diff-equal-face))))
+
+				       ;; search history mode
+				       ((equal panel-mode :search-hist)
+					(cond (current? 'efar-dir-current-face)
+					      ((not current?) 'efar-dir-face)))
+					
+				       ((and (not exists?) current?) 'efar-non-existing-current-file-face)
+				       ((not exists?) 'efar-non-existing-file-face)
+				       
+				       ((and current? marked?) 'efar-marked-current-face)
+				       ((and (not current?) marked?) 'efar-marked-face)
+				       
+				       ((and current? executable?) 'efar-file-current-executable-face)
+				       ((and (not current?) executable?) 'efar-file-executable-face)
+				       
+				       ((and dir? current?) 'efar-dir-current-face)
+				       ((and file? current?) 'efar-file-current-face)
+				       ((and dir? (not current?)) 'efar-dir-face)
+				       ((and file? (not current?)) 'efar-file-face))))
 				  
 				  (efar-place-item
 				   ;; calculate start output position for column
@@ -3136,7 +3204,7 @@ When SKIP-NON-EXISTING? is t then non-existing files removed from the list."
 Switch current panel to :files mode otherwise."
   (unless (efar-get :fast-search-string)
     (let ((side (efar-get :current-panel)))
-      (when (cl-member (efar-get :panels side :mode) '(:search :bookmark :dir-hist :file-hist :disks :dir-diff))
+      (when (cl-member (efar-get :panels side :mode) '(:search :bookmark :dir-hist :file-hist :disks :dir-diff :search-hist))
 	(efar-go-to-dir (efar-last-visited-dir side) side)
 	(when (equal (efar-get :panels (efar-other-side side) :mode) :dir-diff)
 	  (efar-go-to-dir (efar-last-visited-dir (efar-other-side side)) (efar-other-side side))))))
@@ -3552,6 +3620,7 @@ When optional LINE-NUMBER is given then do replacement on corresponding line onl
     (:file-hist . "File history")
     (:disks . "Disks/mount points")
     (:search . "Search results")
+    (:search-hist . "Search history")
     (:dir-diff . "DC")))
 
 
@@ -3580,16 +3649,16 @@ When optional LINE-NUMBER is given then do replacement on corresponding line onl
     
     (efar-set mode :panels side :mode)
     (efar-get-file-list side)
+    (efar-set 0 :panels side :current-pos)
+    (efar-set 0 :panels side :start-file-number)
     
     (cond
      ((equal mode :search)
-      (efar-set 0 :panels side :current-pos)
       (efar-show-search-results side))
      
      ((equal mode :dir-diff)
       (efar-set mode :panels (efar-other-side side) :mode)
       (efar-get-file-list (efar-other-side side))
-      (efar-set 0 :panels side :current-pos)
       (efar-set 0 :panels (efar-other-side side) :current-pos)
       (efar-dir-diff-show-results))
      
@@ -3597,7 +3666,6 @@ When optional LINE-NUMBER is given then do replacement on corresponding line onl
       (efar-set mode-name :panels side :dir)
       
       (efar-remove-notifier side)
-      (efar-set 0 :panels side :current-pos)
       
       (efar-calculate-widths)
       (efar-write-enable (efar-redraw))))))
@@ -4033,6 +4101,8 @@ Restart subprocesses finally."
   (push (cons :end-time (time-to-seconds (current-time))) efar-search-last-command-params)
   
   (setq efar-search-running-p nil)
+
+  (push (cons efar-search-last-command-params efar-search-results) efar-search-history)
   
   (efar-change-panel-mode :search))
 
@@ -4320,6 +4390,17 @@ BUTTON is a button clicked."
 				     (mapconcat #'isearch-text-char-description text "")))))
 
   
+(defun efar-search-open-from-history ()
+  ""
+  (if efar-search-running-p
+      (efar-set-status (format "Wait until current search ends. Press %S to show current search results"  efar-show-search-results-key)
+		       5 t)
+    
+    (let* ((number (efar-current-file-number))
+	   (result (nth number (reverse efar-search-history))))
+      (setf efar-search-results (cdr result))
+      (setf efar-search-last-command-params (car result)))
+    (efar-change-panel-mode :search)))
 
 ;;--------------------------------------------------------------------------------
 ;; Directory comparator
