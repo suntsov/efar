@@ -2547,7 +2547,7 @@ When REREAD-FILES? is t then reread file list for both panels."
        ;; in search history mode we show some details about selected search request
        ((equal panel-mode :search-hist)
 	(let* ((search-rec (nth (efar-current-file-number side) (reverse efar-search-history)))
-	       (started (cdr (assoc :start-time (car search-rec))))	       
+	       (started (cdr (assoc :start-time (car search-rec))))
 	       (finished (cdr (assoc :end-time (car search-rec))))
 	       (ignore-case? (cdr (assoc :ignore-case? (car search-rec))))
 	       (regexp? (cdr (assoc :regexp? (car search-rec)))))
