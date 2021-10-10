@@ -18,6 +18,9 @@ To start eFar just type **M-x efar**.
 
 When Efar is called with universal argument, default-directory of actual buffer is automatically opened in left panel - **C-u M-x efar**.
 
+## Changelog
+See [NEWS.md](NEWS.md).
+
 ## Features
 
 ### Navigation
