@@ -4,7 +4,7 @@
 
 ;; Author: "Vladimir Suntsov" <vladimir@suntsov.online>
 ;; Maintainer: vladimir@suntsov.online
-;; Version: 1.23
+;; Version: 1.24
 ;; Package-Requires: ((emacs "26.1"))
 ;; Keywords: files
 ;; URL: https://github.com/suntsov/efar
@@ -44,7 +44,7 @@
 (require 'esh-mode)
 (require 'em-dirs)
 
-(defconst efar-version 1.23 "Current eFar version number.")
+(defconst efar-version 1.24 "Current eFar version number.")
 
 (defvar efar-state nil)
 (defvar efar-mouse-down-p nil)
