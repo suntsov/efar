@@ -16,7 +16,7 @@ When eFar restarts search history is cleaned up.
   
 ### Version 1.22
 * New: Directory comparator implemented  
-To compare content of two directories open these directories in left and right panels and press <M-f6>. See Readme for details.
+To compare content of two directories open these directories in left and right panels and press **\<M-f6\>**. See Readme for details.
 * Fixes for some minor bugs.
 * Sub-processing code refactoring and optimization.
   
