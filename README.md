@@ -107,6 +107,7 @@ User can run actual renaming or cancel it.
 * togle displaying difference in owner - **C-c \<f6\> o**
 * togle displaying difference in group - **C-c \<f6\> g**
 * togle displaying difference in checksum - **C-c \<f6\> h**
+* new files are marked in green, deleted ones in red and changed in blue
 * multiprocessing used when coparing directories
 
 ### Last visited directories
