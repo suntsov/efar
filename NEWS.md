@@ -11,7 +11,7 @@ To compare content of two directories open these directories in left and right p
 * Sub-processing code refactoring and optimization.
   
 ### Version 1.23
-* bug fix for the issue https://github.com/suntsov/efar/issues/17.
+* bug fix for the [issue #17](https://github.com/suntsov/efar/issues/17).
   
 ### Version 1.24
 * New: Search history  
