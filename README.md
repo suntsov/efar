@@ -150,4 +150,4 @@ Many operations within eFar buffer can be performed using mouse
 * display list of all available key bindigs - **C-c ?**
 
 ### Customization
-* numerous customizable parameters including key bindings and faces available via **M-x customize**
+* numerous customizable parameters including key bindings and faces available via **M-x efar-customize**
