@@ -3872,11 +3872,11 @@ Message consists of MESSAGE-TYPE and DATA."
       ;; message from subprocess indicating that file was skipped due to inaccessibility
       ;; we just add ths file to the list of skipped ones
       (:file-error (let* ((last-command-params (cond
-						(efar-search-running-p efar-search-last-command-params)
-						(efar-dir-diff-running-p efar-dir-diff-last-command-params)))
-			  (errors (cdr (assoc :errors last-command-params))))
+						(efar-search-running-p 'efar-search-last-command-params)
+						(efar-dir-diff-running-p 'efar-dir-diff-last-command-params)))
+			  (errors (cdr (assoc :errors (symbol-value last-command-params)))))
 		     (push data errors)
-		     (push (cons :errors errors) last-command-params)))
+		     (push (cons :errors errors) (symbol-value last-command-params))))
       ;; message from the subprocess about unhandled error
       ;; we show error message and abort the subprocess work
       (:common-error (push (cons :errors data) (cond
