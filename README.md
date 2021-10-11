@@ -107,6 +107,7 @@ User can run actual renaming or cancel it.
 * togle displaying difference in owner - **C-c \<f6\> o**
 * togle displaying difference in group - **C-c \<f6\> g**
 * togle displaying difference in checksum - **C-c \<f6\> h**
+* new files are marked in green, deleted ones in red and changed in blue
 * multiprocessing used when coparing directories
 
 ### Last visited directories
@@ -149,4 +150,4 @@ Many operations within eFar buffer can be performed using mouse
 * display list of all available key bindigs - **C-c ?**
 
 ### Customization
-* numerous customizable parameters including key bindings and faces available via **M-x customize**
+* numerous customizable parameters including key bindings and faces available via **M-x efar-customize**
