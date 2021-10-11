@@ -2557,7 +2557,7 @@ When REREAD-FILES? is t then reread file list for both panels."
 					  (- finished started)
 					  regexp?
 					  ignore-case?)))
-	  (setf status-string ""))
+	  (setf status-string "")))
        ;; in all other modes we show details about selected file/directory
        (t
 	(if (and file
