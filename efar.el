@@ -567,9 +567,9 @@ IGNORE-IN-MODES is a list of modes which should ignore this key binding."
 (efar-register-key "C-c c f" 'efar-change-panel-mode  :file-hist 'efar-show-file-history-key
 		   "show last edited files" t)
 (efar-register-key "C-c c n" 'efar-batch-rename  nil 'efar-batch-rename-key
-		   "perform batch file renaming" t)
+		   "perform batch file renaming" t (list :dir-hist :bookmark :disks :search-hist))
 (efar-register-key "C-c c r" 'efar-batch-replace  nil 'efar-batch-replace-key
-		   "perform batch regexp replace in files" t)
+		   "perform batch regexp replace in files" t (list :dir-hist :bookmark :disks :search-hist))
 (efar-register-key "C-c c m" 'efar-show-mode-selector  nil 'efar-show-mode-selector-key
 		   "show panel mode selector" :space-after)
 
