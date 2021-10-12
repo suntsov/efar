@@ -2,6 +2,9 @@
 
 ## Change log
 
+### In implementation
+* Color themes
+
 ### Version 1.24
 * **New**: Search history  
 From now all search requests and results are stored in search history.  
