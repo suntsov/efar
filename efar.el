@@ -980,7 +980,6 @@ Notifications in the queue will be processed only if there are no new notificati
 				   (efar-process-pending-notifications)))
 		    :notification-timer))))))
 
-
 (defun efar-process-pending-notifications ()
   "Process all pending file notifications."
   ;; while there are notifications in a queue
@@ -3520,17 +3519,17 @@ lower case, upper case or will be capitalized."
 				      (let* ((button (button-at (point)))
 					     (file (when button (button-get button :file)))
 					     (line-number (when button (button-get button :line-number))))
-					;; if buton exists
+					;; if buton exists at point
 					(if button
 					    (progn
-					      ;; do replacement in the corrsponding file
+					      ;; do replacement in the corresponding file
 					      (when replace
 						(efar-retry-when-error (efar-batch-replace-in-file file regexp replacement line-number)))
 					      (read-only-mode 0)
 					      ;; delete processed line from the buffer
 					      (delete-region (line-beginning-position) (1+ (line-end-position)))
-					      ;; if thatwas a line representing file name
-					      ;; delete all source line belonging to that file
+					      ;; if that was a line representing file name
+					      ;; delete all source lines belonging to that file
 					      (unless line-number
 						(while (and (button-at (point))
 							    (button-get (button-at (point)) :line-number))
@@ -4490,9 +4489,6 @@ Child items are not taken into account if DONT-CHECK-CHILDREN is not nil."
     (setq efar-search-running-p nil)
     (setq efar-dir-diff-running-p nil))
   
-  ;; init efar if needed
-  ;;(efar nil nil t)
-  
   (unless (or efar-search-running-p
 	      efar-dir-diff-running-p)
 
@@ -4514,7 +4510,6 @@ Child items are not taken into account if DONT-CHECK-CHILDREN is not nil."
 							(cons :include include-masks)
 							(cons :exclude exclude-masks)
 							(cons :start-time (time-to-seconds (current-time)))))
-	  
 	  
 	  (setq efar-dir-diff-results (make-hash-table :test 'equal))
 	  (setq efar-dir-diff-running-p t)
