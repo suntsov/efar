@@ -1,0 +1,60 @@
+name: Bug Report
+description: File a bug report
+title: "[Bug]: "
+labels: ["bug"]
+assignees:
+  - suntsov
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to fill out this bug report!
+  - type: input
+    id: contact
+    attributes:
+      label: Contact Details
+      description: How can we get in touch with you if we need more info?
+      placeholder: ex. email@example.com
+    validations:
+      required: false
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Also tell us, what did you expect to happen?
+      placeholder: Tell us what you see!
+      value: "A bug happened!"
+    validations:
+      required: true
+  - type: textarea
+    id: version
+    attributes:
+      label: Version
+      description: What version of eFar are you running?
+      value: "1.24"        
+    validations:
+      required: true
+  - type: textarea
+    id: emacs-version
+    attributes:
+      label: Emacs version
+      description: What version of Emacs are you running?
+      value: "27.1"        
+    validations:
+      required: true      
+  - type: dropdown
+    id: browsers
+    attributes:
+      label: What operating system are you running Emacs on?
+      multiple: true
+      options:
+        - Linux
+        - Windows
+        - macOS
+        - other
+  - type: textarea
+    id: extra
+    attributes:
+      label: Any additional information
+      description: Any additional relevant information, screenshots if applicable.
+      render: shell
