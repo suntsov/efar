@@ -39,6 +39,7 @@ See [NEWS.md](NEWS.md).
 * change mode double-panel <-> single-panel - **C-c v M**
 * change number of columns in current panel - **C-c v +   or   C-c v -**
 * change file display mode (short, long, detailed, full) - **C-c v m**
+* Press **\<C-t\>** to switch color theme. For now four themes available: blue, black, white and sand.
 
 ### Selecting disks (Windows) or mount points (Unix)
 * display list of available disks (Windows) or mount points (Unix) - **C-c f d**
@@ -149,5 +150,5 @@ Many operations within eFar buffer can be performed using mouse
 ### Help
 * display list of all available key bindigs - **C-c ?**
 
-### Customization
-* numerous customizable parameters including key bindings and faces available via **M-x efar-customize**
+ ### Customization
+* numerous customizable parameters including key bindings available via **M-x efar-customize**
