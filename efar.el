@@ -4994,7 +4994,7 @@ Go to parent directory when GO-TO-PARENT? is not nil."
        :underline nil))
   "Style for non-existing current files (in bookmarks and directory history")
 
-; efar color themes
+;; efar color themes
 (defvar efar-themes (list (cons :blue
 				(list (cons :background-color "navy")
 				      (cons :current-background-color "cadet blue")
@@ -5068,13 +5068,12 @@ Go to parent directory when GO-TO-PARENT? is not nil."
   "Switch color theme to the next one."
   (let* ((theme-names (mapcar (lambda(e) (car e)) efar-themes))
 	 (current-theme-name (or (efar-get :theme) (car (mapcar (lambda(e) (car e)) efar-themes))))
-	 (next-theme-name (nth (+ 1 (or (cl-position current-theme-name theme-names) -1)) theme-names))	 
+	 (next-theme-name (nth (+ 1 (or (cl-position current-theme-name theme-names) -1)) theme-names))
 	 (theme (assoc (or next-theme-name (car theme-names)) efar-themes)))
-
     (efar-set-theme (car theme))))
     
 (defun efar-set-theme (&optional theme-name)
-  "Set color theme to THEME-NAME."  
+  "Set color theme to THEME-NAME."
   (let* ((theme-names (mapcar (lambda(e) (car e)) efar-themes))
 	 (theme-name (or theme-name
 			 (or (efar-get :theme)
