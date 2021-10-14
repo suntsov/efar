@@ -1,3 +1,4 @@
 
 *.elc
 *.el#
+.#efar.el

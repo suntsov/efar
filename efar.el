@@ -4,7 +4,7 @@
 
 ;; Author: "Vladimir Suntsov" <vladimir@suntsov.online>
 ;; Maintainer: vladimir@suntsov.online
-;; Version: 1.24
+;; Version: 1.25
 ;; Package-Requires: ((emacs "26.1"))
 ;; Keywords: files
 ;; URL: https://github.com/suntsov/efar
@@ -44,7 +44,7 @@
 (require 'esh-mode)
 (require 'em-dirs)
 
-(defconst efar-version 1.24 "Current eFar version number.")
+(defconst efar-version 1.25 "Current eFar version number.")
 
 (defvar efar-state nil)
 (defvar efar-mouse-down-p nil)
@@ -95,13 +95,81 @@
   "eFar faces"
   :group 'efar)
 
-(defgroup efar-search-faces nil
-  "eFar faces"
-  :group 'efar-search-parameters)
-
 (defgroup efar-keys nil
   "eFar key bindings"
   :group 'efar)
+
+;; FACES
+(defface efar-search-file-link-face
+  '((t :foreground "black"
+       :background "snow2"
+       :bold t
+       :underline t))
+  "The face used for representing the link to the file"
+  :group 'efar-faces)
+
+(defface efar-search-line-link-face
+  '((t :foreground "black"
+       :background "ivory"))
+  "The face used for representing the link to the source code line"
+  :group 'efar-faces)
+
+;; faces for directory comparator
+(defface efar-dir-diff-equal-face
+  '((t :foreground "white"
+       :background "navy"
+       :underline nil))
+  ""
+  :group 'efar-faces)
+
+(defface efar-dir-diff-equal-current-face
+  '((t :foreground "black"
+       :background "cadet blue"
+       :underline nil))
+  ""
+  :group 'efar-faces)
+
+(defface efar-dir-diff-removed-face
+  '((t :foreground "red"
+       :background "navy"
+       :underline nil))
+  ""
+  :group 'efar-faces)
+
+(defface efar-dir-diff-removed-current-face
+  '((t :foreground "red"
+       :background "cadet blue"
+       :underline nil))
+  ""
+  :group 'efar-faces)
+
+(defface efar-dir-diff-new-face
+  '((t :foreground "green"
+       :background "navy"
+       :underline nil))
+  ""
+  :group 'efar-faces)
+
+(defface efar-dir-diff-new-current-face
+  '((t :foreground "dark green"
+       :background "cadet blue"
+       :underline nil))
+  ""
+  :group 'efar-faces)
+
+(defface efar-dir-diff-changed-face
+  '((t :foreground "deep sky blue"
+       :background "navy"
+       :underline nil))
+  ""
+  :group 'efar-faces)
+
+(defface efar-dir-diff-changed-current-face
+  '((t :foreground "dark blue"
+       :background "cadet blue"
+       :underline nil))
+  ""
+  :group 'efar-faces)
 
 ;; MAIN PARAMETERS
 (eval-and-compile
@@ -206,185 +274,6 @@
   "Follow directory symlinks when searching?"
   :group 'efar-search-parameters
   :type 'boolean)
-
-;; FACES
-(defface efar-border-line-face
-  '((t :foreground "white"
-       :background "navy"
-       :underline nil))
-  "Border line face"
-  :group 'efar-faces)
-
-
-(defface efar-file-face
-  '((t :foreground "deep sky blue"
-       :background "navy"
-       :underline nil))
-  "File item style (default)"
-  :group 'efar-faces)
-
-(defface efar-file-executable-face
-  '((t :foreground "green"
-       :background "navy"
-       :underline nil))
-  "File item style (executable file)"
-  :group 'efar-faces)
-
-(defface efar-file-current-executable-face
-  '((t :foreground "green"
-       :background "cadet blue"
-       :underline nil))
-  "Current file item style (executable file)"
-  :group 'efar-faces)
-
-(defface efar-marked-current-face
-  '((t :foreground "gold"
-       :background "cadet blue"
-       :underline nil))
-  "Current marked item style"
-  :group 'efar-faces)
-
-(defface efar-dir-face
-  '((t :foreground "white"
-       :background "navy"
-       :underline nil))
-  "Directory item style"
-  :group 'efar-faces)
-
-(defface efar-file-current-face
-  '((t :foreground "black"
-       :background "cadet blue"
-       :underline nil))
-  "Current file item style"
-  :group 'efar-faces)
-
-(defface efar-dir-current-face
-  '((t :foreground "black"
-       :background "cadet blue"
-       :underline nil))
-  "Current directory item style"
-  :group 'efar-faces)
-
-(defface efar-marked-face
-  '((t :foreground "gold"
-       :background "navy"
-       :underline nil))
-  "Marked item style"
-  :group 'efar-faces)
-
-(defface efar-marked-current-face
-  '((t :foreground "gold"
-       :background "cadet blue"
-       :underline nil))
-  "Current marked item style"
-  :group 'efar-faces)
-
-
-(defface efar-dir-name-face
-  '((t :foreground "white"
-       :background "navy"
-       :underline nil))
-  "Directory name header style"
-  :group 'efar-faces)
-
-(defface efar-header-face
-  '((t :foreground "orange"
-       :background "navy"
-       :underline nil))
-  "Header style"
-  :group 'efar-faces)
-
-(defface efar-dir-name-current-face
-  '((t :foreground "navy"
-       :background "bisque"
-       :underline nil))
-  "Current directory name header style"
-  :group 'efar-faces)
-
-(defface efar-non-existing-file-face
-  '((t :foreground "red"
-       :background "navy"
-       :underline nil))
-  "Style for non-existing files (in bookmarks and directory history"
-  :group 'efar-faces)
-
-(defface efar-non-existing-current-file-face
-  '((t :foreground "red"
-       :background "bisque"
-       :underline nil))
-  "Style for non-existing current files (in bookmarks and directory history"
-  :group 'efar-faces)
-
-(defface efar-search-file-link-face
-  '((t :foreground "black"
-       :background "snow2"
-       :bold t
-       :underline t))
-  "The face used for representing the link to the file"
-  :group 'efar-search-faces)
-
-(defface efar-search-line-link-face
-  '((t :foreground "black"
-       :background "ivory"))
-  "The face used for representing the link to the source code line"
-  :group 'efar-search-faces)
-
-;; faces for directory comparator
-(defface efar-dir-diff-equal-face
-  '((t :foreground "white"
-       :background "navy"
-       :underline nil))
-  ""
-  :group 'efar-faces)
-
-(defface efar-dir-diff-equal-current-face
-  '((t :foreground "black"
-       :background "cadet blue"
-       :underline nil))
-  ""
-  :group 'efar-faces)
-
-(defface efar-dir-diff-removed-face
-  '((t :foreground "red"
-       :background "navy"
-       :underline nil))
-  ""
-  :group 'efar-faces)
-
-(defface efar-dir-diff-removed-current-face
-  '((t :foreground "red"
-       :background "cadet blue"
-       :underline nil))
-  ""
-  :group 'efar-faces)
-
-(defface efar-dir-diff-new-face
-  '((t :foreground "green"
-       :background "navy"
-       :underline nil))
-  ""
-  :group 'efar-faces)
-
-(defface efar-dir-diff-new-current-face
-  '((t :foreground "dark green"
-       :background "cadet blue"
-       :underline nil))
-  ""
-  :group 'efar-faces)
-
-(defface efar-dir-diff-changed-face
-  '((t :foreground "deep sky blue"
-       :background "navy"
-       :underline nil))
-  ""
-  :group 'efar-faces)
-
-(defface efar-dir-diff-changed-current-face
-  '((t :foreground "dark blue"
-       :background "cadet blue"
-       :underline nil))
-  ""
-  :group 'efar-faces)
 
 ;; macros
 (defmacro efar-with-notification-disabled(&rest body)
@@ -567,9 +456,9 @@ IGNORE-IN-MODES is a list of modes which should ignore this key binding."
 (efar-register-key "C-c c f" 'efar-change-panel-mode  :file-hist 'efar-show-file-history-key
 		   "show last edited files" t)
 (efar-register-key "C-c c n" 'efar-batch-rename  nil 'efar-batch-rename-key
-		   "perform batch file renaming" t)
+		   "perform batch file renaming" t (list :dir-hist :bookmark :disks :search-hist))
 (efar-register-key "C-c c r" 'efar-batch-replace  nil 'efar-batch-replace-key
-		   "perform batch regexp replace in files" t)
+		   "perform batch regexp replace in files" t (list :dir-hist :bookmark :disks :search-hist))
 (efar-register-key "C-c c m" 'efar-show-mode-selector  nil 'efar-show-mode-selector-key
 		   "show panel mode selector" :space-after)
 
@@ -601,6 +490,8 @@ IGNORE-IN-MODES is a list of modes which should ignore this key binding."
 (efar-register-key "C-c <f6> m" 'efar-dir-diff-toggle-copmarision-display-options :modes 'efar-show-dir-difference-in-modes-key
 		   "toggle displaying difference in file modes (permissions)" :space-after (list :file-hist :dir-hist :bookmark :disks :files :search))
 
+(efar-register-key "C-t" 'efar-change-theme  nil 'efar-change-theme-key
+		   "change eFar color theme" :space-after)
 
 (efar-register-key "C-g" 'efar-abort  nil nil
 		   "quit fast search mode or switch panel to files mode" t)
@@ -660,6 +551,8 @@ When NO-SWITCH? is t then don't switch to eFar buffer."
       ;; do initialisation if necessary and redraw the content of the buffer
       (when need-init?
 	(efar-init)
+
+	(efar-set-theme)
 	
 	;; make search processes
 	;; we do this in advance to speed up search process
@@ -771,8 +664,8 @@ REINIT? is a boolean indicating that configuration should be generated enew."
   (efar-set '(:long) :panels :left :view :search :file-disp-mode)
   (efar-set 1 :panels :left :view :dir-diff :column-number)
   (efar-set '(:short) :panels :left :view :dir-diff :file-disp-mode)
-  (efar-set 1 :panels :left :view :search-history :column-number)
-  (efar-set '(:short) :panels :left :view :search-history :file-disp-mode)
+  (efar-set 1 :panels :left :view :search-hist :column-number)
+  (efar-set '(:short) :panels :left :view :search-hist :file-disp-mode)
   
   (efar-set 1 :panels :right :view :files :column-number)
   (efar-set '(:short :long :detailed :full) :panels :right :view :files :file-disp-mode)
@@ -788,8 +681,8 @@ REINIT? is a boolean indicating that configuration should be generated enew."
   (efar-set '(:long) :panels :right :view :search :file-disp-mode)
   (efar-set 1 :panels :right :view :dir-diff :column-number)
   (efar-set '(:short) :panels :right :view :dir-diff :file-disp-mode)
-  (efar-set 1 :panels :right :view :search-history :column-number)
-  (efar-set '(:short) :panels :right :view :search-history :file-disp-mode)
+  (efar-set 1 :panels :right :view :search-hist :column-number)
+  (efar-set '(:short) :panels :right :view :search-hist :file-disp-mode)
   
   (efar-set nil :last-auto-read-buffer)
   
@@ -979,7 +872,6 @@ Notifications in the queue will be processed only if there are no new notificati
 				 (lambda()
 				   (efar-process-pending-notifications)))
 		    :notification-timer))))))
-
 
 (defun efar-process-pending-notifications ()
   "Process all pending file notifications."
@@ -2837,12 +2729,12 @@ otherwise redraw all."
 			 (not efar-search-running-p)))
 	    
 	    (setf str (substring (efar-get :panels side :sort-function-name) 0 1))
-	    (efar-place-item col 1 str 'efar-header-face nil nil nil nil nil
+	    (efar-place-item col 1 str 'efar-controls-face nil nil nil nil nil
 			     (list (cons :side side) (cons :control :sort-func))
 			     'hand)
 	    
 	    (setf str (if (efar-get :panels side :sort-order) (char-to-string 9660) (char-to-string 9650)))
-	    (efar-place-item (+ col 1) 1 str 'efar-header-face nil nil nil nil nil
+	    (efar-place-item (+ col 1) 1 str 'efar-controls-face nil nil nil nil nil
 			     (list (cons :side side) (cons :control :sort-order))
 			     'hand)))
 
@@ -2851,23 +2743,23 @@ otherwise redraw all."
 	  (setf str (if efar-dir-diff-show-changed-only-p
 			"[a]"
 		      "[A]"))
-	  (efar-place-item col 1 str 'efar-header-face nil nil nil nil nil
+	  (efar-place-item col 1 str 'efar-controls-face nil nil nil nil nil
 			   (list (cons :control :dir-diff-display-changed-only))
 			   'hand)
 	 
-	  (efar-place-item (+ col 4) 1 "[" 'efar-header-face)
+	  (efar-place-item (+ col 4) 1 "[" 'efar-controls-face)
 	  (let ((cnt 5))
 	    (cl-loop for par in efar-dir-diff-comp-params do
 		     (efar-place-item (+ col cnt) 1
 				      (if (member par efar-dir-diff-actual-comp-params)
 					  (capitalize (substring (symbol-name par) 1 2))
 					(substring (symbol-name par) 1 2))
-				      'efar-header-face
+				      'efar-controls-face
 				      nil nil nil nil nil
 				      (list (cons :param par) (cons :control :dir-diff-comp-param-switcher))
 				      'hand)
 		     (cl-incf cnt))
-	    (efar-place-item (+ col cnt) 1 "]" 'efar-header-face)))
+	    (efar-place-item (+ col cnt) 1 "]" 'efar-controls-face)))
 	
 	;; output filter string
 	(unless (and (string-empty-p filter)
@@ -2880,7 +2772,7 @@ otherwise redraw all."
 	
 	;; output control for changing column number and panel mode
 	(setf str (concat "- " (int-to-string column-number) " +"))
-	(efar-place-item nil 1 str 'efar-header-face nil nil side :center nil
+	(efar-place-item nil 1 str 'efar-controls-face nil nil side :center nil
 			 (list (cons :side side) (cons :control :col-number))
 			 'hand)
 	
@@ -2891,7 +2783,7 @@ otherwise redraw all."
 	 	      (:long "L")
 	 	      (:detailed "D")
 		      (:full "F")))
-	  (efar-place-item (+ col (- (efar-panel-width side) 3)) 1 str 'efar-header-face nil nil nil nil nil
+	  (efar-place-item (+ col (- (efar-panel-width side) 3)) 1 str 'efar-controls-face nil nil nil nil nil
 			   (list (cons :side side) (cons :control :file-disp-mode))
 			   'hand))
 	
@@ -2899,7 +2791,7 @@ otherwise redraw all."
 	(setf str (if (equal (efar-get :mode) :both)
 	 	      (char-to-string 9633)
 	 	    (char-to-string 8213)))
-	(efar-place-item (+ col (- (efar-panel-width side) 1)) 1 str 'efar-header-face nil nil nil nil nil
+	(efar-place-item (+ col (- (efar-panel-width side) 1)) 1 str 'efar-controls-face nil nil nil nil nil
 			 (list (cons :side side) (cons :control :maximize))
 			 'hand)))))
 
@@ -3520,17 +3412,17 @@ lower case, upper case or will be capitalized."
 				      (let* ((button (button-at (point)))
 					     (file (when button (button-get button :file)))
 					     (line-number (when button (button-get button :line-number))))
-					;; if buton exists
+					;; if buton exists at point
 					(if button
 					    (progn
-					      ;; do replacement in the corrsponding file
+					      ;; do replacement in the corresponding file
 					      (when replace
 						(efar-retry-when-error (efar-batch-replace-in-file file regexp replacement line-number)))
 					      (read-only-mode 0)
 					      ;; delete processed line from the buffer
 					      (delete-region (line-beginning-position) (1+ (line-end-position)))
-					      ;; if thatwas a line representing file name
-					      ;; delete all source line belonging to that file
+					      ;; if that was a line representing file name
+					      ;; delete all source lines belonging to that file
 					      (unless line-number
 						(while (and (button-at (point))
 							    (button-get (button-at (point)) :line-number))
@@ -4490,9 +4382,6 @@ Child items are not taken into account if DONT-CHECK-CHILDREN is not nil."
     (setq efar-search-running-p nil)
     (setq efar-dir-diff-running-p nil))
   
-  ;; init efar if needed
-  ;;(efar nil nil t)
-  
   (unless (or efar-search-running-p
 	      efar-dir-diff-running-p)
 
@@ -4514,7 +4403,6 @@ Child items are not taken into account if DONT-CHECK-CHILDREN is not nil."
 							(cons :include include-masks)
 							(cons :exclude exclude-masks)
 							(cons :start-time (time-to-seconds (current-time)))))
-	  
 	  
 	  (setq efar-dir-diff-results (make-hash-table :test 'equal))
 	  (setq efar-dir-diff-running-p t)
@@ -5011,5 +4899,223 @@ Go to parent directory when GO-TO-PARENT? is not nil."
     (add-hook 'window-configuration-change-hook #'efar-window-conf-changed)
     (add-hook 'kill-buffer-hook #'efar-buffer-killed nil 'local)
     (add-hook 'kill-emacs-hook #'efar-emacs-killed)))
+
+;;--------------------------------------------------------------------------------
+;; eFar color themes
+;;--------------------------------------------------------------------------------
+;; FACES
+(defface efar-border-line-face
+  '((t :foreground "white"
+       :background "navy"
+       :underline nil))
+  "Border line face")
+
+(defface efar-file-face
+  '((t :foreground "deep sky blue"
+       :background "navy"
+       :underline nil))
+  "File item style (default)")
+
+(defface efar-file-executable-face
+  '((t :foreground "green"
+       :background "navy"
+       :underline nil))
+  "File item style (executable file)")
+
+(defface efar-file-current-executable-face
+  '((t :foreground "green"
+       :background "cadet blue"
+       :underline nil))
+  "Current file item style (executable file)")
+
+(defface efar-marked-current-face
+  '((t :foreground "gold"
+       :background "cadet blue"
+       :underline nil))
+  "Current marked item style")
+
+(defface efar-dir-face
+  '((t :foreground "white"
+       :background "navy"
+       :underline nil))
+  "Directory item style")
+
+(defface efar-file-current-face
+  '((t :foreground "black"
+       :background "cadet blue"
+       :underline nil))
+  "Current file item style")
+
+(defface efar-dir-current-face
+  '((t :foreground "black"
+       :background "cadet blue"
+       :underline nil))
+  "Current directory item style")
+
+(defface efar-marked-face
+  '((t :foreground "gold"
+       :background "navy"
+       :underline nil))
+  "Marked item style")
+
+(defface efar-marked-current-face
+  '((t :foreground "gold"
+       :background "cadet blue"
+       :underline nil))
+  "Current marked item style")
+
+(defface efar-dir-name-face
+  '((t :foreground "white"
+       :background "navy"
+       :underline nil))
+  "Directory name header style")
+
+(defface efar-controls-face
+  '((t :foreground "orange"
+       :background "navy"
+       :underline nil))
+  "Header style")
+
+(defface efar-dir-name-current-face
+  '((t :foreground "navy"
+       :background "bisque"
+       :underline nil))
+  "Current directory name header style")
+
+(defface efar-non-existing-file-face
+  '((t :foreground "red"
+       :background "navy"
+       :underline nil))
+  "Style for non-existing files (in bookmarks and directory history")
+
+(defface efar-non-existing-current-file-face
+  '((t :foreground "red"
+       :background "bisque"
+       :underline nil))
+  "Style for non-existing current files (in bookmarks and directory history")
+
+;; efar color themes
+(defvar efar-themes (list (cons :blue
+				(list (cons :background-color "navy")
+				      (cons :current-background-color "cadet blue")
+				      (cons :border-color "white")
+				      (cons :current-executable-color "green")
+				      (cons :executable-color "green")
+				      (cons :marked-color "gold")
+				      (cons :marked-current-color "gold")
+				      (cons :controls-color "orange")
+				      (cons :current-header-background-color "bisque")
+				      (cons :current-header-foreground-color "navy")
+				      (cons :non-existing-color "red")
+				      (cons :non-existing-current-color "red")
+				      (cons :file-color "deep sky blue")
+				      (cons :current-file-color "blue")
+				      (cons :dir-color "white")
+				      (cons :current-dir-color "white")))
+			  (cons :black
+				(list (cons :background-color "black")
+				      (cons :current-background-color "grey")
+				      (cons :border-color "white")
+				      (cons :current-executable-color "dark green")
+				      (cons :executable-color "green")
+				      (cons :marked-color "gold")
+				      (cons :marked-current-color "gold")
+				      (cons :controls-color "orange")
+				      (cons :current-header-background-color "bisque")
+				      (cons :current-header-foreground-color "navy")
+				      (cons :non-existing-color "red")
+				      (cons :non-existing-current-color "red")
+				      (cons :file-color "blue")
+				      (cons :current-file-color "blue")
+				      (cons :dir-color "white")
+				      (cons :current-dir-color "black")))
+			  (cons :white
+				(list (cons :background-color "seashell1")
+				      (cons :current-background-color "light grey")
+				      (cons :border-color "black")
+				      (cons :current-executable-color "sea green")
+				      (cons :executable-color "sea green")
+				      (cons :marked-color "gold")
+				      (cons :marked-current-color "gold")
+				      (cons :controls-color "orange")
+				      (cons :current-header-background-color "bisque")
+				      (cons :current-header-foreground-color "navy")
+				      (cons :non-existing-color "red")
+				      (cons :non-existing-current-color "red")
+				      (cons :file-color "blue")
+				      (cons :current-file-color "blue")
+				      (cons :dir-color "black")
+				      (cons :current-dir-color "black")))
+			  (cons :sand
+				(list (cons :background-color "#fcf6bd")
+				      (cons :current-background-color "LightGoldenrod2")
+				      (cons :border-color "black")
+				      (cons :current-executable-color "sea green")
+				      (cons :executable-color "sea green")
+				      (cons :marked-color "gold")
+				      (cons :marked-current-color "gold")
+				      (cons :controls-color "orange3")
+				      (cons :current-header-background-color "LightGoldenrod3")
+				      (cons :current-header-foreground-color "navy")
+				      (cons :non-existing-color "red")
+				      (cons :non-existing-current-color "red")
+				      (cons :file-color "blue")
+				      (cons :current-file-color "blue")
+				      (cons :dir-color "black")
+				      (cons :current-dir-color "black")))))
+
+(defun efar-change-theme ()
+  "Switch color theme to the next one."
+  (let* ((theme-names (mapcar (lambda(e) (car e)) efar-themes))
+	 (current-theme-name (or (efar-get :theme) (car (mapcar (lambda(e) (car e)) efar-themes))))
+	 (next-theme-name (nth (+ 1 (or (cl-position current-theme-name theme-names) -1)) theme-names))
+	 (theme (assoc (or next-theme-name (car theme-names)) efar-themes)))
+    (efar-set-theme (car theme))))
+    
+(defun efar-set-theme (&optional theme-name)
+  "Set color theme to THEME-NAME."
+  (let* ((theme-names (mapcar (lambda(e) (car e)) efar-themes))
+	 (theme-name (or theme-name
+			 (or (efar-get :theme)
+			     (car (mapcar (lambda(e) (car e)) efar-themes)))))
+	 (theme (or (assoc (or theme-name (car theme-names)) efar-themes)
+		    (cdr (car efar-themes )))))
+
+    (efar-set (car theme) :theme)
+    (set-face-background 'efar-border-line-face (cdr (assoc :background-color (cdr theme))))
+    (set-face-foreground 'efar-border-line-face (cdr (assoc :border-color (cdr theme))))
+
+    (set-face-background 'efar-file-face (cdr (assoc :background-color (cdr theme))))
+    (set-face-foreground 'efar-file-face (cdr (assoc :file-color (cdr theme))))
+    (set-face-background 'efar-file-current-face (cdr (assoc :current-background-color (cdr theme))))
+    (set-face-foreground 'efar-file-current-face (cdr (assoc :current-file-color (cdr theme))))
+    
+    (set-face-background 'efar-file-executable-face (cdr (assoc :background-color (cdr theme))))
+    (set-face-foreground 'efar-file-executable-face (cdr (assoc :executable-color (cdr theme))))
+    (set-face-background 'efar-file-current-executable-face (cdr (assoc :current-background-color (cdr theme))))
+    (set-face-foreground 'efar-file-current-executable-face (cdr (assoc :current-executable-color (cdr theme))))
+
+    (set-face-background 'efar-marked-face (cdr (assoc :background-color (cdr theme))))
+    (set-face-foreground 'efar-marked-face (cdr (assoc :marked-color (cdr theme))))
+    (set-face-background 'efar-marked-current-face (cdr (assoc :current-background-color (cdr theme))))
+    (set-face-foreground 'efar-marked-current-face (cdr (assoc :marked-current-color (cdr theme))))
+
+    (set-face-background 'efar-dir-face (cdr (assoc :background-color (cdr theme))))
+    (set-face-foreground 'efar-dir-face (cdr (assoc :dir-color (cdr theme))))
+    (set-face-background 'efar-dir-current-face (cdr (assoc :current-background-color (cdr theme))))
+    (set-face-foreground 'efar-dir-current-face (cdr (assoc :current-dir-color (cdr theme))))
+
+    (set-face-background 'efar-dir-name-face (cdr (assoc :background-color (cdr theme))))
+    (set-face-foreground 'efar-dir-name-face (cdr (assoc :border-color (cdr theme))))
+    (set-face-background 'efar-dir-name-current-face (cdr (assoc :current-header-background-color (cdr theme))))
+    (set-face-foreground 'efar-dir-name-current-face (cdr (assoc :current-header-foreground-color (cdr theme))))
+
+    (set-face-background 'efar-non-existing-file-face (cdr (assoc :background-color (cdr theme))))
+    (set-face-foreground 'efar-non-existing-file-face (cdr (assoc :non-existing-color (cdr theme))))
+    (set-face-background 'efar-non-existing-current-file-face (cdr (assoc :current-background-color (cdr theme))))
+    (set-face-foreground 'efar-non-existing-current-file-face (cdr (assoc :non-existing-current-color (cdr theme))))
+    
+    (set-face-background 'efar-controls-face (cdr (assoc :background-color (cdr theme))))
+    (set-face-foreground 'efar-controls-face (cdr (assoc :controls-color (cdr theme))))))
 
 ;;; efar.el ends here
