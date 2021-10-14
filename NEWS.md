@@ -2,9 +2,13 @@
 
 ## Change log
 
+### Version 1.25
+* **New**: Color themes  
+Press **\<C-t\>** to switch color theme. For now four themes available: blue, black, white and sand.
+
 ### Version 1.24
 * **New**: Search history  
-From now all search requests and results are stored in search history.  
+From now on all search requests and results are stored in search history.  
 Search history by default opened with **\<C-f7\>**.  
 When eFar restarts search history is cleaned up.
 * **New**: Blink red in status bar on errors/warning.
