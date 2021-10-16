@@ -24,13 +24,14 @@
 
 ;;; Commentary:
 
-;; This package provides FAR-like file manager.
+;; This package provides FAR-like file manager with some extended
+;; functionality, like file search, directory comparison, etc.
 
 ;; To start eFar just type M-x efar.
 ;; When Efar is called with universal argument (C-u M-x efar),
 ;; default-directory of actual buffer is automatically opened in left panel.
 
-;; Press C-? to show buffer with all available key bindings.
+;; Press <C-e ?> to show buffer with all available key bindings.
 
 ;; Use M-x customize to configure numerous eFar parameters.
 
@@ -743,7 +744,15 @@ from version FROM-VERSION to actual version."
 	    (efar-set '(:short) :panels :left :view :search-hist :file-disp-mode)
 	    (efar-set 1 :panels :right :view :search-hist :column-number)
 	    (efar-set '(:short) :panels :right :view :search-hist :file-disp-mode)
-	    (message "eFar state file upgraded to version 1.24")))
+	    (message "eFar state file upgraded to version 1.24"))
+	  ;; 1.25 -> 1.26
+	  (when (< from-version 1.26)
+	    (let ((b (get-buffer-create "Efar 1.26")))
+	      (with-current-buffer b
+		(insert (propertize
+			 "Starting from version 1.26 default eFar key bindings changed according to the Emacs Key Binding Conventions.\nCheck actual key bindings by <C-e ?>.\nSee also Readme at https://github.com/suntsov/efar"
+			 'face '(:foreground "red"))))
+	      (switch-to-buffer-other-window b))))
       
       (error
        (message "Error occured during upgrading state file: %s. State file skipped." (error-message-string err))
