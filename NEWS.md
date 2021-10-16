@@ -2,6 +2,12 @@
 
 ## Change log
 
+### Version 1.26
+* **New**: The way of key binding castomization changed. See [Readme](README.md) for details.  
+Default eFar key bindings used in previous versions have been changed according to the [Emacs Key Binding Conventions](https://www.gnu.org/software/emacs/manual/html_node/elisp/Key-Binding-Conventions.html).  
+  Actual key bindings you can check by **C-e ? (M-x efar-do-show-help)**  
+  In case if you'd like to get back to previous configuration you can load [get-back-keys.el](adds/get-back-keys.el) in your Emacs init file.  
+
 ### Version 1.25
 * **New**: Color themes  
 Press **\<C-t\>** to switch color theme. For now four themes available: blue, black, white and sand.
