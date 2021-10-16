@@ -7,7 +7,7 @@ This package provides FAR-like file manager for Emacs.
 ![](efar.png)
 
 ## Please note!
-In version 1.26 default eFar key bindings used in previous versions have been changed according to the [Emacs Key Binding Conventions](https://www.gnu.org/software/emacs/manual/html_node/elisp/Key-Binding-Conventions.html).  
+In version 1.26 some default eFar key bindings have been changed according to the [Emacs Key Binding Conventions](https://www.gnu.org/software/emacs/manual/html_node/elisp/Key-Binding-Conventions.html).  
 
 Actual key bindings you can check by **C-e ? (M-x efar-do-show-help)**  
 
