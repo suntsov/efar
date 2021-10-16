@@ -163,7 +163,7 @@ Many operations within eFar buffer can be performed using mouse
 * numerous customizable parameters available via **M-x efar-customize**
 
 ### How to customize eFar key bindings?
-Suppose you want to replace default binding **\<up\>** by **C-p** for command **efar-do-move-down**.  
+Suppose you want to replace default binding **\<up\>** by **C-p** for command **efar-do-move-up**.  
 Then add following code to your init file:  
 ```
 (eval-after-load 'efar
