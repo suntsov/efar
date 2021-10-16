@@ -1005,16 +1005,27 @@ When NOTIFY-WITH-COLOR? is t then blink red."
      (with-current-buffer buffer
        (read-only-mode -1)
        (erase-buffer)
+
+       (insert (propertize "How to customize eFar key bindings?\n\n" 'face 'bold))
+       (insert (format "Suppose you want to replace default binding %s by %s for command %s.\n"
+		       (propertize "<up>" 'face 'bold)
+		       (propertize "C-p" 'face 'bold)
+		       (propertize "efar-do-move-down" 'face 'bold)))
+       (insert "Then add following code to your init file:\n\n")
+       
+       (insert (propertize "(eval-after-load 'efar\n  '(progn\n    (define-key efar-mode-map (kbd \"<up>\") nil)\n    (define-key efar-mode-map (kbd \"C-p\") 'efar-do-move-up)))\n\n" 'face 'italic))
+       (insert "If you like to just add an additional binding and keep default one then the first 'define-key' is not needed.\n\n\n")
+       (insert "Bellow is a list of currently configured bindings:\n\n")
        
        (cl-loop for func in (let ((funcs '()))
-			      (map-keymap (lambda (e d) (when (and e d (symbolp d)) (push  d funcs))) efar-mode-map)
+			      (cl--map-keymap-recursively (lambda (e d) (when (and e d (symbolp d)) (cl-pushnew  d funcs))) efar-mode-map)
 			      funcs) do
-			      (let* ((keys (with-current-buffer efar-buffer-name (where-is-internal func)))
-				     (keys (mapconcat 'key-description keys ", ")))
+			      (let* ((keys (where-is-internal func efar-mode-map))
+				     (keys (mapconcat #'key-description keys ", ")))
 				(insert (format "%s\t\t%s\nM-x %s\n\n"
 						(propertize keys 'face '(:foreground "dark blue") )
 						(documentation func)
-						(symbol-name func)))))
+						(propertize (symbol-name func) 'face '(:underline t))))))
        
        (align-regexp (point-min) (point-max) "\\(\\s-*\\)\t" nil 2)
        (goto-char 0)
@@ -2020,13 +2031,13 @@ When NO-AUTO-READ? is t then no auto file read happens."
    (efar-move-cursor :up)))
 
 (defun efar-do-move-left ()
-  "Move cursor to the left."
+  "Move cursor one page up."
   (interactive)
   (efar-when-can-execute
    (efar-move-cursor :left)))
 
 (defun efar-do-move-right ()
-  "Move cursor to the right."
+  "Move cursor one page down."
   (interactive)
   (efar-when-can-execute
    (efar-move-cursor :right)))
@@ -3144,18 +3155,18 @@ widths for uid and gid columns."
 ;; Batch file renaming
 ;;--------------------------------------------------------------------------------
 (defun efar-do-run-batch-rename ()
-  "Very simple batch file renamer.
-It's allowed to use following tags in the format string:
-  <name>  -  replaced by whole file name with extension
-  <basename>  -  replaced by file name without extension
-  <ext>  -  replaced by extension with leading '.'
-  <number>  -  replaced by running number.
-
-Tags also can be written in different form:
-  <name>, <NAME>, <Name>
-
-Depending on the form corresponding part will be written in
-lower case, upper case or will be capitalized."
+  "Very simple batch file renamer."
+  ;; It's allowed to use following tags in the format string:
+  ;;   <name>  -  replaced by whole file name with extension
+  ;;   <basename>  -  replaced by file name without extension
+  ;;   <ext>  -  replaced by extension with leading '.'
+  ;;   <number>  -  replaced by running number.
+  
+  ;; Tags also can be written in different form:
+  ;;   <name>, <NAME>, <Name>
+  
+  ;; Depending on the form corresponding part will be written in
+  ;; lower case, upper case or will be capitalized.
   (interactive)
   (efar-when-can-execute
    (let* ((side (efar-get :current-panel))
@@ -3619,18 +3630,20 @@ When optional LINE-NUMBER is given then do replacement on corresponding line onl
 (defun efar-do-suggest-hint ()
   "Display in the statusbar the next tip for key bindings."
   (interactive)
-  (let* ;; get next tip number to show
-      ((hint-number (efar-get :next-hint-number))
-       ;; get functions
-       (funcs (let ((funcs '()))
-		(map-keymap (lambda (e d) (when (and e d (symbolp d)) (push  d funcs))) efar-mode-map)
+  (let* ;; get functions
+      ((funcs (let ((funcs '()))
+		(map-keymap (lambda (e d) (when (and e d (symbolp d)) (cl-pushnew  d funcs))) efar-mode-map)
 		funcs))
+       ;; get next tip number to show
+       (hint-number (if (> (efar-get :next-hint-number) (length funcs))
+			0
+		      (efar-get :next-hint-number)))
        ;; key binding to show this time
        (func (nth hint-number funcs)))
     
     ;; display tip in the statusbar
     (let* ((keys (with-current-buffer efar-buffer-name (where-is-internal func)))
-	   (keys (mapconcat 'key-description keys ", ")))
+	   (keys (mapconcat #'key-description keys ", ")))
       (efar-set-status (format "Hint: use '%s' to %s" keys (downcase (documentation func)))))
     
     ;; calculate and store next tip number
@@ -4894,23 +4907,21 @@ Go to parent directory when GO-TO-PARENT? is not nil."
     (define-key keymap (kbd "<C-right>") 'efar-do-move-end)
     (define-key keymap (kbd "RET") 'efar-do-enter-directory)
     (define-key keymap (kbd "C-<up>") 'efar-do-enter-parent)
-    (define-key keymap (kbd "C-e <f5><f5>") 'efar-do-copy)
-    (define-key keymap (kbd "C-e <f6><f6>") 'efar-do-rename)
-    (define-key keymap (kbd "C-e <f7><f7>") 'efar-do-make-dir)
-    (define-key keymap (kbd "C-e <f8><f8>") 'efar-do-delete)
-    (define-key keymap (kbd "<C-M-up>") 'efar-do-directory-history-previous)
-    (define-key keymap (kbd "<C-M-down>") 'efar-do-directory-history-next)
-    (define-key keymap (kbd "M-RET") 'efar-do-send-to-shell)
-    (define-key keymap (kbd "<M-up>") 'efar-do-scroll-other-window-up)
-    (define-key keymap (kbd "<M-down>") 'efar-do-scroll-other-window-down)
-    (define-key keymap (kbd "<insert>") 'efar-do-mark-file)
-    (define-key keymap (kbd "<C-insert>") 'efar-do-unmark-all)
-    (define-key keymap (kbd "<C-M-insert>") 'efar-do-mark-all)
+    (define-key keymap (kbd "C-e c d") 'efar-do-change-directory)
     (define-key keymap (kbd "TAB") 'efar-do-switch-to-other-panel)
     (define-key keymap (kbd "C-c TAB") 'efar-do-open-dir-other-panel)
     (define-key keymap (kbd "<f4>") 'efar-do-edit-file)
     (define-key keymap (kbd "<M-f4>") 'efar-do-open-file-in-external-app)
     (define-key keymap (kbd "<f3>") 'efar-do-read-file)
+    (define-key keymap (kbd "<insert>") 'efar-do-mark-file)
+    (define-key keymap (kbd "<C-insert>") 'efar-do-unmark-all)
+    (define-key keymap (kbd "<C-M-insert>") 'efar-do-mark-all)
+    (define-key keymap (kbd "C-e <f5><f5>") 'efar-do-copy)
+    (define-key keymap (kbd "C-e <f6><f6>") 'efar-do-rename)
+    (define-key keymap (kbd "C-e <f7><f7>") 'efar-do-make-dir)
+    (define-key keymap (kbd "C-e <f8><f8>") 'efar-do-delete)
+    (define-key keymap (kbd "<M-up>") 'efar-do-scroll-other-window-up)
+    (define-key keymap (kbd "<M-down>") 'efar-do-scroll-other-window-down)
     (define-key keymap (kbd "S-C-<left>") 'efar-do-move-splitter-left)
     (define-key keymap (kbd "S-C-<right>") 'efar-do-move-splitter-right)
     (define-key keymap (kbd "S-C-<down>") 'efar-do-move-splitter-center)
@@ -4923,22 +4934,18 @@ Go to parent directory when GO-TO-PARENT? is not nil."
     (define-key keymap (kbd "C-e v -") 'efar-do-decrease-column-number)
     (define-key keymap (kbd "C-e v m") 'efar-do-change-file-display-mode)
     (define-key keymap (kbd "C-e c p") 'efar-do-copy-file-path)
-    (define-key keymap (kbd "C-e c d") 'efar-do-change-directory)
     (define-key keymap (kbd "C-e c e") 'efar-do-ediff-files)
     (define-key keymap (kbd "C-e c s") 'efar-do-file-stat)
     (define-key keymap (kbd "C-e c o") 'efar-do-open-shell)
-    (define-key keymap (kbd "C-e <f12> <f12>") 'efar-do-reinit)
-    (define-key keymap (kbd "C-e ?") 'efar-do-show-help)
+    (define-key keymap (kbd "M-RET") 'efar-do-send-to-shell)
     (define-key keymap (kbd "C-e c b") 'efar-do-show-bookmarks)
     (define-key keymap (kbd "C-e c B") 'efar-do-add-bookmark)
     (define-key keymap (kbd "C-e c h") 'efar-do-show-directory-history)
+    (define-key keymap (kbd "<C-M-up>") 'efar-do-directory-history-previous)
+    (define-key keymap (kbd "<C-M-down>") 'efar-do-directory-history-next)
     (define-key keymap (kbd "C-e c f") 'efar-do-show-file-history)
     (define-key keymap (kbd "C-e c n") 'efar-do-run-batch-rename)
     (define-key keymap (kbd "C-e c r") 'efar-do-run-batch-replace)
-    (define-key keymap (kbd "C-t") 'efar-do-change-theme)
-    (define-key keymap (kbd "C-g") 'efar-do-abort)
-    (define-key keymap (kbd "C-n") 'efar-do-suggest-hint)
-    (define-key keymap (kbd "C-e c m") 'efar-do-show-mode-selector)
     (define-key keymap (kbd "C-e <M-f7>") 'efar-do-start-search)
     (define-key keymap (kbd "C-e <S-f7>") 'efar-do-show-search-results)
     (define-key keymap (kbd "C-e <C-f7>") 'efar-do-show-search-history)
@@ -4952,6 +4959,12 @@ Go to parent directory when GO-TO-PARENT? is not nil."
     (define-key keymap (kbd "C-e <f6> o") 'efar-do-directory-comparison-toggle-owner)
     (define-key keymap (kbd "C-e <f6> g") 'efar-do-directory-comparison-toggle-group)
     (define-key keymap (kbd "C-e <f6> m") 'efar-do-directory-comparison-toggle-modes)
+    (define-key keymap (kbd "C-e c m") 'efar-do-show-mode-selector)
+    (define-key keymap (kbd "C-e ?") 'efar-do-show-help)
+    (define-key keymap (kbd "C-t") 'efar-do-change-theme)
+    (define-key keymap (kbd "C-g") 'efar-do-abort)
+    (define-key keymap (kbd "C-e <f12> <f12>") 'efar-do-reinit)
+    (define-key keymap (kbd "C-n") 'efar-do-suggest-hint)
     
     (cl-loop for char in
 	     (list ?a ?b ?c ?d ?e ?f ?g ?h ?i ?j ?k ?l ?m ?n ?o ?p ?q ?r ?s ?t ?u ?v ?w ?x ?y ?z
@@ -4982,23 +4995,6 @@ Go to parent directory when GO-TO-PARENT? is not nil."
 					  (efar-process-mouse-event event))))
     keymap)
   "Keymap for eFar buffer.")
-
-(defun efar-remove-key (key)
-  "Unbind the KEY in `efar-mode-map'."
-  (define-key efar-mode-map key nil)
-  (setq key (cl-mapcan (lambda (k)
-                         (if (and (integerp k)
-                                  (/= (logand k ?\M-\^@) 0))
-                             (list ?\e (- k ?\M-\^@))
-                           (list k)))
-                       key))
-  (if (= (length key) 1)
-      (delete key efar-mode-map)
-    (let* ((prefix (vconcat (butlast key)))
-           (submap (lookup-key efar-mode-map prefix)))
-      (delete (last key) submap)
-      (when (= (length submap) 1)
-        (efar-remove-key prefix)))))
 
 (defvar efar-valid-keys-for-modes
   (list (cons 'efar-do-enter-parent  (list :files :dir-diff))
