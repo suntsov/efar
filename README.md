@@ -102,6 +102,7 @@ User can run actual renaming or cancel it.
 * display last search results - **C-e \<S-f7\>**
 * go to the file from search result list - **RET**
 * show buffer with detailed search results - **C-e \<C-M-f7\>**
+* open list with last search queries - **C-e \<C-f7\>**
 * it's possible to search for text in files using simple string or Emacs regular expressions
 * when opening file from the file search results an incremental search is automatically activated for the searched text
 * no external tools used for search functionality, it's completely implemented using pure elisp
