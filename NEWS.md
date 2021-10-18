@@ -2,6 +2,10 @@
 
 ## Change log
 
+### Version 1.27
+* **Bugfix**: fix color theme for directory comparison mode
+* **Bugfux**: cursor disappears when scrolling with PgDN to the bottom of long file list
+
 ### Version 1.26
 * **New**: The way of key binding castomization changed. See [Readme](README.md) for details.  
 Default eFar key bindings used in previous versions have been changed according to the [Emacs Key Binding Conventions](https://www.gnu.org/software/emacs/manual/html_node/elisp/Key-Binding-Conventions.html).  
