@@ -2011,7 +2011,14 @@ When NO-AUTO-READ? is t then no auto file read happens."
 				   (efar-set (+ start-file-number max-files-in-column)
 					     :panels side :start-file-number)))
 				;; else go to the last file in the list
-				(t (efar-set (- max-file-number start-file-number 1) :panels side :current-pos)))))
+				(t (progn
+				     (if (or (< max-file-number max-files-in-column)
+					     (< (- max-file-number start-file-number) max-files-in-column))
+					 (progn
+					   (efar-set (- max-file-number start-file-number 1) :panels side :current-pos))
+
+				       (efar-set (- max-file-number max-files-in-column) :panels side :start-file-number)
+				       (efar-set (- max-file-number (- max-file-number max-files-in-column) 1) :panels side :current-pos)))))))
 			     
 			     (efar-output-files side affected-item-numbers)
 			     
