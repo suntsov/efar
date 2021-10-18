@@ -5100,7 +5100,7 @@ Go to parent directory when GO-TO-PARENT? is not nil."
 				      (cons :current-header-foreground-color "navy")
 				      (cons :non-existing-color "red")
 				      (cons :non-existing-current-color "red")
-				      (cons :file-color "blue")
+				      (cons :file-color "dodger blue")
 				      (cons :current-file-color "blue")
 				      (cons :dir-color "ivory")
 				      (cons :current-dir-color "black")))
@@ -5158,42 +5158,53 @@ Go to parent directory when GO-TO-PARENT? is not nil."
 	 (theme (or (assoc (or theme-name (car theme-names)) efar-themes)
 		    (cdr (car efar-themes )))))
 
+    ;; main faces
     (efar-set (car theme) :theme)
     (set-face-background 'efar-border-line-face (cdr (assoc :background-color (cdr theme))))
     (set-face-foreground 'efar-border-line-face (cdr (assoc :border-color (cdr theme))))
-
     (set-face-background 'efar-file-face (cdr (assoc :background-color (cdr theme))))
     (set-face-foreground 'efar-file-face (cdr (assoc :file-color (cdr theme))))
     (set-face-background 'efar-file-current-face (cdr (assoc :current-background-color (cdr theme))))
     (set-face-foreground 'efar-file-current-face (cdr (assoc :current-file-color (cdr theme))))
-    
     (set-face-background 'efar-file-executable-face (cdr (assoc :background-color (cdr theme))))
     (set-face-foreground 'efar-file-executable-face (cdr (assoc :executable-color (cdr theme))))
     (set-face-background 'efar-file-current-executable-face (cdr (assoc :current-background-color (cdr theme))))
     (set-face-foreground 'efar-file-current-executable-face (cdr (assoc :current-executable-color (cdr theme))))
-
     (set-face-background 'efar-marked-face (cdr (assoc :background-color (cdr theme))))
     (set-face-foreground 'efar-marked-face (cdr (assoc :marked-color (cdr theme))))
     (set-face-background 'efar-marked-current-face (cdr (assoc :current-background-color (cdr theme))))
     (set-face-foreground 'efar-marked-current-face (cdr (assoc :marked-current-color (cdr theme))))
-
     (set-face-background 'efar-dir-face (cdr (assoc :background-color (cdr theme))))
     (set-face-foreground 'efar-dir-face (cdr (assoc :dir-color (cdr theme))))
     (set-face-background 'efar-dir-current-face (cdr (assoc :current-background-color (cdr theme))))
     (set-face-foreground 'efar-dir-current-face (cdr (assoc :current-dir-color (cdr theme))))
-
     (set-face-background 'efar-dir-name-face (cdr (assoc :background-color (cdr theme))))
     (set-face-foreground 'efar-dir-name-face (cdr (assoc :border-color (cdr theme))))
     (set-face-background 'efar-dir-name-current-face (cdr (assoc :current-header-background-color (cdr theme))))
     (set-face-foreground 'efar-dir-name-current-face (cdr (assoc :current-header-foreground-color (cdr theme))))
-
     (set-face-background 'efar-non-existing-file-face (cdr (assoc :background-color (cdr theme))))
     (set-face-foreground 'efar-non-existing-file-face (cdr (assoc :non-existing-color (cdr theme))))
     (set-face-background 'efar-non-existing-current-file-face (cdr (assoc :current-background-color (cdr theme))))
     (set-face-foreground 'efar-non-existing-current-file-face (cdr (assoc :non-existing-current-color (cdr theme))))
-    
     (set-face-background 'efar-controls-face (cdr (assoc :background-color (cdr theme))))
-    (set-face-foreground 'efar-controls-face (cdr (assoc :controls-color (cdr theme))))))
+    (set-face-foreground 'efar-controls-face (cdr (assoc :controls-color (cdr theme))))
+    ;; directory comparison faces
+    (set-face-background 'efar-dir-diff-equal-face (cdr (assoc :background-color (cdr theme ))))
+    (set-face-foreground 'efar-dir-diff-equal-face (cdr (assoc :dir-color (cdr theme ))))
+    (set-face-background 'efar-dir-diff-equal-current-face (cdr (assoc :current-background-color (cdr theme ))))
+    (set-face-foreground 'efar-dir-diff-equal-current-face (cdr (assoc :current-dir-color (cdr theme ))))
+    (set-face-background 'efar-dir-diff-removed-face (cdr (assoc :background-color (cdr theme ))))
+    (set-face-foreground 'efar-dir-diff-removed-face (cdr (assoc :non-existing-color (cdr theme ))))
+    (set-face-background 'efar-dir-diff-removed-current-face (cdr (assoc :current-background-color (cdr theme ))))
+    (set-face-foreground 'efar-dir-diff-removed-current-face (cdr (assoc :non-existing-current-color (cdr theme ))))
+    (set-face-background 'efar-dir-diff-new-face (cdr (assoc :background-color (cdr theme ))))
+    (set-face-foreground 'efar-dir-diff-new-face (cdr (assoc :executable-color (cdr theme ))))
+    (set-face-background 'efar-dir-diff-new-current-face (cdr (assoc :current-background-color (cdr theme ))))
+    (set-face-foreground 'efar-dir-diff-new-current-face (cdr (assoc :current-executable-color (cdr theme ))))
+    (set-face-background 'efar-dir-diff-changed-face (cdr (assoc :background-color (cdr theme ))))
+    (set-face-foreground 'efar-dir-diff-changed-face (cdr (assoc :file-color (cdr theme ))))
+    (set-face-background 'efar-dir-diff-changed-current-face (cdr (assoc :current-background-color (cdr theme ))))
+    (set-face-foreground 'efar-dir-diff-changed-current-face (cdr (assoc :current-file-color (cdr theme ))))))
 
 ;; FACES
 (defface efar-border-line-face
