@@ -644,6 +644,7 @@ Notifications in the queue will be processed only if there are no new notificati
 
 (defun efar-save-state ()
   "Save eFar state to the state file.  Data from this file is used during startup to restore last state."
+  (efar-do-abort)
   (with-temp-file efar-state-file-name
     (let ((copy (copy-hash-table efar-state)))
       
