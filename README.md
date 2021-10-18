@@ -7,7 +7,7 @@ This package provides FAR-like file manager for Emacs.
 ![](efar.png)
 
 ## Please note!
-In version 1.26 default eFar key bindings used in previous versions have been changed according to the [Emacs Key Binding Conventions](https://www.gnu.org/software/emacs/manual/html_node/elisp/Key-Binding-Conventions.html).  
+In version 1.26 some default eFar key bindings have been changed according to the [Emacs Key Binding Conventions](https://www.gnu.org/software/emacs/manual/html_node/elisp/Key-Binding-Conventions.html).  
 
 Actual key bindings you can check by **C-e ? (M-x efar-do-show-help)**  
 
@@ -102,6 +102,7 @@ User can run actual renaming or cancel it.
 * display last search results - **C-e \<S-f7\>**
 * go to the file from search result list - **RET**
 * show buffer with detailed search results - **C-e \<C-M-f7\>**
+* open list with last search queries - **C-e \<C-f7\>**
 * it's possible to search for text in files using simple string or Emacs regular expressions
 * when opening file from the file search results an incremental search is automatically activated for the searched text
 * no external tools used for search functionality, it's completely implemented using pure elisp

@@ -2,6 +2,9 @@
 
 ## Change log
 
+### In development
+* Working with archives
+
 ### Version 1.27
 * **Bugfix**: fix color theme for directory comparison mode
 * **Bugfux**: cursor disappears when scrolling with PgDN to the bottom of long file list
@@ -26,7 +29,7 @@ When eFar restarts search history is cleaned up.
 * **Bugfix**: files skipped during file search/directory comparison are not shown in the additional information results.
 * **Bugfix**: read files in normal mode (not literally) when searching text.
 
-### Version 1.23
+### Version 1.23 (Melpa stable)
 * **Bugfix**: [issue #17](https://github.com/suntsov/efar/issues/17).
   
 ### Version 1.22
