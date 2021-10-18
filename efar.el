@@ -4911,7 +4911,7 @@ Go to parent directory when GO-TO-PARENT? is not nil."
 
 (defvar efar-mode-map
   (let ((keymap (make-sparse-keymap)))
-    
+    ;; define keys for interactive functions    
     (define-key keymap (kbd "<up>") 'efar-do-move-up)
     (define-key keymap (kbd "<down>") 'efar-do-move-down)
     (define-key keymap (kbd "<left>") 'efar-do-move-left)
@@ -4982,7 +4982,8 @@ Go to parent directory when GO-TO-PARENT? is not nil."
     (define-key keymap (kbd "C-g") 'efar-do-abort)
     (define-key keymap (kbd "C-e <f12> <f12>") 'efar-do-reinit)
     (define-key keymap (kbd "C-n") 'efar-do-suggest-hint)
-    
+
+    ;; define keys for live filtering 
     (cl-loop for char in
 	     (list ?a ?b ?c ?d ?e ?f ?g ?h ?i ?j ?k ?l ?m ?n ?o ?p ?q ?r ?s ?t ?u ?v ?w ?x ?y ?z
 		   ?A ?B ?C ?D ?E ?F ?G ?H ?I ?J ?K ?L ?M ?N ?O ?P ?Q ?R ?S ?T ?U ?V ?W ?X ?Y ?Z
@@ -4991,11 +4992,11 @@ Go to parent directory when GO-TO-PARENT? is not nil."
 		   ?- ?_
 		   32) do
 	       (define-key keymap (kbd (char-to-string char)) `(lambda() (interactive) (efar-fast-search ,char))))
-    
     (define-key keymap (kbd "DEL") (lambda() (interactive) (efar-fast-search :back)))
     (define-key keymap (kbd "C-s") (lambda() (interactive) (efar-fast-search :next)))
     (define-key keymap (kbd "C-r") (lambda() (interactive) (efar-fast-search :prev)))
 
+    ;; define actions for mouse events
     (cl-loop for k in '("<double-mouse-1>"
 			"<mouse-1>"
 			"<wheel-down>"
