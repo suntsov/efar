@@ -4,7 +4,7 @@
 
 ;; Author: "Vladimir Suntsov" <vladimir@suntsov.online>
 ;; Maintainer: vladimir@suntsov.online
-;; Version: 1.27
+;; Version: 1.28
 ;; Package-Requires: ((emacs "26.1"))
 ;; Keywords: files
 ;; URL: https://github.com/suntsov/efar
@@ -44,7 +44,7 @@
 (require 'esh-mode)
 (require 'em-dirs)
 
-(defconst efar-version 1.27 "Current eFar version number.")
+(defconst efar-version 1.28 "Current eFar version number.")
 
 (defvar efar-state nil)
 (defvar efar-mouse-down-p nil)
@@ -813,14 +813,14 @@ Otherwise ask user where to copy/move files to."
 	     (when files
 	       
 	       (let ((destination (or dest
-				      (read-directory-name (if (equal operation :copy)
-							       "Copy selected file(s) to "
-							     "Move selected file(s) to ")
-							   (file-name-as-directory todir)
-							   nil
-							   nil
-							   ;;when only one file is selected we add file name to proposed path
-							   (when (equal (length files) 1) (efar-get-short-file-name (car files)))))))
+				      (read-file-name (if (equal operation :copy)
+							  "Copy selected file(s) to "
+							"Move selected file(s) to ")
+						      (file-name-as-directory todir)
+						      nil
+						      nil
+						      ;;when only one file is selected we add file name to proposed path
+						      (when (equal (length files) 1) (efar-get-short-file-name (car files)))))))
 		 
 		 (efar-set-status (if (equal operation :copy)
 				      "Copying files..."
@@ -862,7 +862,7 @@ User also can select an option to overwrite all remaining files to not be asked 
 			       ((and (not (equal (cadr f) t)) (not (file-exists-p newfile)))
 				;; we just copy it using elisp function
 				(if (equal operation :copy)
-				    (efar-retry-when-error (copy-file (car f) newfile))
+				      (efar-retry-when-error (copy-file (car f) newfile))
 				  (efar-retry-when-error (rename-file (car f) newfile nil))))
 			       			       
 			       ;; if file is a directory and doesn't exist in destination folder
@@ -904,10 +904,10 @@ PROMPT is a string to prompt with.
 OPTIONS is a collection with possible answers."
   (let* ((completion-ignore-case t)
 	 (options (or options '("Yes" "No")))
-	 (prompt (concat prompt " ("
-			 (mapconcat #'identity options " | ")
-			 ") ")))
-    (completing-read prompt options nil t nil 'options (car options))))
+	 (prompt (format "%s (%s)"
+			 prompt
+			 (mapconcat #'identity options " | "))))
+    (completing-read prompt options nil t nil nil (car options))))
 
 (defun efar-do-delete ()
   "Delete files."
@@ -1412,7 +1412,7 @@ K is a character typed by the user."
     ;; if a printable character was pressed
     ;; add it to the end of search string
     (unless (member k '(:next :prev :back :clear))
-      (setf str (concat str (format "%c" k))))
+      (setf str (format "%s%c" (or str "") k)))
     
     ;; if user entered at least one character
     ;; we can navigate to file(s) with matching name
@@ -2029,7 +2029,7 @@ When NO-AUTO-READ? is t then no auto file read happens."
 			     
 			     (condition-case err
 				 (unless no-auto-read? (efar-auto-read-file))
-			       (error (efar-set-status (concat "Error: "(error-message-string err)) nil t t)))))))
+			       (error (efar-set-status (format "Error: %s"(error-message-string err)) nil t t)))))))
 	
 	(move-for-side side)
 	(when (equal panel-mode :dir-diff)
@@ -2038,38 +2038,32 @@ When NO-AUTO-READ? is t then no auto file read happens."
 (defun efar-do-move-down ()
   "Move cursor down."
   (interactive)
-  (efar-when-can-execute
-   (efar-move-cursor :down)))
+  (efar-move-cursor :down))
   
 (defun efar-do-move-up ()
   "Move cursor up."
   (interactive)
-  (efar-when-can-execute
-   (efar-move-cursor :up)))
+  (efar-move-cursor :up))
 
 (defun efar-do-move-left ()
   "Move cursor one page up."
   (interactive)
-  (efar-when-can-execute
-   (efar-move-cursor :left)))
+  (efar-move-cursor :left))
 
 (defun efar-do-move-right ()
   "Move cursor one page down."
   (interactive)
-  (efar-when-can-execute
-   (efar-move-cursor :right)))
+  (efar-move-cursor :right))
 
 (defun efar-do-move-home ()
   "Move cursor to the beginning of the file list."
   (interactive)
-  (efar-when-can-execute
-   (efar-move-cursor :home)))
+  (efar-move-cursor :home))
 
 (defun efar-do-move-end ()
   "Move cursor to the end of the file list."
   (interactive)
-  (efar-when-can-execute
-   (efar-move-cursor :end)))
+  (efar-move-cursor :end))
 
 (defun efar-auto-read-file ()
   "Automatically show content of the directory or file under cursor."
