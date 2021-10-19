@@ -5,6 +5,10 @@
 ### In development
 * Working with archives
 
+### Version 1.28
+* **Bugfix**: fix errors on removal, renaming/copying when helm is activated 
+* **Performance**: don't refresh whole eFar when moving cursor
+
 ### Version 1.27
 * **Bugfix**: fix color theme for directory comparison mode
 * **Bugfux**: cursor disappears when scrolling with PgDN to the bottom of long file list
