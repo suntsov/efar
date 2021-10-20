@@ -257,7 +257,8 @@
 (defmacro efar-when-can-execute(&rest body)
   "Execute BODY only if command is allowed in current panel mode."
   `(progn
-     (efar nil)
+     (unless (get-buffer-window efar-buffer-name)
+       (efar nil))
      (let ((mode (efar-get :panels (efar-get :current-panel) :mode))
 	   (def (assoc this-command efar-valid-keys-for-modes)))
        
