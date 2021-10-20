@@ -5350,6 +5350,26 @@ Go to parent directory when GO-TO-PARENT? is not nil."
   ""
   :group 'efar-faces)
 
+;;--------------------------------------------------------------------------------
+;; eFar working with archives
+;;--------------------------------------------------------------------------------
+(defun efar-archive-list-commands ()
+  '(("zip" . "unzip -Z -1 %s")
+    ("tar" . "tar -t -f %s")))
+
+(defun efar-archive-build-file-list (archive)
+  ""
+  (let* ((ext (file-name-extension archive))
+	 (list-command (format (cdr (assoc ext (efar-archive-list-commands))) archive))
+	 (file-list (shell-command-to-string list-command)))
+    
+    (let ((files '()))
+      (cl-loop for file in (split-string file-list "[\n]+") do
+	       (unless (string-empty-p file)
+		 (push (list file (directory-name-p file) (efar-get-parent-dir file)) files)))
+      (print files))))
+    
+
 (provide 'efar)
 
 ;;; efar.el ends here
