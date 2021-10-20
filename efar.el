@@ -4,7 +4,7 @@
 
 ;; Author: "Vladimir Suntsov" <vladimir@suntsov.online>
 ;; Maintainer: vladimir@suntsov.online
-;; Version: 1.28
+;; Version: 1.29
 ;; Package-Requires: ((emacs "26.1"))
 ;; Keywords: files
 ;; URL: https://github.com/suntsov/efar
@@ -44,7 +44,7 @@
 (require 'esh-mode)
 (require 'em-dirs)
 
-(defconst efar-version 1.28 "Current eFar version number.")
+(defconst efar-version 1.29 "Current eFar version number.")
 
 (defvar efar-state nil)
 (defvar efar-mouse-down-p nil)
@@ -286,7 +286,9 @@ When NO-SWITCH? is t then don't switch to eFar buffer."
        (go-to-dir (when arg default-directory)))
     
     (with-current-buffer efar-buffer
-      
+
+      (buffer-disable-undo)
+
       (unless (equal major-mode 'efar-mode)
 	(efar-mode))
       ;; do initialisation if necessary and redraw the content of the buffer
@@ -4905,7 +4907,7 @@ Go to parent directory when GO-TO-PARENT? is not nil."
 
 (defvar efar-mode-map
   (let ((keymap (make-sparse-keymap)))
-    ;; define keys for interactive functions    
+    ;; define keys for interactive functions
     (define-key keymap (kbd "<up>") 'efar-do-move-up)
     (define-key keymap (kbd "<down>") 'efar-do-move-down)
     (define-key keymap (kbd "<left>") 'efar-do-move-left)
@@ -5349,7 +5351,7 @@ Go to parent directory when GO-TO-PARENT? is not nil."
        :underline nil))
   ""
   :group 'efar-faces)
-
+	 
 (provide 'efar)
 
 ;;; efar.el ends here
