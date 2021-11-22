@@ -1,6 +1,7 @@
 ;;; efar.el --- FAR-like file manager -*- lexical-binding: t; -*-
 
 ;; Copyright (C) 2021 Vladimir Suntsov
+;; SPDX-License-Identifier: GPL-2.0-or-later
 
 ;; Author: "Vladimir Suntsov" <vladimir@suntsov.online>
 ;; Maintainer: vladimir@suntsov.online
