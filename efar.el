@@ -4,7 +4,7 @@
 
 ;; Author: "Vladimir Suntsov" <vladimir@suntsov.online>
 ;; Maintainer: vladimir@suntsov.online
-;; Version: 1.28
+;; Version: 1.29
 ;; Package-Requires: ((emacs "26.1"))
 ;; Keywords: files
 ;; URL: https://github.com/suntsov/efar
@@ -44,7 +44,7 @@
 (require 'esh-mode)
 (require 'em-dirs)
 
-(defconst efar-version 1.28 "Current eFar version number.")
+(defconst efar-version 1.29 "Current eFar version number.")
 
 (defvar efar-state nil)
 (defvar efar-mouse-down-p nil)
@@ -257,7 +257,8 @@
 (defmacro efar-when-can-execute(&rest body)
   "Execute BODY only if command is allowed in current panel mode."
   `(progn
-     (efar nil)
+     (unless (get-buffer-window efar-buffer-name)
+       (efar nil))
      (let ((mode (efar-get :panels (efar-get :current-panel) :mode))
 	   (def (assoc this-command efar-valid-keys-for-modes)))
        
@@ -286,7 +287,9 @@ When NO-SWITCH? is t then don't switch to eFar buffer."
        (go-to-dir (when arg default-directory)))
     
     (with-current-buffer efar-buffer
-      
+
+      (buffer-disable-undo)
+
       (unless (equal major-mode 'efar-mode)
 	(efar-mode))
       ;; do initialisation if necessary and redraw the content of the buffer
@@ -1055,7 +1058,8 @@ When NOTIFY-WITH-COLOR? is t then blink red."
      ;; BUTTON DOWN
      ((or (equal "down-mouse-1" (symbol-name click-type))
 	  (equal "C-down-mouse-1" (symbol-name click-type))
-	  (equal "S-down-mouse-1" (symbol-name click-type)))
+	  (equal "S-down-mouse-1" (symbol-name click-type))
+	  (equal "down-mouse-3" (symbol-name click-type)))
       (efar-process-mouse-down event))
      
      ;; MOUSE DRAG HAPPENED
@@ -1069,6 +1073,7 @@ When NOTIFY-WITH-COLOR? is t then blink red."
      
      ;; BUTTON CLICKED
      ((or (equal "mouse-1" (symbol-name click-type))
+	  (equal "mouse-3" (symbol-name click-type))
 	  (equal "double-mouse-1" (symbol-name click-type))
 	  (equal "C-mouse-1" (symbol-name click-type))
 	  (equal "S-mouse-1" (symbol-name click-type)))
@@ -1201,7 +1206,8 @@ The point where mouse click occurred determined out of EVENT parameters."
       (efar-auto-read-file))
     
     ;; when clicked with ctrl we mark single item
-    (when (equal click-type 'C-mouse-1)
+    (when (or (equal click-type 'C-mouse-1)
+	      (equal click-type 'mouse-3))
       (efar-mark-file t))
     
     ;; when clicked with shift we mark all items between clicked item and item marked last time
@@ -2296,21 +2302,19 @@ Execute it unless DONT-RUN? is t."
   (interactive)
   (efar-when-can-execute
    (efar-quit-fast-search)
-   (when (equal (efar-get :mode) :both)
-     (let ((side (efar-get :current-panel)))
-       
-       (if (equal side  :left)
-	   (progn
-	     (efar-set :right :current-panel)
-	     (setf default-directory (if (equal :dir-diff (efar-get :panels :right :mode))
-					 (cdr (assoc :right efar-dir-diff-last-command-params))
-				       (efar-get :panels :right :dir))))
-	 (progn
-	   (efar-set :left :current-panel)
-	   (setf default-directory (if (equal :dir-diff (efar-get :panels :right :mode))
-				       (cdr (assoc :left efar-dir-diff-last-command-params))
-				     (efar-get :panels :left :dir))))))
-     (efar-write-enable (efar-redraw)))))
+      
+   (let ((side (efar-get :current-panel))
+	 (mode (efar-get :mode)))
+
+     (efar-set (efar-other-side side) :current-panel)
+     (when (not (equal mode :both))
+       (efar-set (efar-other-side mode) :mode))
+     
+     (setf default-directory (if (equal :dir-diff (efar-get :panels :right :mode))
+ 				 (cdr (assoc (efar-get :current-panel) efar-dir-diff-last-command-params))
+			       (efar-get :panels (efar-get :current-panel) :dir))))   
+   (efar-calculate-widths)
+   (efar-write-enable (efar-redraw))))
 
 (defun efar-calculate-window-size ()
   "Calculate and set windows sizes."
@@ -4905,7 +4909,7 @@ Go to parent directory when GO-TO-PARENT? is not nil."
 
 (defvar efar-mode-map
   (let ((keymap (make-sparse-keymap)))
-    ;; define keys for interactive functions    
+    ;; define keys for interactive functions
     (define-key keymap (kbd "<up>") 'efar-do-move-up)
     (define-key keymap (kbd "<down>") 'efar-do-move-down)
     (define-key keymap (kbd "<left>") 'efar-do-move-left)
@@ -4993,6 +4997,7 @@ Go to parent directory when GO-TO-PARENT? is not nil."
     ;; define actions for mouse events
     (cl-loop for k in '("<double-mouse-1>"
 			"<mouse-1>"
+			"<mouse-3>"
 			"<wheel-down>"
 			"<wheel-up>"
 			"<C-mouse-1>"
@@ -5000,7 +5005,8 @@ Go to parent directory when GO-TO-PARENT? is not nil."
 			"<S-mouse-1>"
 			"<S-down-mouse-1>"
 			"<drag-mouse-1>"
-			"<down-mouse-1>")
+			"<down-mouse-1>"
+			"<down-mouse-3>")
 	     do
 	     (define-key keymap (kbd k) (lambda (event)
 					  (interactive "e")
@@ -5349,7 +5355,7 @@ Go to parent directory when GO-TO-PARENT? is not nil."
        :underline nil))
   ""
   :group 'efar-faces)
-
+	 
 (provide 'efar)
 
 ;;; efar.el ends here
