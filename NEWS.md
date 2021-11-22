@@ -6,7 +6,7 @@
 * Working with archives
 
 ### Version 1.30
-* **New** Enable file operation (copy, move, delete) in file search results
+* **New** Enable file operations (copy, move, delete) in file search results
 
 ### Version 1.29
 * **New** Right-click file selection (https://github.com/suntsov/efar/issues/27)
