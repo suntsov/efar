@@ -2313,7 +2313,7 @@ Execute it unless DONT-RUN? is t."
      
      (setf default-directory (if (equal :dir-diff (efar-get :panels :right :mode))
  				 (cdr (assoc (efar-get :current-panel) efar-dir-diff-last-command-params))
-			       (efar-get :panels (efar-get :current-panel) :dir))))   
+			       (efar-get :panels (efar-get :current-panel) :dir))))
    (efar-calculate-widths)
    (efar-write-enable (efar-redraw))))
 
