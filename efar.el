@@ -5,7 +5,7 @@
 
 ;; Author: "Vladimir Suntsov" <vladimir@suntsov.online>
 ;; Maintainer: vladimir@suntsov.online
-;; Version: 1.29
+;; Version: 1.30
 ;; Package-Requires: ((emacs "26.1"))
 ;; Keywords: files
 ;; URL: https://github.com/suntsov/efar
@@ -45,7 +45,7 @@
 (require 'esh-mode)
 (require 'em-dirs)
 
-(defconst efar-version 1.29 "Current eFar version number.")
+(defconst efar-version 1.30 "Current eFar version number.")
 
 (defvar efar-state nil)
 (defvar efar-mouse-down-p nil)
@@ -920,6 +920,7 @@ OPTIONS is a collection with possible answers."
    (let ((mode (efar-get :panels (efar-get :current-panel) :mode)))
      (pcase mode
        (:files (efar-delete-selected))
+       (:search (efar-delete-selected))
        (:bookmark (efar-delete-bookmark))))))
 
 (defun efar-delete-selected ()
@@ -3955,15 +3956,13 @@ Restart subprocesses finally."
    (unless (or efar-search-running-p
 	       efar-dir-diff-running-p)
      ;; gather search parameters
-     (let* ((proposed-dir (if (called-interactively-p "interactive")
-			      default-directory
-			    (let ((selected-item (caar (efar-selected-files (efar-get :current-panel) t))))
-			      (cond ((null  selected-item)
-				     default-directory)
-				    ((file-directory-p selected-item)
-				     selected-item)
-				    (t
-				     (efar-get-parent-dir selected-item))))))
+     (let* ((proposed-dir (let ((selected-item (caar (efar-selected-files (efar-get :current-panel) t))))
+			    (cond ((null  selected-item)
+				   default-directory)
+				  ((file-directory-p selected-item)
+				   selected-item)
+				  (t
+				   (efar-get-parent-dir selected-item)))))
 	    (dir (read-directory-name "Search in: " proposed-dir proposed-dir))
 	    (wildcards (split-string (read-string "File name mask(s): "
 						  (let ((wildcards (cdr (assoc :wildcards efar-search-last-command-params))))
@@ -5017,17 +5016,17 @@ Go to parent directory when GO-TO-PARENT? is not nil."
 
 (defvar efar-valid-keys-for-modes
   (list (cons 'efar-do-enter-parent  (list :files :dir-diff))
-	(cons 'efar-do-send-to-shell (list :files))
-	(cons 'efar-do-mark-file (list :files))
-	(cons 'efar-do-mark-all (list :files))
-	(cons 'efar-do-unmark-all (list :files))
+	(cons 'efar-do-send-to-shell (list :files :search))
+	(cons 'efar-do-mark-file (list :files :search))
+	(cons 'efar-do-mark-all (list :files :search))
+	(cons 'efar-do-unmark-all (list :files :search))
 	(cons 'efar-do-edit-file (list :files :search :bookmark :dir-hist :file-hist :disks :dir-diff))
 	(cons 'efar-do-open-file-in-external-app (list :files :search :bookmark :dir-hist :file-hist :disks :dir-diff))
 	(cons 'efar-do-read-file (list :files :search :bookmark :dir-hist :file-hist :disks :dir-diff))
-	(cons 'efar-do-copy (list :files))
-	(cons 'efar-do-rename (list :files))
+	(cons 'efar-do-copy (list :files :search))
+	(cons 'efar-do-rename (list :files :search))
 	(cons 'efar-do-make-dir (list :files))
-	(cons 'efar-do-delete (list :files :bookmark))
+	(cons 'efar-do-delete (list :files :bookmark :search))
 	(cons 'efar-do-change-sorting (list :files :search))
 	(cons 'efar-do-filter-files (list :files))
 	(cons 'efar-do-ediff-files (list :files :dir-diff))
