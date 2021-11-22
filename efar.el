@@ -2299,21 +2299,19 @@ Execute it unless DONT-RUN? is t."
   (interactive)
   (efar-when-can-execute
    (efar-quit-fast-search)
-   (when (equal (efar-get :mode) :both)
-     (let ((side (efar-get :current-panel)))
-       
-       (if (equal side  :left)
-	   (progn
-	     (efar-set :right :current-panel)
-	     (setf default-directory (if (equal :dir-diff (efar-get :panels :right :mode))
-					 (cdr (assoc :right efar-dir-diff-last-command-params))
-				       (efar-get :panels :right :dir))))
-	 (progn
-	   (efar-set :left :current-panel)
-	   (setf default-directory (if (equal :dir-diff (efar-get :panels :right :mode))
-				       (cdr (assoc :left efar-dir-diff-last-command-params))
-				     (efar-get :panels :left :dir))))))
-     (efar-write-enable (efar-redraw)))))
+      
+   (let ((side (efar-get :current-panel))
+	 (mode (efar-get :mode)))
+
+     (efar-set (efar-other-side side) :current-panel)
+     (when (not (equal mode :both))
+       (efar-set (efar-other-side mode) :mode))
+     
+     (setf default-directory (if (equal :dir-diff (efar-get :panels :right :mode))
+ 				 (cdr (assoc (efar-get :current-panel) efar-dir-diff-last-command-params))
+			       (efar-get :panels (efar-get :current-panel) :dir))))   
+   (efar-calculate-widths)
+   (efar-write-enable (efar-redraw))))
 
 (defun efar-calculate-window-size ()
   "Calculate and set windows sizes."
