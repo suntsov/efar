@@ -5,6 +5,9 @@
 ### In development
 * Working with archives
 
+### Version 1.30
+* **New** Enable file operation (copy, move, delete) in file search results
+
 ### Version 1.29
 * **New** Right-click file selection (https://github.com/suntsov/efar/issues/27)
 * **Bugfix** Switch to other panel by TAB in single panel mode (https://github.com/suntsov/efar/issues/26)
