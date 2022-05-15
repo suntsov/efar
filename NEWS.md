@@ -9,7 +9,7 @@
 * **Bugfix** Error when search finished caused by trying to kill already killed subprocess
 
 ### Version 1.30
-* **New** File operations in search mode
+* **New** Enable file operations (copy, move, delete) in file search results
 
 ### Version 1.29
 * **New** Right-click file selection (https://github.com/suntsov/efar/issues/27)
