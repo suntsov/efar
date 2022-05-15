@@ -5,7 +5,7 @@
 
 ;; Author: "Vladimir Suntsov" <vladimir@suntsov.online>
 ;; Maintainer: vladimir@suntsov.online
-;; Version: 1.30
+;; Version: 1.31
 ;; Package-Requires: ((emacs "26.1"))
 ;; Keywords: files
 ;; URL: https://github.com/suntsov/efar
@@ -45,7 +45,7 @@
 (require 'esh-mode)
 (require 'em-dirs)
 
-(defconst efar-version 1.30 "Current eFar version number.")
+(defconst efar-version 1.31 "Current eFar version number.")
 
 (defvar efar-state nil)
 (defvar efar-mouse-down-p nil)
@@ -3701,9 +3701,6 @@ When optional LINE-NUMBER is given then do replacement on corresponding line onl
   (when (and efar-subprocess-manager (process-live-p efar-subprocess-manager))
     (kill-process efar-subprocess-manager))
   (setq efar-subprocess-manager nil)
-  
-  (cl-loop for proc in efar-subprocess-processes do
-	   (kill-process proc))
   
   (when (and efar-subprocess-server
 	     (process-live-p efar-subprocess-server))

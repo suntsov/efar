@@ -5,6 +5,9 @@
 ### In development
 * Working with archives
 
+### Version 1.31
+* **Bugfix** Error when search finished caused by trying to kill already killed subprocess
+
 ### Version 1.30
 * **New** Enable file operations (copy, move, delete) in file search results
 
