@@ -5,6 +5,12 @@
 ### In development
 * Working with archives
 
+### Version 1.31
+* **Bugfix** Error when search finished caused by trying to kill already killed subprocess
+
+### Version 1.30
+* **New** File operations in search mode
+
 ### Version 1.29
 * **New** Right-click file selection (https://github.com/suntsov/efar/issues/27)
 * **Bugfix** Switch to other panel by TAB in single panel mode (https://github.com/suntsov/efar/issues/26)
