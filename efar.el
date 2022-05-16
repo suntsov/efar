@@ -192,6 +192,12 @@
   :group 'efar-parameters
   :type 'boolean)
 
+(defcustom efar-height-correction 0
+  "Number of lines by which to shrink eFar panel height.
+This might be useful in some cases to avoid problems in eFar displaying."
+  :group 'efar-parameters
+  :type 'integer)
+
 (defcustom efar-subprocess-max-processes 8
   "Number of subprocesses to use for file search."
   :group 'efar-search-parameters
@@ -2325,7 +2331,7 @@ Execute it unless DONT-RUN? is t."
   (let ((efar-window (get-buffer-window efar-buffer-name)))
     (efar-set (- (window-width efar-window) 1) :window-width)
     (efar-set (window-height efar-window) :window-height)
-    (efar-set (- (window-height efar-window) 6) :panel-height)))
+    (efar-set (- (window-height efar-window) 6 efar-height-correction) :panel-height)))
 
 (defun efar-redraw (&optional reread-files?)
   "The main function to output content of eFar buffer.
