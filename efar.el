@@ -807,7 +807,10 @@ from version FROM-VERSION to actual version."
   "Copy files."
   (interactive)
   (efar-when-can-execute
-   (efar-copy-or-move-files :copy)))
+   (let ((mode (efar-get :panels (efar-get :current-panel) :mode)))
+     (pcase mode
+       (:files (efar-copy-or-move-files :copy))
+       (:archive (efar-archive-copy-files))))))
 
 (defun efar-do-rename ()
   "Rename/move files."
@@ -3607,7 +3610,7 @@ When optional LINE-NUMBER is given then do replacement on corresponding line onl
       (efar-dir-diff-show-results))
 
      ((equal mode :archive)
-      (efar-archive-show side))
+      (efar-write-enable (efar-redraw t)))
      
      (t
       (efar-set mode-name :panels side :dir)
@@ -5074,7 +5077,7 @@ Go to parent directory when GO-TO-PARENT? is not nil."
 	(cons 'efar-do-edit-file (list :files :search :bookmark :dir-hist :file-hist :disks :dir-diff))
 	(cons 'efar-do-open-file-in-external-app (list :files :search :bookmark :dir-hist :file-hist :disks :dir-diff))
 	(cons 'efar-do-read-file (list :files :search :bookmark :dir-hist :file-hist :disks :dir-diff :archive))
-	(cons 'efar-do-copy (list :files :search))
+	(cons 'efar-do-copy (list :files :search :archive))
 	(cons 'efar-do-rename (list :files :search))
 	(cons 'efar-do-make-dir (list :files))
 	(cons 'efar-do-delete (list :files :bookmark :search))
@@ -5407,7 +5410,6 @@ Go to parent directory when GO-TO-PARENT? is not nil."
   ""
   :group 'efar-faces)
 
-
 ;;--------------------------------------------------------------------------------
 ;; eFar working with archives
 ;;--------------------------------------------------------------------------------
@@ -5417,10 +5419,8 @@ Go to parent directory when GO-TO-PARENT? is not nil."
 (defvar efar-archive-current-type nil)
 (defvar efar-archive-read-buffer-name nil)
 
-(makunbound 'efar-archive-configuration)
-
 (defun efar-archive-get-conf (&rest keys)
-  ""
+  "Return configuration value defined by given KEYS."
   (let ((value efar-archive-configuration))
     (cl-loop for key in keys do
 	     (setf value (cdr (assoc key value))))
@@ -5469,7 +5469,7 @@ Go to parent directory when GO-TO-PARENT? is not nil."
 				(cons :args "e -so %s %s")))))))
 
 (defun efar-archive-postprocess-7z-list ()
-  ""
+  "Extract files from the output of 7z list command."
   (let ((result))
     (goto-char (point-min))
     (search-forward "----------")
@@ -5485,7 +5485,7 @@ Go to parent directory when GO-TO-PARENT? is not nil."
      result))
 		  
 (defun efar-archive-postprocess-list ()
-  ""
+  "Extract files from the output of tar/unzip list commands."
   (let ((files))
     (cl-loop for line in (split-string  (buffer-string) "[\n]+") do
 	     (unless (string-empty-p line)
@@ -5498,7 +5498,7 @@ Go to parent directory when GO-TO-PARENT? is not nil."
      files))
 
 (defun efar-archive-build-file-list (archive type)
-  ""
+  "Get file list for ARCHIVE of type TYPE."
   (let ((command (efar-archive-get-conf type :list :command))
 	(args (efar-archive-get-conf type :list :args)))
     (unless command
@@ -5513,9 +5513,8 @@ Go to parent directory when GO-TO-PARENT? is not nil."
 	(let ((postprocessing-function (efar-archive-get-conf type :list :post-function)))
 	  (funcall postprocessing-function))))))
 
-
 (defun efar-archive-read-file ()
-  ""  
+  "Show content of selected file in other buffer."  
   (let* ((side (efar-get :current-panel))
 	 (file (car (efar-selected-files side t t))))
 
@@ -5550,7 +5549,7 @@ Go to parent directory when GO-TO-PARENT? is not nil."
     (switch-to-buffer-other-window efar-buffer-name))))
 	
 (defun efar-archive-enter-archive (side file type)
-  ""
+  "Enter archive file FILE of type TYPE under cursor in panel SIDE."
   (setf efar-archive-current-archive file)
   (setf efar-archive-current-type type)
   (setf efar-archive-files (efar-archive-build-file-list file type))
@@ -5561,12 +5560,8 @@ Go to parent directory when GO-TO-PARENT? is not nil."
 	    :panels side :dir)
   (efar-change-panel-mode :archive side))
 
-(defun efar-archive-show (side)
-  ""
-  (efar-write-enable (efar-redraw t)))
-
 (defun efar-archive-handle-enter ()
-  ""
+  "Process the press of the Enter key in archive mode."
   (let* ((side (efar-get :current-panel))
 	 (file (car (efar-selected-files side t t))))
     
@@ -5584,9 +5579,7 @@ Go to parent directory when GO-TO-PARENT? is not nil."
 		 (setf efar-archive-current-dir (efar-get-parent-dir efar-archive-current-dir))
 		 (efar-get-file-list side)
 		 
-		 (efar-go-to-file current-dir)
-		 ))
-	      
+		 (efar-go-to-file current-dir)))
 	      
 	      ((cadr file)
 	       (efar-set 0 :panels side :current-pos)
@@ -5602,7 +5595,7 @@ Go to parent directory when GO-TO-PARENT? is not nil."
 	(efar-write-enable (efar-redraw)))))))
 
 (defun efar-archive-enter-parent ()
-  ""
+  "Go to parent directory in archive mode."
   (efar-go-to-file "..")
   (efar-archive-handle-enter))
 
