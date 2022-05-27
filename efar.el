@@ -1,4 +1,4 @@
-;;; efar.el --- far-like file manager -*- lexical-binding: t; -*-
+;;; efar.el --- FAR-like file manager -*- lexical-binding: t; -*-
 
 ;; Copyright (C) 2021 Vladimir Suntsov
 ;; SPDX-License-Identifier: GPL-2.0-or-later
@@ -44,7 +44,7 @@
 (require 'eshell)
 (require 'esh-mode)
 (require 'em-dirs)
-(require 'arc-mode)
+(require 'shell)
 (defconst efar-version 1.4 "Current eFar version number.")
 (defvar efar-state nil)
 (defvar efar-mouse-down-p nil)
@@ -230,7 +230,7 @@ This might be useful in some cases to avoid problems in eFar displaying."
   :group 'efar-search-parameters
   :type 'boolean)
 
-;; macros
+;; helper macros and functions
 (defmacro efar-with-notification-disabled(&rest body)
   "Execute BODY with efar-notifications disabled."
   `(let ((file-notifier-left (efar-get :panels :left :file-notifier))
@@ -281,6 +281,17 @@ This might be useful in some cases to avoid problems in eFar displaying."
 	   (progn
 	     (efar-set-status (format "Function '%s' is not allowed in mode '%s'" this-command (symbol-name mode)) nil t t)	   )
 	 ,@body))))
+
+(defun efar-split-string-shell-command (string)
+  "Split STRING (a shell command) into a list of strings.
+General shell syntax, like single and double quoting, as well as
+backslash quoting, is respected.
+Copied of Emacs 28.1 split-string-shell-command function for the
+purpose of backward compatibility."
+  (with-temp-buffer
+    (insert string)
+    (let ((comint-file-name-quote-list shell-file-name-quote-list))
+      (car (shell--parse-pcomplete-arguments)))))
 
 ;;--------------------------------------------------------------------------------
 ;; eFar main functions
@@ -5508,7 +5519,7 @@ Go to parent directory when GO-TO-PARENT? is not nil."
       (with-temp-buffer
 	(apply #'call-process
 	       command nil t nil
-	       (split-string-shell-command args))
+	       (efar-split-string-shell-command args))
 
 	(let ((postprocessing-function (efar-archive-get-conf type :list :post-function)))
 	  (funcall postprocessing-function))))))
@@ -5542,7 +5553,7 @@ Go to parent directory when GO-TO-PARENT? is not nil."
 	  (erase-buffer)
 	  (apply #'call-process
 		 command nil t nil
-		 (split-string-shell-command args))
+		 (efar-split-string-shell-command args))
 	  (goto-char (point-min)))
 	
 	(switch-to-buffer-other-window buffer)))
