@@ -1,4 +1,4 @@
-;;; efar.el --- FAR-like file manager -*- lexical-binding: t; -*-efar-
+;;; efar.el --- far-like file manager -*- lexical-binding: t; -*-efar-
 
 ;; Copyright (C) 2021 Vladimir Suntsov
 ;; SPDX-License-Identifier: GPL-2.0-or-later
@@ -72,6 +72,13 @@
 (defvar efar-dir-diff-show-changed-only-p nil)
 (defconst efar-dir-diff-comp-params '(:size :hash :owner :group :modes))
 (defvar efar-dir-diff-actual-comp-params '(:size :hash :owner :group :modes))
+
+;; variables for archive mode
+(defvar efar-archive-current-archive nil)
+(defvar efar-archive-current-dir nil)
+(defvar efar-archive-files nil)
+(defvar efar-archive-current-type nil)
+(defvar efar-archive-read-buffer-name nil)
 
 (defvar efar-valid-keys-for-modes)
 (defvar efar-mode-map)
@@ -809,8 +816,8 @@ from version FROM-VERSION to actual version."
   (efar-when-can-execute
    (let ((mode (efar-get :panels (efar-get :current-panel) :mode)))
      (pcase mode
-       (:files (efar-copy-or-move-files :copy))
-       (:archive (efar-archive-copy-files))))))
+       (:files (efar-copy-or-move-files :copy))))))
+;;(:archive (efar-archive-copy-files))))))
 
 (defun efar-do-rename ()
   "Rename/move files."
@@ -1602,7 +1609,8 @@ When NO-HIST? is t then DIR is not saved in the history list."
 
 
 (defun efar-get-parent-dir (dir &optional with-trailing-slash?)
-  "Return parent directory of given DIR."
+  "Return parent directory of given DIR.
+If WITH-TRAILING-SLASH? is t then keep trailing slash."
   (let ((parent (file-name-directory (directory-file-name dir))))
     (cond ((null parent)
 	   nil)
@@ -5413,19 +5421,6 @@ Go to parent directory when GO-TO-PARENT? is not nil."
 ;;--------------------------------------------------------------------------------
 ;; eFar working with archives
 ;;--------------------------------------------------------------------------------
-(defvar efar-archive-current-archive nil)
-(defvar efar-archive-current-dir nil)
-(defvar efar-archive-files nil)
-(defvar efar-archive-current-type nil)
-(defvar efar-archive-read-buffer-name nil)
-
-(defun efar-archive-get-conf (&rest keys)
-  "Return configuration value defined by given KEYS."
-  (let ((value efar-archive-configuration))
-    (cl-loop for key in keys do
-	     (setf value (cdr (assoc key value))))
-    value))
-
 (defvar efar-archive-configuration
   (list (cons "zip"
 	      (list (cons :list
@@ -5468,6 +5463,13 @@ Go to parent directory when GO-TO-PARENT? is not nil."
 			  (list (cons :command "7z")
 				(cons :args "e -so %s %s")))))))
 
+(defun efar-archive-get-conf (&rest keys)
+  "Return configuration value defined by given KEYS."
+  (let ((value efar-archive-configuration))
+    (cl-loop for key in keys do
+	     (setf value (cdr (assoc key value))))
+    value))
+
 (defun efar-archive-postprocess-7z-list ()
   "Extract files from the output of 7z list command."
   (let ((result))
@@ -5490,8 +5492,7 @@ Go to parent directory when GO-TO-PARENT? is not nil."
     (cl-loop for line in (split-string  (buffer-string) "[\n]+") do
 	     (unless (string-empty-p line)
 	       (let* ((dir? (not (null (string-match-p "/$" line)))))
-		 (push (list (file-name-nondirectory (directory-file-name line))
-			       dir?			     
+		 (push (list (file-name-nondirectory (directory-file-name line)) dir?			     
 			       (string-trim-right line "[\//]+")
 			       (efar-get-parent-dir line))
 		       files))))
