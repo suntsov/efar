@@ -1780,7 +1780,10 @@ When FOR-READ? is t switch back to eFar buffer."
   "Show content of the file under cursor in other buffer."
   (interactive)
   (efar-when-can-execute
-   (efar-edit-file t)))
+    (let ((mode (efar-get :panels (efar-get :current-panel) :mode)))
+     (if (equal mode :archive)
+	 (efar-archive-read-file)
+       (efar-edit-file t)))))
 
 (defun efar-set-files-order (files side)
   "Change sort direction of FILES in panel SIDE."
@@ -2189,7 +2192,8 @@ When COPY-TO-SHELL? is t file name is copied to the shell."
    (let ((mode (efar-get :panels (efar-get :current-panel) :mode)))
      (pcase mode
        (:files (efar-enter-directory t))
-       (:dir-diff (efar-dir-diff-enter-directory t))))))
+       (:dir-diff (efar-dir-diff-enter-directory t))
+       (:archive (efar-archive-enter-parent))))))
 
 (defun efar-do-send-to-shell ()
   "Insert name of the file under the cursor to the shell."
@@ -5062,7 +5066,7 @@ Go to parent directory when GO-TO-PARENT? is not nil."
   "Keymap for eFar buffer.")
 
 (defvar efar-valid-keys-for-modes
-  (list (cons 'efar-do-enter-parent  (list :files :dir-diff))
+  (list (cons 'efar-do-enter-parent  (list :files :dir-diff :archive))
 	(cons 'efar-do-send-to-shell (list :files :search))
 	(cons 'efar-do-mark-file (list :files :search))
 	(cons 'efar-do-mark-all (list :files :search))
@@ -5411,6 +5415,7 @@ Go to parent directory when GO-TO-PARENT? is not nil."
 (defvar efar-archive-current-dir nil)
 (defvar efar-archive-files nil)
 (defvar efar-archive-current-type nil)
+(defvar efar-archive-read-buffer-name nil)
 
 (makunbound 'efar-archive-configuration)
 
@@ -5426,26 +5431,42 @@ Go to parent directory when GO-TO-PARENT? is not nil."
 	      (list (cons :list
 			  (list (cons :command "unzip")
 				(cons :args "-Z -1 %s")
-				(cons :post-function 'efar-archive-postprocess-zip-list)))))
+				(cons :post-function 'efar-archive-postprocess-list)))
+		    (cons :read
+			  (list (cons :command "unzip")
+				(cons :args "-p %s %s")))))
 	(cons "tar"
 	      (list (cons :list
 			  (list (cons :command "tar")
 				(cons :args "-t -f %s")
-				(cons :post-function 'efar-archive-postprocess-tar-list)))))
+				(cons :post-function 'efar-archive-postprocess-list)))
+		    (cons :read
+			  (list (cons :command "tar")
+				(cons :args "-xOf %s %s")))))
+	(cons "tar.bz2"
+	      (list (cons :list
+			  (list (cons :command "tar")
+				(cons :args "-tjf %s")
+				(cons :post-function 'efar-archive-postprocess-list)))
+		    (cons :read
+			  (list (cons :command "tar")
+				(cons :args "-xjOf %s %s")))))
+	(cons "tar.gz"
+	      (list (cons :list
+			  (list (cons :command "tar")
+				(cons :args "-tzf %s")
+				(cons :post-function 'efar-archive-postprocess-list)))
+		    (cons :read
+			  (list (cons :command "tar")
+				(cons :args "-xzOf %s %s")))))
 	(cons "7z"
 	      (list (cons :list
 			  (list (cons :command "7z")
 				(cons :args "-slt l %s")
-				(cons :post-function 'efar-archive-postprocess-7z-list)))))
-	))
-
-	;; (cons "tar"  (list "tar" " -t -f %s"))
-	;; (cons "tgz"  (list "tar" " -t -f %s"))
-	;; (cons "tar.gz"  (list "tar" " -t -f %s"))
-	;; (cons "tbz"  (list "tar" " -t -f %s"))
-	;; (cons "tar.bz2"  (list "tar" " -t -f %s"))
-	;; (cons "7z" (list "7z" " -slt l %s"))))
-
+				(cons :post-function 'efar-archive-postprocess-7z-list)))
+		    (cons :read
+			  (list (cons :command "7z")
+				(cons :args "e -so %s %s")))))))
 
 (defun efar-archive-postprocess-7z-list ()
   ""
@@ -5463,20 +5484,7 @@ Go to parent directory when GO-TO-PARENT? is not nil."
 		result))))
      result))
 		  
-(defun efar-archive-postprocess-tar-list ()
-  ""
-  (let ((files))
-    (cl-loop for line in (split-string  (buffer-string) "[\n]+") do
-	     (unless (string-empty-p line)
-	       (let* ((dir? (not (null (string-match-p "/$" line)))))
-		 (push (list (file-name-nondirectory (directory-file-name line))
-			       dir?			     
-			       (string-trim-right line "[\//]+")
-			       (efar-get-parent-dir line))
-		       files))))
-     files))
-
-(defun efar-archive-postprocess-zip-list ()
+(defun efar-archive-postprocess-list ()
   ""
   (let ((files))
     (cl-loop for line in (split-string  (buffer-string) "[\n]+") do
@@ -5496,19 +5504,51 @@ Go to parent directory when GO-TO-PARENT? is not nil."
     (unless command
       (error (format "Executable %s not found in the path" command)))
     
-    (let* ((args (split-string (format args archive))))
+    (let* ((args (format args (shell-quote-argument archive))))
       (with-temp-buffer
-	(apply 'call-process (append (list command nil t nil) args))
+	(apply 'call-process
+	       command nil t nil
+	       (split-string-shell-command args))
 
 	(let ((postprocessing-function (efar-archive-get-conf type :list :post-function)))
 	  (funcall postprocessing-function))))))
 
-(defvar efar-archive-temp-dir temporary-file-directory)
 
 (defun efar-archive-read-file ()
-  ""
-  (print "read"))
+  ""  
+  (let* ((side (efar-get :current-panel))
+	 (file (car (efar-selected-files side t t))))
 
+  (let ((command (efar-archive-get-conf efar-archive-current-type :read :command))
+	(args (efar-archive-get-conf efar-archive-current-type :read :args)))
+    (unless command
+      (error (format "Executable %s not found in the path" command)))
+
+    (when (nth 1 file)
+      (error (format "%s is a directory" (nth 2 file))))
+    
+    (let* ((args (format args
+			 (shell-quote-argument efar-archive-current-archive)
+			 (shell-quote-argument (nth 2 file)))))
+
+      (let* ((buffer-name (concat efar-archive-current-archive " -> " (nth 2 file)))
+	     (buffer (get-buffer-create (or efar-archive-read-buffer-name buffer-name))))
+
+	(setq efar-archive-read-buffer-name buffer-name)
+	
+	(with-current-buffer buffer
+	  (when efar-archive-read-buffer-name
+	    (rename-buffer buffer-name))
+	  
+	  (erase-buffer)
+	  (apply 'call-process
+		 command nil t nil
+		 (split-string-shell-command args))
+	  (goto-char (point-min)))
+	
+	(switch-to-buffer-other-window buffer)))
+    (switch-to-buffer-other-window efar-buffer-name))))
+	
 (defun efar-archive-enter-archive (side file type)
   ""
   (setf efar-archive-current-archive file)
@@ -5561,16 +5601,10 @@ Go to parent directory when GO-TO-PARENT? is not nil."
 		  :panels side :dir)
 	(efar-write-enable (efar-redraw)))))))
 
-
-    ;; (efar-set (format "%s/%s"
-    ;; 		      efar-archive-current-archive
-    ;; 		      (or efar-archive-current-dir ""))
-    ;; 	      :panels side :dir)
-;;    )
-
-
-  ;;
-
+(defun efar-archive-enter-parent ()
+  ""
+  (efar-go-to-file "..")
+  (efar-archive-handle-enter))
 
 (provide 'efar)
 
