@@ -1,4 +1,4 @@
-;;; efar.el --- far-like file manager -*- lexical-binding: t; -*-efar-
+;;; efar.el --- far-like file manager -*- lexical-binding: t; -*-
 
 ;; Copyright (C) 2021 Vladimir Suntsov
 ;; SPDX-License-Identifier: GPL-2.0-or-later
@@ -79,6 +79,7 @@
 (defvar efar-archive-files nil)
 (defvar efar-archive-current-type nil)
 (defvar efar-archive-read-buffer-name nil)
+(defvar efar-archive-configuration nil)
 
 (defvar efar-valid-keys-for-modes)
 (defvar efar-mode-map)
@@ -5421,47 +5422,47 @@ Go to parent directory when GO-TO-PARENT? is not nil."
 ;;--------------------------------------------------------------------------------
 ;; eFar working with archives
 ;;--------------------------------------------------------------------------------
-(defvar efar-archive-configuration
-  (list (cons "zip"
-	      (list (cons :list
-			  (list (cons :command "unzip")
-				(cons :args "-Z -1 %s")
-				(cons :post-function 'efar-archive-postprocess-list)))
-		    (cons :read
-			  (list (cons :command "unzip")
-				(cons :args "-p %s %s")))))
-	(cons "tar"
-	      (list (cons :list
-			  (list (cons :command "tar")
-				(cons :args "-t -f %s")
-				(cons :post-function 'efar-archive-postprocess-list)))
-		    (cons :read
-			  (list (cons :command "tar")
-				(cons :args "-xOf %s %s")))))
-	(cons "tar.bz2"
-	      (list (cons :list
-			  (list (cons :command "tar")
-				(cons :args "-tjf %s")
-				(cons :post-function 'efar-archive-postprocess-list)))
-		    (cons :read
-			  (list (cons :command "tar")
-				(cons :args "-xjOf %s %s")))))
-	(cons "tar.gz"
-	      (list (cons :list
-			  (list (cons :command "tar")
-				(cons :args "-tzf %s")
-				(cons :post-function 'efar-archive-postprocess-list)))
-		    (cons :read
-			  (list (cons :command "tar")
-				(cons :args "-xzOf %s %s")))))
-	(cons "7z"
-	      (list (cons :list
-			  (list (cons :command "7z")
-				(cons :args "-slt l %s")
-				(cons :post-function 'efar-archive-postprocess-7z-list)))
-		    (cons :read
-			  (list (cons :command "7z")
-				(cons :args "e -so %s %s")))))))
+(setq efar-archive-configuration
+      (list (cons "zip"
+		  (list (cons :list
+			      (list (cons :command "unzip")
+				    (cons :args "-Z -1 %s")
+				    (cons :post-function 'efar-archive-postprocess-list)))
+			(cons :read
+			      (list (cons :command "unzip")
+				    (cons :args "-p %s %s")))))
+	    (cons "tar"
+		  (list (cons :list
+			      (list (cons :command "tar")
+				    (cons :args "-t -f %s")
+				    (cons :post-function 'efar-archive-postprocess-list)))
+			(cons :read
+			      (list (cons :command "tar")
+				    (cons :args "-xOf %s %s")))))
+	    (cons "tar.bz2"
+		  (list (cons :list
+			      (list (cons :command "tar")
+				    (cons :args "-tjf %s")
+				    (cons :post-function 'efar-archive-postprocess-list)))
+			(cons :read
+			      (list (cons :command "tar")
+				    (cons :args "-xjOf %s %s")))))
+	    (cons "tar.gz"
+		  (list (cons :list
+			      (list (cons :command "tar")
+				    (cons :args "-tzf %s")
+				    (cons :post-function 'efar-archive-postprocess-list)))
+			(cons :read
+			      (list (cons :command "tar")
+				    (cons :args "-xzOf %s %s")))))
+	    (cons "7z"
+		  (list (cons :list
+			      (list (cons :command "7z")
+				    (cons :args "-slt l %s")
+				    (cons :post-function 'efar-archive-postprocess-7z-list)))
+			(cons :read
+			      (list (cons :command "7z")
+				    (cons :args "e -so %s %s")))))))
 
 (defun efar-archive-get-conf (&rest keys)
   "Return configuration value defined by given KEYS."
@@ -5492,9 +5493,7 @@ Go to parent directory when GO-TO-PARENT? is not nil."
     (cl-loop for line in (split-string  (buffer-string) "[\n]+") do
 	     (unless (string-empty-p line)
 	       (let* ((dir? (not (null (string-match-p "/$" line)))))
-		 (push (list (file-name-nondirectory (directory-file-name line)) dir?			     
-			       (string-trim-right line "[\//]+")
-			       (efar-get-parent-dir line))
+		 (push (list (file-name-nondirectory (directory-file-name line)) dir? (string-trim-right line "[\//]+") (efar-get-parent-dir line))
 		       files))))
      files))
 
