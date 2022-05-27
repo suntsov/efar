@@ -5,6 +5,17 @@
 ### In development
 * Working with archives
 
+### Version 1.31
+* **Bugfix** Error when search finished caused by trying to kill already killed subprocess
+
+### Version 1.30
+* **New** Enable file operations (copy, move, delete) in file search results
+
+### Version 1.29
+* **New** Right-click file selection (https://github.com/suntsov/efar/issues/27)
+* **Bugfix** Switch to other panel by TAB in single panel mode (https://github.com/suntsov/efar/issues/26)
+* **Bugfix** Make eFar buffer stop keeping undo information
+
 ### Version 1.28
 * **Bugfix**: fix errors on removal, renaming/copying when helm is activated 
 * **Performance**: don't refresh whole eFar when moving cursor

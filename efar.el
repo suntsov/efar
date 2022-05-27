@@ -1,6 +1,7 @@
 ;;; efar.el --- FAR-like file manager -*- lexical-binding: t; -*-efar-
 
 ;; Copyright (C) 2021 Vladimir Suntsov
+;; SPDX-License-Identifier: GPL-2.0-or-later
 
 ;; Author: "Vladimir Suntsov" <vladimir@suntsov.online>
 ;; Maintainer: vladimir@suntsov.online
@@ -45,7 +46,6 @@
 (require 'em-dirs)
 (require 'arc-mode)
 (defconst efar-version 1.4 "Current eFar version number.")
-
 (defvar efar-state nil)
 (defvar efar-mouse-down-p nil)
 (defvar efar-rename-map nil)
@@ -191,6 +191,12 @@
   :group 'efar-parameters
   :type 'boolean)
 
+(defcustom efar-height-correction 0
+  "Number of lines by which to shrink eFar panel height.
+This might be useful in some cases to avoid problems in eFar displaying."
+  :group 'efar-parameters
+  :type 'integer)
+
 (defcustom efar-subprocess-max-processes 8
   "Number of subprocesses to use for file search."
   :group 'efar-search-parameters
@@ -257,7 +263,8 @@
 (defmacro efar-when-can-execute(&rest body)
   "Execute BODY only if command is allowed in current panel mode."
   `(progn
-     (efar nil)
+     (unless (get-buffer-window efar-buffer-name)
+       (efar nil))
      (let ((mode (efar-get :panels (efar-get :current-panel) :mode))
 	   (def (assoc this-command efar-valid-keys-for-modes)))
        
@@ -286,7 +293,9 @@ When NO-SWITCH? is t then don't switch to eFar buffer."
        (go-to-dir (when arg default-directory)))
     
     (with-current-buffer efar-buffer
-      
+
+      (buffer-disable-undo)
+
       (unless (equal major-mode 'efar-mode)
 	(efar-mode))
       ;; do initialisation if necessary and redraw the content of the buffer
@@ -927,6 +936,7 @@ OPTIONS is a collection with possible answers."
    (let ((mode (efar-get :panels (efar-get :current-panel) :mode)))
      (pcase mode
        (:files (efar-delete-selected))
+       (:search (efar-delete-selected))
        (:bookmark (efar-delete-bookmark))))))
 
 (defun efar-delete-selected ()
@@ -1066,7 +1076,8 @@ When NOTIFY-WITH-COLOR? is t then blink red."
      ;; BUTTON DOWN
      ((or (equal "down-mouse-1" (symbol-name click-type))
 	  (equal "C-down-mouse-1" (symbol-name click-type))
-	  (equal "S-down-mouse-1" (symbol-name click-type)))
+	  (equal "S-down-mouse-1" (symbol-name click-type))
+	  (equal "down-mouse-3" (symbol-name click-type)))
       (efar-process-mouse-down event))
      
      ;; MOUSE DRAG HAPPENED
@@ -1080,6 +1091,7 @@ When NOTIFY-WITH-COLOR? is t then blink red."
      
      ;; BUTTON CLICKED
      ((or (equal "mouse-1" (symbol-name click-type))
+	  (equal "mouse-3" (symbol-name click-type))
 	  (equal "double-mouse-1" (symbol-name click-type))
 	  (equal "C-mouse-1" (symbol-name click-type))
 	  (equal "S-mouse-1" (symbol-name click-type)))
@@ -1212,7 +1224,8 @@ The point where mouse click occurred determined out of EVENT parameters."
       (efar-auto-read-file))
     
     ;; when clicked with ctrl we mark single item
-    (when (equal click-type 'C-mouse-1)
+    (when (or (equal click-type 'C-mouse-1)
+	      (equal click-type 'mouse-3))
       (efar-mark-file t))
     
     ;; when clicked with shift we mark all items between clicked item and item marked last time
@@ -2325,21 +2338,19 @@ Execute it unless DONT-RUN? is t."
   (interactive)
   (efar-when-can-execute
    (efar-quit-fast-search)
-   (when (equal (efar-get :mode) :both)
-     (let ((side (efar-get :current-panel)))
-       
-       (if (equal side  :left)
-	   (progn
-	     (efar-set :right :current-panel)
-	     (setf default-directory (if (equal :dir-diff (efar-get :panels :right :mode))
-					 (cdr (assoc :right efar-dir-diff-last-command-params))
-				       (efar-get :panels :right :dir))))
-	 (progn
-	   (efar-set :left :current-panel)
-	   (setf default-directory (if (equal :dir-diff (efar-get :panels :right :mode))
-				       (cdr (assoc :left efar-dir-diff-last-command-params))
-				     (efar-get :panels :left :dir))))))
-     (efar-write-enable (efar-redraw)))))
+      
+   (let ((side (efar-get :current-panel))
+	 (mode (efar-get :mode)))
+
+     (efar-set (efar-other-side side) :current-panel)
+     (when (not (equal mode :both))
+       (efar-set (efar-other-side mode) :mode))
+     
+     (setf default-directory (if (equal :dir-diff (efar-get :panels :right :mode))
+ 				 (cdr (assoc (efar-get :current-panel) efar-dir-diff-last-command-params))
+			       (efar-get :panels (efar-get :current-panel) :dir))))
+   (efar-calculate-widths)
+   (efar-write-enable (efar-redraw))))
 
 (defun efar-calculate-window-size ()
   "Calculate and set windows sizes."
@@ -2348,7 +2359,7 @@ Execute it unless DONT-RUN? is t."
   (let ((efar-window (get-buffer-window efar-buffer-name)))
     (efar-set (- (window-width efar-window) 1) :window-width)
     (efar-set (window-height efar-window) :window-height)
-    (efar-set (- (window-height efar-window) 6) :panel-height)))
+    (efar-set (- (window-height efar-window) 6 efar-height-correction) :panel-height)))
 
 (defun efar-redraw (&optional reread-files?)
   "The main function to output content of eFar buffer.
@@ -3741,9 +3752,6 @@ When optional LINE-NUMBER is given then do replacement on corresponding line onl
     (kill-process efar-subprocess-manager))
   (setq efar-subprocess-manager nil)
   
-  (cl-loop for proc in efar-subprocess-processes do
-	   (kill-process proc))
-  
   (when (and efar-subprocess-server
 	     (process-live-p efar-subprocess-server))
     (delete-process efar-subprocess-server))
@@ -3995,15 +4003,13 @@ Restart subprocesses finally."
    (unless (or efar-search-running-p
 	       efar-dir-diff-running-p)
      ;; gather search parameters
-     (let* ((proposed-dir (if (called-interactively-p "interactive")
-			      default-directory
-			    (let ((selected-item (caar (efar-selected-files (efar-get :current-panel) t))))
-			      (cond ((null  selected-item)
-				     default-directory)
-				    ((file-directory-p selected-item)
-				     selected-item)
-				    (t
-				     (efar-get-parent-dir selected-item))))))
+     (let* ((proposed-dir (let ((selected-item (caar (efar-selected-files (efar-get :current-panel) t))))
+			    (cond ((null  selected-item)
+				   default-directory)
+				  ((file-directory-p selected-item)
+				   selected-item)
+				  (t
+				   (efar-get-parent-dir selected-item)))))
 	    (dir (read-directory-name "Search in: " proposed-dir proposed-dir))
 	    (wildcards (split-string (read-string "File name mask(s): "
 						  (let ((wildcards (cdr (assoc :wildcards efar-search-last-command-params))))
@@ -4950,7 +4956,7 @@ Go to parent directory when GO-TO-PARENT? is not nil."
 
 (defvar efar-mode-map
   (let ((keymap (make-sparse-keymap)))
-    ;; define keys for interactive functions    
+    ;; define keys for interactive functions
     (define-key keymap (kbd "<up>") 'efar-do-move-up)
     (define-key keymap (kbd "<down>") 'efar-do-move-down)
     (define-key keymap (kbd "<left>") 'efar-do-move-left)
@@ -5038,6 +5044,7 @@ Go to parent directory when GO-TO-PARENT? is not nil."
     ;; define actions for mouse events
     (cl-loop for k in '("<double-mouse-1>"
 			"<mouse-1>"
+			"<mouse-3>"
 			"<wheel-down>"
 			"<wheel-up>"
 			"<C-mouse-1>"
@@ -5045,7 +5052,8 @@ Go to parent directory when GO-TO-PARENT? is not nil."
 			"<S-mouse-1>"
 			"<S-down-mouse-1>"
 			"<drag-mouse-1>"
-			"<down-mouse-1>")
+			"<down-mouse-1>"
+			"<down-mouse-3>")
 	     do
 	     (define-key keymap (kbd k) (lambda (event)
 					  (interactive "e")
@@ -5055,17 +5063,17 @@ Go to parent directory when GO-TO-PARENT? is not nil."
 
 (defvar efar-valid-keys-for-modes
   (list (cons 'efar-do-enter-parent  (list :files :dir-diff))
-	(cons 'efar-do-send-to-shell (list :files))
-	(cons 'efar-do-mark-file (list :files))
-	(cons 'efar-do-mark-all (list :files))
-	(cons 'efar-do-unmark-all (list :files))
+	(cons 'efar-do-send-to-shell (list :files :search))
+	(cons 'efar-do-mark-file (list :files :search))
+	(cons 'efar-do-mark-all (list :files :search))
+	(cons 'efar-do-unmark-all (list :files :search))
 	(cons 'efar-do-edit-file (list :files :search :bookmark :dir-hist :file-hist :disks :dir-diff))
 	(cons 'efar-do-open-file-in-external-app (list :files :search :bookmark :dir-hist :file-hist :disks :dir-diff))
 	(cons 'efar-do-read-file (list :files :search :bookmark :dir-hist :file-hist :disks :dir-diff :archive))
-	(cons 'efar-do-copy (list :files))
-	(cons 'efar-do-rename (list :files))
+	(cons 'efar-do-copy (list :files :search))
+	(cons 'efar-do-rename (list :files :search))
 	(cons 'efar-do-make-dir (list :files))
-	(cons 'efar-do-delete (list :files :bookmark))
+	(cons 'efar-do-delete (list :files :bookmark :search))
 	(cons 'efar-do-change-sorting (list :files :search))
 	(cons 'efar-do-filter-files (list :files))
 	(cons 'efar-do-ediff-files (list :files :dir-diff))
@@ -5395,6 +5403,7 @@ Go to parent directory when GO-TO-PARENT? is not nil."
   ""
   :group 'efar-faces)
 
+
 ;;--------------------------------------------------------------------------------
 ;; eFar working with archives
 ;;--------------------------------------------------------------------------------
@@ -5561,6 +5570,7 @@ Go to parent directory when GO-TO-PARENT? is not nil."
 
 
   ;;
+
 
 (provide 'efar)
 
