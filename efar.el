@@ -5492,7 +5492,7 @@ Go to parent directory when GO-TO-PARENT? is not nil."
   (let ((files))
     (cl-loop for line in (split-string  (buffer-string) "[\n]+") do
 	     (unless (string-empty-p line)
-	       (let* ((dir? (not (null (string-match-p "/$" line)))))
+	       (let* ((dir? (string-match-p "/$" line)))
 		 (push (list (file-name-nondirectory (directory-file-name line)) dir? (string-trim-right line "[\//]+") (efar-get-parent-dir line))
 		       files))))
      files))
@@ -5502,11 +5502,11 @@ Go to parent directory when GO-TO-PARENT? is not nil."
   (let ((command (efar-archive-get-conf type :list :command))
 	(args (efar-archive-get-conf type :list :args)))
     (unless command
-      (error (format "Executable %s not found in the path" command)))
+      (error "Executable %s not found in the path" command))
     
     (let* ((args (format args (shell-quote-argument archive))))
       (with-temp-buffer
-	(apply 'call-process
+	(apply #'call-process
 	       command nil t nil
 	       (split-string-shell-command args))
 
@@ -5521,10 +5521,10 @@ Go to parent directory when GO-TO-PARENT? is not nil."
   (let ((command (efar-archive-get-conf efar-archive-current-type :read :command))
 	(args (efar-archive-get-conf efar-archive-current-type :read :args)))
     (unless command
-      (error (format "Executable %s not found in the path" command)))
+      (error "Executable %s not found in the path" command))
 
     (when (nth 1 file)
-      (error (format "%s is a directory" (nth 2 file))))
+      (error "%s is a directory" (nth 2 file)))
     
     (let* ((args (format args
 			 (shell-quote-argument efar-archive-current-archive)
@@ -5540,7 +5540,7 @@ Go to parent directory when GO-TO-PARENT? is not nil."
 	    (rename-buffer buffer-name))
 	  
 	  (erase-buffer)
-	  (apply 'call-process
+	  (apply #'call-process
 		 command nil t nil
 		 (split-string-shell-command args))
 	  (goto-char (point-min)))
