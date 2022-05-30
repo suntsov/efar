@@ -152,6 +152,13 @@ Many operations within eFar buffer can be performed using mouse
 * use controls in the panel header to change sort order, file display mode, column number, etc.
 * drag or double click the splitter between panels to change the widths of panels
 
+### Working with archive files
+Actually eFar works with folowing archive type: .zip, .7z, .tar, .tar.gz, .tar.bz2.  
+Press **enter** on archive file of supported type to "get into" the archive.  
+Press **F3** on a file inside archive to see the content of the file.  
+Creating and extracting archive files is not yet implemented.  
+Functions to work with archive files require corresponding command line utilities to be available in the Path.  
+
 ### Shell
 * when double-click or press enter on a executable file an eFar Emacs Shell is opened and the file is then executed in the shell
 * a single Shell buffer is used when running files from eFar

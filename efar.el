@@ -5,7 +5,7 @@
 
 ;; Author: "Vladimir Suntsov" <vladimir@suntsov.online>
 ;; Maintainer: vladimir@suntsov.online
-;; Version: 1.31
+;; Version: 1.32
 ;; Package-Requires: ((emacs "26.1"))
 ;; Keywords: files
 ;; URL: https://github.com/suntsov/efar
@@ -44,9 +44,8 @@
 (require 'eshell)
 (require 'esh-mode)
 (require 'em-dirs)
-
-(defconst efar-version 1.31 "Current eFar version number.")
-
+(require 'shell)
+(defconst efar-version 1.32 "Current eFar version number.")
 (defvar efar-state nil)
 (defvar efar-mouse-down-p nil)
 (defvar efar-rename-map nil)
@@ -73,6 +72,14 @@
 (defvar efar-dir-diff-show-changed-only-p nil)
 (defconst efar-dir-diff-comp-params '(:size :hash :owner :group :modes))
 (defvar efar-dir-diff-actual-comp-params '(:size :hash :owner :group :modes))
+
+;; variables for archive mode
+(defvar efar-archive-current-archive nil)
+(defvar efar-archive-current-dir nil)
+(defvar efar-archive-files nil)
+(defvar efar-archive-current-type nil)
+(defvar efar-archive-read-buffer-name nil)
+(defvar efar-archive-configuration nil)
 
 (defvar efar-valid-keys-for-modes)
 (defvar efar-mode-map)
@@ -223,7 +230,7 @@ This might be useful in some cases to avoid problems in eFar displaying."
   :group 'efar-search-parameters
   :type 'boolean)
 
-;; macros
+;; helper macros and functions
 (defmacro efar-with-notification-disabled(&rest body)
   "Execute BODY with efar-notifications disabled."
   `(let ((file-notifier-left (efar-get :panels :left :file-notifier))
@@ -274,6 +281,17 @@ This might be useful in some cases to avoid problems in eFar displaying."
 	   (progn
 	     (efar-set-status (format "Function '%s' is not allowed in mode '%s'" this-command (symbol-name mode)) nil t t)	   )
 	 ,@body))))
+
+(defun efar-split-string-shell-command (string)
+  "Split STRING (a shell command) into a list of strings.
+General shell syntax, like single and double quoting, as well as
+backslash quoting, is respected.
+Copied of Emacs 28.1 split-string-shell-command function for the
+purpose of backward compatibility."
+  (with-temp-buffer
+    (insert string)
+    (let ((comint-file-name-quote-list shell-file-name-quote-list))
+      (car (shell--parse-pcomplete-arguments)))))
 
 ;;--------------------------------------------------------------------------------
 ;; eFar main functions
@@ -415,6 +433,8 @@ REINIT? is a boolean indicating that configuration should be generated enew."
   (efar-set '(:long) :panels :left :view :search :file-disp-mode)
   (efar-set 1 :panels :left :view :dir-diff :column-number)
   (efar-set '(:short) :panels :left :view :dir-diff :file-disp-mode)
+  (efar-set 1 :panels :left :view :archive :column-number)
+  (efar-set '(:short) :panels :left :view :archive :file-disp-mode)
   (efar-set 1 :panels :left :view :search-hist :column-number)
   (efar-set '(:short) :panels :left :view :search-hist :file-disp-mode)
   
@@ -432,9 +452,11 @@ REINIT? is a boolean indicating that configuration should be generated enew."
   (efar-set '(:long) :panels :right :view :search :file-disp-mode)
   (efar-set 1 :panels :right :view :dir-diff :column-number)
   (efar-set '(:short) :panels :right :view :dir-diff :file-disp-mode)
+  (efar-set 1 :panels :right :view :archive :column-number)
+  (efar-set '(:short) :panels :right :view :archive :file-disp-mode)
   (efar-set 1 :panels :right :view :search-hist :column-number)
   (efar-set '(:short) :panels :right :view :search-hist :file-disp-mode)
-  
+
   (efar-set nil :last-auto-read-buffer)
   
   (efar-set '() :directory-history)
@@ -694,7 +716,7 @@ Notifications in the queue will be processed only if there are no new notificati
       (message "eFar state loaded from file %s" efar-state-file-name)
       state)
      
-     ;; else if curent version of eFar is lower then version stored in state file
+     ;; else if current version of eFar is lower then version stored in state file
      ;; we have to skip loading state
      ((< efar-version state-version)
       (message "Version of state file is greater then eFar version. State file loading skipped...")
@@ -763,7 +785,14 @@ from version FROM-VERSION to actual version."
 		(insert (propertize
 			 "Starting from version 1.26 default eFar key bindings changed according to the Emacs Key Binding Conventions.\nCheck actual key bindings by <C-e ?>.\nSee also Readme at https://github.com/suntsov/efar"
 			 'face '(:foreground "red"))))
-	      (switch-to-buffer-other-window b))))
+	      (switch-to-buffer-other-window b)))
+	  ;; -> 1.32
+	  (when (< from-version 1.32)
+	    (efar-set 1 :panels :left :view :archive :column-number)
+	    (efar-set '(:short) :panels :left :view :archive :file-disp-mode)
+	    (efar-set 1 :panels :right :view :archive :column-number)
+	    (efar-set '(:short) :panels :right :view :archive :file-disp-mode)
+	    (message "eFar state file upgraded to version 1.32")))
       
       (error
        (message "Error occured during upgrading state file: %s. State file skipped." (error-message-string err))
@@ -797,7 +826,10 @@ from version FROM-VERSION to actual version."
   "Copy files."
   (interactive)
   (efar-when-can-execute
-   (efar-copy-or-move-files :copy)))
+   (let ((mode (efar-get :panels (efar-get :current-panel) :mode)))
+     (pcase mode
+       (:files (efar-copy-or-move-files :copy))))))
+;;(:archive (efar-archive-copy-files))))))
 
 (defun efar-do-rename ()
   "Rename/move files."
@@ -1588,13 +1620,15 @@ When NO-HIST? is t then DIR is not saved in the history list."
     (efar-write-enable (efar-redraw))))
 
 
-(defun efar-get-parent-dir (dir)
-  "Return parent directory of given DIR."
+(defun efar-get-parent-dir (dir &optional with-trailing-slash?)
+  "Return parent directory of given DIR.
+If WITH-TRAILING-SLASH? is t then keep trailing slash."
   (let ((parent (file-name-directory (directory-file-name dir))))
     (cond ((null parent)
 	   nil)
 	  ((equal parent "/")
            parent)
+	  (with-trailing-slash? parent)
 	  (t
 	   (string-trim-right parent "[/]")))))
 
@@ -1769,7 +1803,10 @@ When FOR-READ? is t switch back to eFar buffer."
   "Show content of the file under cursor in other buffer."
   (interactive)
   (efar-when-can-execute
-   (efar-edit-file t)))
+    (let ((mode (efar-get :panels (efar-get :current-panel) :mode)))
+     (if (equal mode :archive)
+	 (efar-archive-read-file)
+       (efar-edit-file t)))))
 
 (defun efar-set-files-order (files side)
   "Change sort direction of FILES in panel SIDE."
@@ -1789,6 +1826,8 @@ When FOR-READ? is t switch back to eFar buffer."
 	 (mode (efar-get :panels side :mode))
 	 (root? (cond ((equal mode :dir-diff)
 		       (null efar-dir-diff-current-dir))
+		      ((equal mode :archive)
+		       nil)		     
 		      ((not (equal mode :files))
 		       t)
 		      (t
@@ -1823,8 +1862,9 @@ When FOR-READ? is t switch back to eFar buffer."
 		    
 		    
 		    ;; get selected sort function
-		    ;; we do sorting only in modes :files and :search
+		    ;; we do sorting only in modes :files, :search and :archive
 		    (sort-function (cond ((or (equal mode :files)
+					      (equal mode :archive)
 					      (and (equal mode :search)
 						   (not efar-search-running-p)))
 					  (efar-get-sort-function (efar-get :panels side :sort-function-name)))
@@ -1912,7 +1952,12 @@ The way to build a list depends on MODE."
 					     efar-dir-diff-current-dir))
 				 (and efar-dir-diff-show-changed-only-p
 				      (efar-dir-diff-equal e))))
-			   (hash-table-values efar-dir-diff-results))))))
+			   (hash-table-values efar-dir-diff-results))))
+    (:archive
+     
+     (cl-remove-if (lambda(e)
+		     (not (equal (car (last e)) efar-archive-current-dir)))
+		   efar-archive-files))))
 
 (defun efar-move-cursor (direction &optional no-auto-read?)
   "Move cursor in direction DIRECTION.
@@ -2121,22 +2166,30 @@ when executable file - open shell and execute it in the shell
 when normal file - open it in external application.
 When COPY-TO-SHELL? is t file name is copied to the shell."
   (let* ((side (efar-get :current-panel))
-	 (file (car (efar-selected-files side t t))))
+	 (file (car (efar-selected-files side t t)))
+	 (executable? (file-executable-p (car file)))
+	 (archive-type (catch 'archive-type
+			 (cl-loop for archive-type in (mapcar (lambda(e) (car e)) efar-archive-configuration) do
+				  (when (string-match-p (concat archive-type "$") (car file))
+				    (throw 'archive-type archive-type)))))
+	 (dir? (or
+		;; file is a normal directory
+		(equal (cadr file) t)
+		;; file is a symlink pointing to the directory
+		(and (stringp (cadr file))
+		      (file-directory-p (cadr file))))))
     
-    (cond ((and (not copy-to-shell?)
-		(or
-		 ;; file is a normal directory
-		 (equal (cadr file) t)
-		 ;; file is a symlink pointing to the directory
-		 (and (stringp (cadr file))
-		      (file-directory-p (cadr file)))))
-	   
-	   (efar-enter-directory))
-	  
-	  ((or copy-to-shell?
-	       (file-executable-p (car file)))
+    (cond ((or copy-to-shell?
+	       (and executable?
+		    (not dir?)))
 	   (efar-execute-file copy-to-shell?))
-	  
+
+	  (archive-type
+	   (efar-archive-enter-archive side (car file) archive-type))
+
+	  (dir?
+	   (efar-enter-directory))
+
 	  (t (efar-do-open-file-in-external-app)))))
 
 (defun efar-do-enter-directory ()
@@ -2152,7 +2205,8 @@ When COPY-TO-SHELL? is t file name is copied to the shell."
        (:disks (efar-switch-to-disk))
        (:search (efar-navigate-to-file))
        (:search-hist (efar-search-open-from-history))
-       (:dir-diff (efar-dir-diff-enter-directory))))))
+       (:dir-diff (efar-dir-diff-enter-directory))
+       (:archive (efar-archive-handle-enter))))))
  
 (defun efar-do-enter-parent ()
   "Go to the parent directory."
@@ -2161,7 +2215,8 @@ When COPY-TO-SHELL? is t file name is copied to the shell."
    (let ((mode (efar-get :panels (efar-get :current-panel) :mode)))
      (pcase mode
        (:files (efar-enter-directory t))
-       (:dir-diff (efar-dir-diff-enter-directory t))))))
+       (:dir-diff (efar-dir-diff-enter-directory t))
+       (:archive (efar-archive-enter-parent))))))
 
 (defun efar-do-send-to-shell ()
   "Insert name of the file under the cursor to the shell."
@@ -2373,16 +2428,15 @@ When REREAD-FILES? is t then reread file list for both panels."
 
 (defun efar-get-short-file-name (file)
   "Return short name of a given FILE."
-  (if (nth 1 file)
-      (file-name-nondirectory (directory-file-name (nth 0 file)))
-    (file-name-nondirectory (nth 0 file))))
+  (file-name-nondirectory (directory-file-name (car file))))
 
 (defun efar-output-file-details (side)
   "Output details of the file under cursor in panel SIDE."
   (let* ((mode (efar-get :mode))
 	 (panel-mode (efar-get :panels side :mode))
 	 (selected-file (car (efar-selected-files side t t
-						  (not (equal :search-hist panel-mode)))))
+						  (and (not (equal :search-hist panel-mode))
+						       (not (equal :archive panel-mode))))))
 	 (file (if (and (not (equal (car selected-file) ".."))
 			(equal :dir-diff (efar-get :panels side :mode)))
 		   (when selected-file
@@ -2410,19 +2464,22 @@ When REREAD-FILES? is t then reread file list for both panels."
 	  (setf status-string "")))
        ;; in all other modes we show details about selected file/directory
        (t
-	(if (and file
-		 (efar-get :panels side :files)
-		 (or (equal mode :both) (equal mode side)))
-	    
-	    (setf status-string (concat  (efar-get-short-file-name file)
-					 "  "
-					 (format-time-string "%x %X" (nth 6 file))
-					 "  "
-					 (if (equal (nth 1 file) t)
-					     "Directory"
-					   (when (numberp (nth 8 file))
-					     (format "%d bytes (%s)" (nth 8 file) (efar-file-size-as-string (nth 8 file)))))))
-	  (setf status-string (if (efar-get :panels side :files) "Non-existing or not-accessible file!" "")))))
+	(cond ((equal :archive panel-mode)
+	       (setf status-string (nth 0 selected-file)))				
+	      ((and file
+		    (efar-get :panels side :files)
+		    (or (equal mode :both) (equal mode side)))
+	       
+	       (setf status-string (concat  (efar-get-short-file-name file)
+					    "  "
+					    (format-time-string "%x %X" (nth 6 file))
+					    "  "
+					    (if (equal (nth 1 file) t)
+						"Directory"
+					      (when (numberp (nth 8 file))
+						(format "%d bytes (%s)" (nth 8 file) (efar-file-size-as-string (nth 8 file))))))))
+	      (t
+	       (setf status-string (if (efar-get :panels side :files) "Non-existing or not-accessible file!" ""))))))
       
       (efar-place-item nil (+ 3 (efar-get :panel-height))
 		       status-string
@@ -2544,7 +2601,14 @@ otherwise redraw all."
 					     (cond
 					      ;; search history mode
 					      ((equal :search-hist panel-mode)
-					       (car file))
+					       (concat (car file)))
+
+					      ((equal :archive panel-mode)
+					       (concat (car file)
+						       (when (and dir?
+								  efar-add-slash-to-directories
+								  (not (equal (car file) "..")))
+							 "/")))
 					      ;; in dir-compare mode we add shortcuts of comparison results
 					      ((equal :dir-diff panel-mode)
 					       (concat (file-name-nondirectory (car file))
@@ -2620,6 +2684,13 @@ otherwise redraw all."
 					   
 					   (current? 'efar-dir-diff-equal-current-face)
 					   (t  'efar-dir-diff-equal-face))))
+
+				       ;; archive mode
+				       ((equal panel-mode :archive)
+					(cond ((and dir? current?) 'efar-dir-current-face)
+					      ((and dir? (not current?)) 'efar-dir-face)
+					      (current? 'efar-file-current-face)
+					      ((not current?) 'efar-file-face)))
 
 				       ;; search history mode
 				       ((equal panel-mode :search-hist)
@@ -3070,7 +3141,7 @@ Switch current panel to :files mode otherwise."
   (efar-when-can-execute
    (unless (efar-get :fast-search-string)
      (let ((side (efar-get :current-panel)))
-       (when (cl-member (efar-get :panels side :mode) '(:search :bookmark :dir-hist :file-hist :disks :dir-diff :search-hist))
+       (when (cl-member (efar-get :panels side :mode) '(:search :bookmark :dir-hist :file-hist :disks :dir-diff :search-hist :archive))
 	 (efar-go-to-dir (efar-last-visited-dir side) side)
 	 (when (equal (efar-get :panels (efar-other-side side) :mode) :dir-diff)
 	   (efar-go-to-dir (efar-last-visited-dir (efar-other-side side)) (efar-other-side side))))))
@@ -3501,7 +3572,8 @@ When optional LINE-NUMBER is given then do replacement on corresponding line onl
     (:disks . "Disks/mount points")
     (:search . "Search results")
     (:search-hist . "Search history")
-    (:dir-diff . "DC")))
+    (:dir-diff . "DC")
+    (:archive  . "Archive")))
 
 (defun efar-do-move-splitter-left ()
   "Move panel splitter to the left."
@@ -3560,6 +3632,9 @@ When optional LINE-NUMBER is given then do replacement on corresponding line onl
       (efar-set mode :panels (efar-other-side side) :mode)
       (efar-get-file-list (efar-other-side side))
       (efar-dir-diff-show-results))
+
+     ((equal mode :archive)
+      (efar-write-enable (efar-redraw t)))
      
      (t
       (efar-set mode-name :panels side :dir)
@@ -5018,15 +5093,15 @@ Go to parent directory when GO-TO-PARENT? is not nil."
   "Keymap for eFar buffer.")
 
 (defvar efar-valid-keys-for-modes
-  (list (cons 'efar-do-enter-parent  (list :files :dir-diff))
+  (list (cons 'efar-do-enter-parent  (list :files :dir-diff :archive))
 	(cons 'efar-do-send-to-shell (list :files :search))
 	(cons 'efar-do-mark-file (list :files :search))
 	(cons 'efar-do-mark-all (list :files :search))
 	(cons 'efar-do-unmark-all (list :files :search))
 	(cons 'efar-do-edit-file (list :files :search :bookmark :dir-hist :file-hist :disks :dir-diff))
 	(cons 'efar-do-open-file-in-external-app (list :files :search :bookmark :dir-hist :file-hist :disks :dir-diff))
-	(cons 'efar-do-read-file (list :files :search :bookmark :dir-hist :file-hist :disks :dir-diff))
-	(cons 'efar-do-copy (list :files :search))
+	(cons 'efar-do-read-file (list :files :search :bookmark :dir-hist :file-hist :disks :dir-diff :archive))
+	(cons 'efar-do-copy (list :files :search :archive))
 	(cons 'efar-do-rename (list :files :search))
 	(cons 'efar-do-make-dir (list :files))
 	(cons 'efar-do-delete (list :files :bookmark :search))
@@ -5358,7 +5433,189 @@ Go to parent directory when GO-TO-PARENT? is not nil."
        :underline nil))
   ""
   :group 'efar-faces)
-	 
+
+;;--------------------------------------------------------------------------------
+;; eFar working with archives
+;;--------------------------------------------------------------------------------
+(setq efar-archive-configuration
+      (list (cons "zip"
+		  (list (cons :list
+			      (list (cons :command "unzip")
+				    (cons :args "-Z -1 %s")
+				    (cons :post-function 'efar-archive-postprocess-list)))
+			(cons :read
+			      (list (cons :command "unzip")
+				    (cons :args "-p %s %s")))))
+	    (cons "tar"
+		  (list (cons :list
+			      (list (cons :command "tar")
+				    (cons :args "-t -f %s")
+				    (cons :post-function 'efar-archive-postprocess-list)))
+			(cons :read
+			      (list (cons :command "tar")
+				    (cons :args "-xOf %s %s")))))
+	    (cons "tar.bz2"
+		  (list (cons :list
+			      (list (cons :command "tar")
+				    (cons :args "-tjf %s")
+				    (cons :post-function 'efar-archive-postprocess-list)))
+			(cons :read
+			      (list (cons :command "tar")
+				    (cons :args "-xjOf %s %s")))))
+	    (cons "tar.gz"
+		  (list (cons :list
+			      (list (cons :command "tar")
+				    (cons :args "-tzf %s")
+				    (cons :post-function 'efar-archive-postprocess-list)))
+			(cons :read
+			      (list (cons :command "tar")
+				    (cons :args "-xzOf %s %s")))))
+	    (cons "7z"
+		  (list (cons :list
+			      (list (cons :command "7z")
+				    (cons :args "-slt l %s")
+				    (cons :post-function 'efar-archive-postprocess-7z-list)))
+			(cons :read
+			      (list (cons :command "7z")
+				    (cons :args "e -so %s %s")))))))
+
+(defun efar-archive-get-conf (&rest keys)
+  "Return configuration value defined by given KEYS."
+  (let ((value efar-archive-configuration))
+    (cl-loop for key in keys do
+	     (setf value (cdr (assoc key value))))
+    value))
+
+(defun efar-archive-postprocess-7z-list ()
+  "Extract files from the output of 7z list command."
+  (let ((result))
+    (goto-char (point-min))
+    (search-forward "----------")
+    (while (search-forward-regexp "Path = \\(.*\\)$" nil t)
+      (let ((file (string-trim-right (replace-regexp-in-string "\\\\" "/" (match-string 1)) "/")))
+	(search-forward-regexp "Attributes = \\(.*\\)$")
+	(let ((dir? (string-match-p "D" (match-string 1))))
+	  (push (list (file-name-nondirectory (directory-file-name file))
+		      dir?
+		      file
+		      (efar-get-parent-dir file))
+		result))))
+     result))
+		  
+(defun efar-archive-postprocess-list ()
+  "Extract files from the output of tar/unzip list commands."
+  (let ((files))
+    (cl-loop for line in (split-string  (buffer-string) "[\n]+") do
+	     (unless (string-empty-p line)
+	       (let* ((dir? (string-match-p "/$" line)))
+		 (push (list (file-name-nondirectory (directory-file-name line)) dir? (string-trim-right line "[\//]+") (efar-get-parent-dir line))
+		       files))))
+     files))
+
+(defun efar-archive-build-file-list (archive type)
+  "Get file list for ARCHIVE of type TYPE."
+  (let ((command (efar-archive-get-conf type :list :command))
+	(args (efar-archive-get-conf type :list :args)))
+    (unless command
+      (error "Executable %s not found in the path" command))
+    
+    (let* ((args (format args (shell-quote-argument archive))))
+      (with-temp-buffer
+	(unless (zerop
+		 (apply #'call-process
+			command nil t nil
+			(efar-split-string-shell-command args)))
+	  (error "Error when opening archive '%s': %s" archive (buffer-string)))
+	  
+	(let ((postprocessing-function (efar-archive-get-conf type :list :post-function)))
+	  (funcall postprocessing-function))))))
+
+(defun efar-archive-read-file ()
+  "Show content of selected file in other buffer."  
+  (let* ((side (efar-get :current-panel))
+	 (file (car (efar-selected-files side t t))))
+
+  (let ((command (efar-archive-get-conf efar-archive-current-type :read :command))
+	(args (efar-archive-get-conf efar-archive-current-type :read :args)))
+    (unless command
+      (error "Executable %s not found in the path" command))
+
+    (when (nth 1 file)
+      (error "%s is a directory" (nth 2 file)))
+    
+    (let* ((args (format args
+			 (shell-quote-argument efar-archive-current-archive)
+			 (shell-quote-argument (nth 2 file)))))
+
+      (let* ((buffer-name (concat efar-archive-current-archive " -> " (nth 2 file)))
+	     (buffer (get-buffer-create (or efar-archive-read-buffer-name buffer-name))))
+
+	(setq efar-archive-read-buffer-name buffer-name)
+	
+	(with-current-buffer buffer
+	  (when efar-archive-read-buffer-name
+	    (rename-buffer buffer-name))
+	  
+	  (erase-buffer)
+	  (apply #'call-process
+		 command nil t nil
+		 (efar-split-string-shell-command args))
+	  (goto-char (point-min)))
+	
+	(switch-to-buffer-other-window buffer)))
+    (switch-to-buffer-other-window efar-buffer-name))))
+	
+(defun efar-archive-enter-archive (side file type)
+  "Enter archive file FILE of type TYPE under cursor in panel SIDE."
+  (setf efar-archive-current-archive file)
+  (setf efar-archive-current-type type)
+  (setf efar-archive-files (efar-archive-build-file-list file type))
+  (setf efar-archive-current-dir nil)
+  (efar-set (format "%s -> %s"
+		    efar-archive-current-archive
+		    (or efar-archive-current-dir ""))
+	    :panels side :dir)
+  (efar-change-panel-mode :archive side))
+
+(defun efar-archive-handle-enter ()
+  "Process the press of the Enter key in archive mode."
+  (let* ((side (efar-get :current-panel))
+	 (file (car (efar-selected-files side t t))))
+    
+    (cond
+     ((and (equal ".." (car file))
+	   (null efar-archive-current-dir)) 
+      (efar-do-abort)
+      (efar-go-to-file efar-archive-current-archive)
+      (efar-write-enable (efar-redraw)))
+
+     (t
+      (progn
+	(cond ((equal ".." (car file))
+	       (let ((current-dir (efar-get-short-file-name (list efar-archive-current-dir t))))		
+		 (setf efar-archive-current-dir (efar-get-parent-dir efar-archive-current-dir))
+		 (efar-get-file-list side)
+		 
+		 (efar-go-to-file current-dir)))
+	      
+	      ((cadr file)
+	       (efar-set 0 :panels side :current-pos)
+	       (efar-set 0 :panels side :start-file-number)
+	       
+	       (setf efar-archive-current-dir (nth 2 file))
+	       (efar-get-file-list side)))
+	
+	(efar-set (format "%s -> %s"
+			  efar-archive-current-archive
+			  (or efar-archive-current-dir ""))
+		  :panels side :dir)
+	(efar-write-enable (efar-redraw)))))))
+
+(defun efar-archive-enter-parent ()
+  "Go to parent directory in archive mode."
+  (efar-go-to-file "..")
+  (efar-archive-handle-enter))
+
 (provide 'efar)
 
 ;;; efar.el ends here
