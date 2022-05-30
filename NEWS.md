@@ -5,10 +5,10 @@
 ### In development
 * Extracting files from archives
 
-### Version 1.4
+### Version 1.32
 * **New** Working with archives:  
   Displaying content of archive files (.zip, .7z, .tar, .tar.gz, .tar.bz2)  
-  Show content of files inside archives with **F3**
+  Reading content of files inside archives with **F3**
   
 ### Version 1.31
 * **Bugfix** Error when search finished caused by trying to kill already killed subprocess
