@@ -5,7 +5,7 @@
 
 ;; Author: "Vladimir Suntsov" <vladimir@suntsov.online>
 ;; Maintainer: vladimir@suntsov.online
-;; Version: 1.4
+;; Version: 1.32
 ;; Package-Requires: ((emacs "26.1"))
 ;; Keywords: files
 ;; URL: https://github.com/suntsov/efar
@@ -45,7 +45,7 @@
 (require 'esh-mode)
 (require 'em-dirs)
 (require 'shell)
-(defconst efar-version 1.4 "Current eFar version number.")
+(defconst efar-version 1.32 "Current eFar version number.")
 (defvar efar-state nil)
 (defvar efar-mouse-down-p nil)
 (defvar efar-rename-map nil)
@@ -786,13 +786,13 @@ from version FROM-VERSION to actual version."
 			 "Starting from version 1.26 default eFar key bindings changed according to the Emacs Key Binding Conventions.\nCheck actual key bindings by <C-e ?>.\nSee also Readme at https://github.com/suntsov/efar"
 			 'face '(:foreground "red"))))
 	      (switch-to-buffer-other-window b)))
-	  ;; -> 1.4
-	  (when (< from-version 1.4)
+	  ;; -> 1.32
+	  (when (< from-version 1.32)
 	    (efar-set 1 :panels :left :view :archive :column-number)
 	    (efar-set '(:short) :panels :left :view :archive :file-disp-mode)
 	    (efar-set 1 :panels :right :view :archive :column-number)
 	    (efar-set '(:short) :panels :right :view :archive :file-disp-mode)
-	    (message "eFar state file upgraded to version 1.4")))
+	    (message "eFar state file upgraded to version 1.32")))
       
       (error
        (message "Error occured during upgrading state file: %s. State file skipped." (error-message-string err))
