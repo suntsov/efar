@@ -2435,7 +2435,8 @@ When REREAD-FILES? is t then reread file list for both panels."
   (let* ((mode (efar-get :mode))
 	 (panel-mode (efar-get :panels side :mode))
 	 (selected-file (car (efar-selected-files side t t
-						  (not (equal :search-hist panel-mode)))))
+						  (and (not (equal :search-hist panel-mode))
+						       (not (equal :archive panel-mode))))))
 	 (file (if (and (not (equal (car selected-file) ".."))
 			(equal :dir-diff (efar-get :panels side :mode)))
 		   (when selected-file
@@ -2463,19 +2464,22 @@ When REREAD-FILES? is t then reread file list for both panels."
 	  (setf status-string "")))
        ;; in all other modes we show details about selected file/directory
        (t
-	(if (and file
-		 (efar-get :panels side :files)
-		 (or (equal mode :both) (equal mode side)))
-	    
-	    (setf status-string (concat  (efar-get-short-file-name file)
-					 "  "
-					 (format-time-string "%x %X" (nth 6 file))
-					 "  "
-					 (if (equal (nth 1 file) t)
-					     "Directory"
-					   (when (numberp (nth 8 file))
-					     (format "%d bytes (%s)" (nth 8 file) (efar-file-size-as-string (nth 8 file)))))))
-	  (setf status-string (if (efar-get :panels side :files) "Non-existing or not-accessible file!" "")))))
+	(cond ((equal :archive panel-mode)
+	       (setf status-string (nth 0 selected-file)))				
+	      ((and file
+		    (efar-get :panels side :files)
+		    (or (equal mode :both) (equal mode side)))
+	       
+	       (setf status-string (concat  (efar-get-short-file-name file)
+					    "  "
+					    (format-time-string "%x %X" (nth 6 file))
+					    "  "
+					    (if (equal (nth 1 file) t)
+						"Directory"
+					      (when (numberp (nth 8 file))
+						(format "%d bytes (%s)" (nth 8 file) (efar-file-size-as-string (nth 8 file))))))))
+	      (t
+	       (setf status-string (if (efar-get :panels side :files) "Non-existing or not-accessible file!" ""))))))
       
       (efar-place-item nil (+ 3 (efar-get :panel-height))
 		       status-string
@@ -5517,10 +5521,12 @@ Go to parent directory when GO-TO-PARENT? is not nil."
     
     (let* ((args (format args (shell-quote-argument archive))))
       (with-temp-buffer
-	(apply #'call-process
-	       command nil t nil
-	       (efar-split-string-shell-command args))
-
+	(unless (zerop
+		 (apply #'call-process
+			command nil t nil
+			(efar-split-string-shell-command args)))
+	  (error "Error when opening archive '%s': %s" archive (buffer-string)))
+	  
 	(let ((postprocessing-function (efar-archive-get-conf type :list :post-function)))
 	  (funcall postprocessing-function))))))
 
