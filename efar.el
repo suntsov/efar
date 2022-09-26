@@ -205,7 +205,7 @@ This might be useful in some cases to avoid problems in eFar displaying."
   :group 'efar-parameters
   :type 'integer)
 
-(defcustom efar-subprocess-max-processes 8
+(defcustom efar-subprocess-max-processes 4
   "Number of subprocesses to use for file search."
   :group 'efar-search-parameters
   :type 'integer)
@@ -3757,6 +3757,7 @@ When optional LINE-NUMBER is given then do replacement on corresponding line onl
 (defun efar-subprocess-command ()
   "Prepare the list with command line arguments for the long-taks subprocesses."
   (list (expand-file-name invocation-name invocation-directory)
+	"-q"
 	"--batch"
 	"-l" (symbol-file 'efar)
 	"-eval" "(efar-subprocess-main-loop)"))
@@ -3844,7 +3845,7 @@ Message consists of MESSAGE-TYPE and DATA."
       
       ;; message from the subprocess indicating that it finished his work
       ;; once all subprocesses send this message we assume that subprocess task is finished
-      (:finished (setq efar-subprocess-clients (cl-remove (process-name proc) efar-subprocess-clients :test 'equal))
+      (:finished (setq efar-subprocess-clients (cl-remove (process-name proc) efar-subprocess-clients :test 'equal))		 
 		 (unless efar-subprocess-clients
 		   (efar-subprocess-work-finished)))
       ;; message from subprocess indicating that file was skipped due to inaccessibility
@@ -3860,8 +3861,6 @@ Message consists of MESSAGE-TYPE and DATA."
       (:common-error (push (cons :errors data) (cond
 						(efar-search-running-p efar-search-last-command-params)
 						(efar-dir-diff-running-p efar-dir-diff-last-command-params)))
-		     (efar-subprocess-killall-processes)
-		     (make-thread 'efar-subprocess-run-processes)
 		     (efar-subprocess-work-finished)
 		     (efar-set-status (concat "Error occurred during background operation: " data) nil nil t)))))
 
@@ -3913,7 +3912,8 @@ Waits for commands in standard input."
 		
 		;; command to inform main process that subprocess workd is finished
 		(:finished
-		 (process-send-string efar-subprocess-server (concat (prin1-to-string (cons :finished '())) "\n")))
+		 (process-send-string efar-subprocess-server (concat (prin1-to-string (cons :finished '())) "\n"))
+		 (throw :exit t))
 
 		;; command to subprocess to finish work (process "dies")
 		(:exit
@@ -3928,7 +3928,8 @@ Waits for commands in standard input."
 		   (efar-search-int-start-search args)
 		   (cl-loop for proc in efar-subprocess-processes do
 			    (while (accept-process-output proc 1)))
-		   (while (accept-process-output nil 1))))
+		   (while (accept-process-output nil 1)))
+		 (throw :exit t))
 		
 		;; command to subprocess to search text in the file
 		(:search-in-file
@@ -3940,7 +3941,8 @@ Waits for commands in standard input."
 		   (efar-dir-diff-int-start-compare args)
 		   (cl-loop for proc in efar-subprocess-processes do
 			    (while (accept-process-output proc 1)))
-		   (while (accept-process-output nil 1))))
+		   (while (accept-process-output nil 1)))
+		 (throw :exit t))
 
 		(:compare-checksums
 		 (efar-dir-diff-compare-checksums args))))))
@@ -3995,11 +3997,13 @@ We do subprocess tasks sending commands one by one to all subprocesses by turns.
     (car efar-subprocess-processes)))
 
 (defun efar-subprocess-work-finished ()
-  "Execute actions when subprocess work is finished.
-Restart subprocesses finally."
+  "Execute actions when subprocess work is finished."
+  (while (accept-process-output))
+  (sleep-for 0 500)
   (cond (efar-search-running-p (efar-search-finished))
 	(efar-dir-diff-running-p (efar-dir-diff-finished)))
-  (make-thread 'efar-subprocess-run-processes))
+  (print "finished!!!!" t)
+  (run-at-time 1 nil 'efar-subprocess-run-processes))
 
 ;;--------------------------------------------------------------------------------
 ;; File search
