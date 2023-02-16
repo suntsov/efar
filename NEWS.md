@@ -5,6 +5,9 @@
 ### In development
 * Extracting files from archives
 
+### Version 1.33
+* **Bugfix** Do not restart subprocesses each time after background task execution
+
 ### Version 1.32
 * **New** Working with archives:  
   Displaying content of archive files (.zip, .7z, .tar, .tar.gz, .tar.bz2)  

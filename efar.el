@@ -5,7 +5,7 @@
 
 ;; Author: "Vladimir Suntsov" <vladimir@suntsov.online>
 ;; Maintainer: vladimir@suntsov.online
-;; Version: 1.32
+;; Version: 1.33
 ;; Package-Requires: ((emacs "26.1"))
 ;; Keywords: files
 ;; URL: https://github.com/suntsov/efar
@@ -45,7 +45,7 @@
 (require 'esh-mode)
 (require 'em-dirs)
 (require 'shell)
-(defconst efar-version 1.32 "Current eFar version number.")
+(defconst efar-version 1.33 "Current eFar version number.")
 (defvar efar-state nil)
 (defvar efar-mouse-down-p nil)
 (defvar efar-rename-map nil)
@@ -3861,7 +3861,6 @@ Message consists of MESSAGE-TYPE and DATA."
 						(efar-search-running-p efar-search-last-command-params)
 						(efar-dir-diff-running-p efar-dir-diff-last-command-params)))
 		     (efar-subprocess-killall-processes)
-		     (make-thread 'efar-subprocess-run-processes)
 		     (efar-subprocess-work-finished)
 		     (efar-set-status (concat "Error occurred during background operation: " data) nil nil t)))))
 
@@ -3998,8 +3997,7 @@ We do subprocess tasks sending commands one by one to all subprocesses by turns.
   "Execute actions when subprocess work is finished.
 Restart subprocesses finally."
   (cond (efar-search-running-p (efar-search-finished))
-	(efar-dir-diff-running-p (efar-dir-diff-finished)))
-  (make-thread 'efar-subprocess-run-processes))
+	(efar-dir-diff-running-p (efar-dir-diff-finished))))
 
 ;;--------------------------------------------------------------------------------
 ;; File search
