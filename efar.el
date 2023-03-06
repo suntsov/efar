@@ -205,6 +205,11 @@ This might be useful in some cases to avoid problems in eFar displaying."
   :group 'efar-parameters
   :type 'integer)
 
+(defcustom efar-open-all-files-in-emacs nil
+  "Open all files in Emacs?"
+  :group 'efar-parameters
+  :type 'boolean)
+
 (defcustom efar-subprocess-max-processes 8
   "Number of subprocesses to use for file search."
   :group 'efar-search-parameters
@@ -1421,6 +1426,10 @@ becomes fullscreen."
 			(y-or-n-p "Open more than 5 files? "))))
        (when $do-it-p
 	 (cond
+    (efar-open-all-files-in-emacs
+     (mapc
+      (lambda ($fpath)
+        (find-file $fpath)) $file-list))
 	  ((string-equal system-type "windows-nt")
 	   (mapc
 	    (lambda ($fpath)
